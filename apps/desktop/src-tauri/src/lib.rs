@@ -22,6 +22,8 @@ use zeroize::Zeroizing;
 
 struct Sitzung {
     store: Store,
+    /// Für Passwortwechsel und Export; bis dahin nur gehalten.
+    #[allow(dead_code)]
     account_key: Key32,
     auth_key: Key32,
     vault: VaultKeys,

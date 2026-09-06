@@ -3,9 +3,16 @@
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  # proc-macro-error2 ist unbetreut; kommt nur über age → i18n-embed-fl (Fehlermeldungs-Lokalisierung)
+  # zur Compile-Zeit ins Spiel, keine Laufzeitwirkung. Beobachten, bis age umstellt.
+  { id = "RUSTSEC-2026-0173", reason = "nur Build-Zeit über age/i18n-embed-fl, keine Alternative ohne age-Fork" },
+]
 
 [licenses]
 version = 2
+# Die eigenen Crates sind unveröffentlicht (publish = false) und noch ohne Lizenz.
+private = { ignore = true }
 allow = [
   "MIT",
   "Apache-2.0",
@@ -14,17 +21,18 @@ allow = [
   "BSD-3-Clause",
   "ISC",
   "Unicode-3.0",
-  "Unicode-DFS-2016",
   "Zlib",
   "MPL-2.0",
   "CC0-1.0",
   "OpenSSL",
-  "BSL-1.0",
+  "CDLA-Permissive-2.0",
 ]
 
 [bans]
 multiple-versions = "allow"
 wildcards = "deny"
+# Pfad-Abhängigkeiten im Workspace tragen keine Version; das ist kein Wildcard-Risiko.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
