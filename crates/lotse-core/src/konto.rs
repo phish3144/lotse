@@ -189,6 +189,7 @@ pub fn standard_home(fallback: Option<PathBuf>) -> Option<PathBuf> {
 
 // ------------------------------------------------------------- Schlüsselbund
 
+#[cfg(feature = "keychain")]
 const KEYRING_DIENST: &str = "app.lotse.desktop";
 
 /// Desktop-Schlüssel im OS-Schlüsselbund ablegen (Keychain, Credential Manager,

@@ -21,7 +21,8 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Desktop-Hülle (Tauri 2) | Kommandos für Konto, Einrichtung, Entsperren, Daten, Tresor und Sync angebunden; Oberfläche nutzt sie in der Hülle statt Beispieldaten. Hier nicht gebaut (braucht GTK/WebKit), erster CI-Build steht aus |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter (`lotse beobachten`) | läuft |
-| MCP-Server, WebAssembly-Client für den Browser | offen |
+| MCP-Server (`lotse mcp`) | läuft |
+| WebAssembly-Client für den Browser | offen |
 
 ## Ausprobieren (CLI)
 
@@ -60,6 +61,19 @@ lotse sync geraete    # Geräte des Kontos, `lotse sync widerrufen <id>` entzieh
 
 Lokal testen: `scripts/sync-e2e.sh` startet den Dienst mit `wrangler dev` und lässt den
 End-to-End-Test des Kerns dagegen laufen. Der Dienst sieht dabei nur Umschläge.
+
+## KI-Assistenten anbinden (MCP)
+
+`lotse mcp` spricht das Model Context Protocol über stdin/stdout. Werkzeuge: `list_projects`,
+`get_project_context`, `log_activity`, `list_open_threads`, `search`. Der Tresor ist über
+diese Schnittstelle nicht erreichbar. Für Claude Code:
+
+```
+claude mcp add lotse --env LOTSE_HOME=$HOME/.lotse --env LOTSE_PASSWORD=… -- lotse mcp
+```
+
+Das Passwort in der Umgebung ist ein Kompromiss für die Kommandozeile; die Desktop-App wird
+den Server aus der entsperrten Sitzung heraus starten.
 
 ## Landing Page und Veröffentlichungen
 

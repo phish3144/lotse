@@ -94,6 +94,8 @@ enum Cmd {
     Export(ExportCmd),
     #[command(subcommand)]
     Sync(SyncCmd),
+    /// MCP-Server über stdin/stdout für KI-Assistenten (z. B. `claude mcp add lotse -- lotse mcp`)
+    Mcp,
     /// Wurzelordner beobachten und Änderungen verdichtet ins Logbuch schreiben (läuft bis Strg+C)
     Beobachten {
         /// Wurzelordner; ohne Angabe die gemerkten. Mit --merken dauerhaft speichern.
@@ -342,6 +344,12 @@ fn run() -> Result<()> {
         }
         Cmd::Export(c) => exportieren(&store, &ak, konto_daten.geraet_id, c),
         Cmd::Sync(c) => sync(&mut store, &konto_daten, &auth_key, c),
+        Cmd::Mcp => {
+            let stdin = std::io::stdin();
+            let stdout = std::io::stdout();
+            lotse_core::mcp::bedienen(&mut store, stdin.lock(), stdout.lock())?;
+            Ok(())
+        }
         Cmd::Beobachten {
             wurzeln,
             merken,
