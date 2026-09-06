@@ -175,7 +175,7 @@ einen vollständigen Pull (`since=0`).
 | D1 Schreibvorgänge/Tag | 100 000 Zeilen | Batching, Debounce 2 s; ein Push = eine Transaktion |
 | D1 Lesevorgänge/Tag | 5 000 000 Zeilen | Pull ist indexbasiert (`records_seq`), kein Full Scan |
 | Worker-Anfragen/Tag | 100 000 | Sync-Intervall 5 min im Leerlauf ≈ 300 Anfragen/Tag/Gerät |
-| Worker CPU/Anfrage | 10 ms | Argon2id läuft **nicht** im Worker; der Dienst hasht `auth_key` mit Argon2id nur bei Login/Registrierung. Falls 10 ms nicht reichen: PBKDF2-SHA256 mit 600 000 Iterationen über WebCrypto als serverseitiger Hash; die Sicherheit trägt ohnehin das clientseitige Argon2id. |
+| Worker CPU/Anfrage | 10 ms | Argon2id läuft **nicht** im Worker. Der Dienst hasht `auth_key` und `recovery_auth_key` mit PBKDF2-SHA256 (600 000 Iterationen, WebCrypto) nur bei Login, Registrierung und Wiederherstellung; die Sicherheit trägt das clientseitige Argon2id. |
 | R2 Speicher | 10 GB | Anhänge über 25 MB werden nur referenziert |
 
 ## 9. Versionierung
