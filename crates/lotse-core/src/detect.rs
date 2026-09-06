@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 use ulid::Ulid;
 use walkdir::WalkDir;
 
-use crate::model::{Kandidat, Vorlage};
-use crate::Result;
+use crate::model::{Art, Kandidat, Notiz, Projekt, Quelle, Referenz, ReferenzTyp, Rolle, Vorlage};
+use crate::store::Store;
+use crate::{git, now_ms, Result};
 
 /// Name der Marker-Datei, mit der Lotse einen Ordner nach Umbenennen wiedererkennt.
 pub const MARKER: &str = ".lotse-projekt";
@@ -268,6 +269,43 @@ fn enthaelt_jahr(s: &str) -> bool {
     let b = s.as_bytes();
     b.windows(4)
         .any(|w| w.iter().all(u8::is_ascii_digit) && (w.starts_with(b"19") || w.starts_with(b"20")))
+}
+
+/// Legt aus einem Kandidaten ein Projekt an: Vorlage, Referenz auf den Ordner, Git-Historie
+/// als rückdatierte Notizen, README als Kurs-Vorschlag (als offener Faden, nie automatisch
+/// als Kurs). Schreibt die Marker-Datei und entfernt den Kandidaten aus der Hafeneinfahrt.
+pub fn uebernehmen(store: &mut Store, k: &Kandidat) -> Result<Projekt> {
+    let jetzt = now_ms();
+    let p = Projekt::neu(&k.name, k.vorlage, jetzt);
+    store.projekt_speichern(&p)?;
+    let faden = match k.readme.as_deref().and_then(kurs_vorschlag) {
+        Some(v) => format!("Kurs festlegen. Vorschlag aus README: »{v}«"),
+        None => "Kurs festlegen: worum geht es, was ist das Ziel?".to_string(),
+    };
+    store.notiz_speichern(&Notiz::neu(p.id, Quelle::Import, Art::Offen, faden, jetzt))?;
+    let pfad = Path::new(&k.pfad);
+    let typ = if k.hat_git {
+        ReferenzTyp::GitRepo
+    } else {
+        ReferenzTyp::Ordner
+    };
+    store.referenz_speichern(&Referenz::neu(p.id, typ, &k.pfad, Rolle::Material))?;
+    if k.hat_git {
+        let commits = git::log(pfad, None, 500)?;
+        for n in git::verdichten(p.id, &commits, Quelle::Import) {
+            store.notiz_speichern(&n)?;
+        }
+    }
+    store.notiz_speichern(&Notiz::neu(
+        p.id,
+        Quelle::Import,
+        Art::Log,
+        format!("Aus Ordner übernommen. Marken: {}", k.marken.join(", ")),
+        jetzt + 1,
+    ))?;
+    marker_schreiben(pfad, p.id).ok();
+    store.kandidat_entfernen(&k.pfad)?;
+    Ok(p)
 }
 
 /// Liest die Projekt-ID aus der Marker-Datei, falls vorhanden.

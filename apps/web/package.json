@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
     "svelte": "^5.57.0"
   },
   "devDependencies": {

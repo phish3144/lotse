@@ -12,6 +12,8 @@ default = ["native"]
 # native: SQLCipher-Speicher, Dateisystem, Beobachter. Ohne dieses Feature bleibt der Kern
 # WebAssembly-tauglich (Modell, Krypto, Sync-Umschläge).
 native = ["dep:rusqlite", "dep:walkdir", "dep:globset", "dep:notify", "dep:age", "dep:secrecy", "dep:ureq"]
+# keychain: Desktop-Schlüssel im OS-Schlüsselbund (Keychain, Credential Manager, Secret Service über zbus).
+keychain = ["native", "dep:keyring"]
 
 [dependencies]
 serde.workspace = true
@@ -34,6 +36,7 @@ notify = { workspace = true, optional = true }
 age = { version = "0.11", optional = true }
 secrecy = { version = "0.10", optional = true }
 ureq = { workspace = true, optional = true }
+keyring = { version = "3", optional = true, default-features = false, features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
 
 # Im Browser liefert WebCrypto den Zufall. getrandom 0.2 (RustCrypto) braucht `js`,
 # getrandom 0.3 (über ulid/rand) braucht `wasm_js` plus das cfg-Flag in `.cargo/config.toml`.

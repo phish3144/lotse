@@ -24,6 +24,8 @@ pub mod export;
 #[cfg(feature = "native")]
 pub mod git;
 #[cfg(feature = "native")]
+pub mod konto;
+#[cfg(feature = "native")]
 pub mod store;
 #[cfg(feature = "native")]
 pub mod watcher;

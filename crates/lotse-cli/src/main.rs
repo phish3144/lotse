@@ -8,16 +8,16 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use lotse_core::brief;
-use lotse_core::crypto::{self, KdfParams, Key32, KontoHeader, RecoveryCode};
+use lotse_core::crypto::{self, KdfParams, Key32, RecoveryCode};
 use lotse_core::detect;
 use lotse_core::export;
+use lotse_core::konto;
 use lotse_core::model::*;
+use lotse_core::now_ms;
 use lotse_core::store::Store;
 use lotse_core::sync::client::{self as sync_client, Client, Geraet as SyncGeraet};
-use lotse_core::vault::{DesktopKey, TresorEintrag, VaultKeys};
+use lotse_core::vault::{TresorEintrag, VaultKeys};
 use lotse_core::watcher::{self, Beobachter};
-use lotse_core::{git, now_ms};
-use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 use zeroize::Zeroizing;
 
@@ -243,14 +243,6 @@ impl From<VorlageArg> for Vorlage {
     }
 }
 
-/// Lokale Kontodatei. Enthält keine geheimen Schlüssel.
-#[derive(Serialize, Deserialize)]
-struct Konto {
-    header: KontoHeader,
-    geraet_id: Ulid,
-    geraet_name: String,
-}
-
 fn main() {
     if let Err(e) = run() {
         eprintln!("Fehler: {e:#}");
@@ -284,7 +276,12 @@ fn run() -> Result<()> {
         return sync_login(&home, url, email, geraet);
     }
 
-    let (mut store, ak, auth_key) = oeffnen(&home)?;
+    let konto::Entsperrt {
+        konto: konto_daten,
+        mut store,
+        account_key: ak,
+        auth_key,
+    } = oeffnen(&home)?;
     match cli.cmd {
         Cmd::Init { .. } => unreachable!(),
         Cmd::Hafen => hafen(&store),
@@ -331,7 +328,7 @@ fn run() -> Result<()> {
         }
         Cmd::Projekt(c) => projekt(&mut store, c),
         Cmd::Ref(c) => referenz(&mut store, c),
-        Cmd::Tresor(c) => tresor(&mut store, &ak, c),
+        Cmd::Tresor(c) => tresor(&mut store, &ak, konto_daten.geraet_id, c),
         Cmd::Scan {
             wurzeln,
             uebernehmen,
@@ -339,12 +336,12 @@ fn run() -> Result<()> {
         Cmd::Uebernehmen { pfad } => {
             let k = detect::erkenne(&pfad)
                 .ok_or_else(|| anyhow!("Kein Projekt erkannt in {}", pfad.display()))?;
-            let p = kandidat_uebernehmen(&mut store, &k)?;
+            let p = detect::uebernehmen(&mut store, &k)?;
             println!("Angelegt: {} ({})", p.titel, p.vorlage.anzeigename());
             Ok(())
         }
-        Cmd::Export(c) => exportieren(&store, &ak, c),
-        Cmd::Sync(c) => sync(&mut store, &home, &auth_key, c),
+        Cmd::Export(c) => exportieren(&store, &ak, konto_daten.geraet_id, c),
+        Cmd::Sync(c) => sync(&mut store, &konto_daten, &auth_key, c),
         Cmd::Beobachten {
             wurzeln,
             merken,
@@ -408,10 +405,6 @@ fn beobachten(
 
 // ------------------------------------------------------------------ konto
 
-fn konto_pfad(home: &Path) -> PathBuf {
-    home.join("konto.json")
-}
-
 fn init(
     home: &Path,
     geraet: &str,
@@ -419,8 +412,7 @@ fn init(
     sync_url: Option<&str>,
     email: Option<&str>,
 ) -> Result<()> {
-    std::fs::create_dir_all(home)?;
-    if konto_pfad(home).exists() {
+    if konto::existiert(home) {
         bail!("In {} ist bereits ein Konto eingerichtet", home.display());
     }
     let pw = passwort_abfragen("Master-Passwort wählen: ")?;
@@ -437,72 +429,52 @@ fn init(
         KdfParams::default()
     };
     eprintln!("Leite Schlüssel ab …");
-    let konto = crypto::konto_einrichten(pw.as_bytes(), kdf)?;
-    let desktop = DesktopKey::generate()?;
+    let mut e = konto::einrichten(home, pw.as_bytes(), geraet, kdf)?;
+    let im_bund = konto::desktop_key_speichern(e.konto.geraet_id, &e.desktop_key).is_ok();
 
     println!();
     println!("Wiederherstellungscode (einmalige Anzeige, in Proton Pass ablegen):");
-    println!("    {}", konto.recovery_code.display().as_str());
+    println!("    {}", e.recovery_code.display().as_str());
     println!();
     println!("Desktop-Schlüssel (einmalige Anzeige, in Proton Pass ablegen; nie auf fremden Rechnern eingeben):");
-    println!("    {}", desktop.display().as_str());
+    println!("    {}", e.desktop_key.display().as_str());
+    if im_bund {
+        println!("    (zusätzlich im Schlüsselbund dieses Rechners abgelegt)");
+    } else {
+        println!("    (kein Schlüsselbund verfügbar; für »nur Desktop«-Einträge LOTSE_DESKTOP_KEY setzen)");
+    }
     println!();
     let ohne_bestaetigung = ohne_bestaetigung || std::env::var_os("LOTSE_SKIP_CONFIRM").is_some();
     if !ohne_bestaetigung {
         let eingabe = passwort_abfragen("Zur Bestätigung den Wiederherstellungscode eingeben: ")?;
-        let parsed = RecoveryCode::parse(&eingabe).context("Code nicht lesbar")?;
-        crypto::konto_wiederherstellen(&konto.header, &parsed)
-            .map_err(|_| anyhow!("Der eingegebene Code ist falsch. Einrichtung abgebrochen."))?;
+        let ok = RecoveryCode::parse(&eingabe)
+            .map(|c| crypto::konto_wiederherstellen(&e.konto.header, &c).is_ok())
+            .unwrap_or(false);
+        if !ok {
+            drop(e);
+            konto::verwerfen(home)?;
+            bail!("Der eingegebene Code ist falsch. Einrichtung verworfen.");
+        }
     }
-
-    let geraet_id = Ulid::new();
-    let k = Konto {
-        header: konto.header.clone(),
-        geraet_id,
-        geraet_name: geraet.to_string(),
-    };
-    export::atomar_schreiben(
-        &konto_pfad(home),
-        serde_json::to_string_pretty(&k)?.as_bytes(),
-    )?;
-    let mut store = Store::open(&home.join("lotse.db"), &konto.account_key, geraet_id)?;
-    store.geraet_speichern(&Geraet {
-        id: geraet_id,
-        name: geraet.to_string(),
-        plattform: std::env::consts::OS.to_string(),
-        angelegt: now_ms(),
-        zuletzt_sync: None,
-    })?;
-    // Lotse ist Projekt Nr. 1 in Lotse.
-    let mut p = Projekt::neu("Lotse", Vorlage::Software, now_ms());
-    p.kurs = "Das Logbuch für alle meine Vorhaben. Vier Kernprobleme: Wiedereinstieg, Faden halten, Rad nicht neu erfinden, Geheimnisse sicher aufbewahren.".into();
-    store.projekt_speichern(&p)?;
-    store.notiz_speichern(&Notiz::neu(
-        p.id,
-        Quelle::Cli,
-        Art::Log,
-        "Konto eingerichtet. Lotse ist Projekt Nr. 1 in Lotse.",
-        now_ms(),
-    ))?;
     println!("Eingerichtet in {}", home.display());
     if let (Some(url), Some(email)) = (sync_url, email) {
         let client = Client::new(url);
         let sg = SyncGeraet {
-            id: geraet_id,
+            id: e.konto.geraet_id,
             name: geraet.to_string(),
             platform: "cli".into(),
         };
         let (account_id, token) = client
             .register(
                 email,
-                &konto.auth_key,
-                &konto.recovery_auth_key,
-                &konto.header,
+                &e.auth_key,
+                &e.recovery_auth_key,
+                &e.konto.header,
                 &sg,
             )
             .context("Registrierung beim Sync-Dienst")?;
-        sync_client::verbindung_merken(&store, url, email, &account_id, &token)?;
-        let r = sync_client::abgleichen(&mut store, &client.with_token(&token))?;
+        sync_client::verbindung_merken(&e.store, url, email, &account_id, &token)?;
+        let r = sync_client::abgleichen(&mut e.store, &client.with_token(&token))?;
         println!(
             "Beim Sync-Dienst registriert ({url}), {} Datensätze gepusht.",
             r.gepusht
@@ -511,29 +483,23 @@ fn init(
     Ok(())
 }
 
-fn oeffnen(home: &Path) -> Result<(Store, Key32, Key32)> {
-    let konto: Konto = serde_json::from_str(
-        &std::fs::read_to_string(konto_pfad(home))
-            .with_context(|| format!("Kein Konto in {}. Zuerst `lotse init`.", home.display()))?,
-    )?;
+fn oeffnen(home: &Path) -> Result<konto::Entsperrt> {
+    if !konto::existiert(home) {
+        bail!(
+            "Kein Konto in {}. Zuerst `lotse init` oder `lotse sync login`.",
+            home.display()
+        );
+    }
     let pw = passwort_abfragen("Master-Passwort: ")?;
-    let (ak, auth) = crypto::konto_entsperren(&konto.header, pw.as_bytes())
-        .map_err(|_| anyhow!("Falsches Master-Passwort"))?;
-    let store = Store::open(&home.join("lotse.db"), &ak, konto.geraet_id)?;
-    Ok((store, ak, auth))
-}
-
-fn konto_lesen(home: &Path) -> Result<Konto> {
-    Ok(serde_json::from_str(
-        &std::fs::read_to_string(konto_pfad(home))
-            .with_context(|| format!("Kein Konto in {}. Zuerst `lotse init`.", home.display()))?,
-    )?)
+    konto::entsperren(home, pw.as_bytes()).map_err(|e| match e {
+        lotse_core::Error::Decrypt => anyhow!("Falsches Master-Passwort"),
+        e => anyhow!(e),
+    })
 }
 
 /// Neues Gerät: Passwort → Prelogin → Login → Konto-Datei → Speicher → Abgleich.
 fn sync_login(home: &Path, url: &str, email: &str, geraet: &str) -> Result<()> {
-    std::fs::create_dir_all(home)?;
-    if konto_pfad(home).exists() {
+    if konto::existiert(home) {
         bail!(
             "In {} ist bereits ein Konto eingerichtet; für ein bestehendes Konto `lotse sync register`",
             home.display()
@@ -554,26 +520,11 @@ fn sync_login(home: &Path, url: &str, email: &str, geraet: &str) -> Result<()> {
     let login = client
         .login(email, &pk.auth, &sg)
         .map_err(|e| anyhow!("Anmeldung fehlgeschlagen: {e}"))?;
-    let (ak, _) = crypto::konto_entsperren(&login.header, pw.as_bytes())
-        .map_err(|_| anyhow!("Der Dienst lieferte einen Konto-Header, der sich mit diesem Passwort nicht öffnen lässt"))?;
-    let k = Konto {
-        header: login.header,
-        geraet_id,
-        geraet_name: geraet.to_string(),
-    };
-    export::atomar_schreiben(
-        &konto_pfad(home),
-        serde_json::to_string_pretty(&k)?.as_bytes(),
-    )?;
-    let mut store = Store::open(&home.join("lotse.db"), &ak, geraet_id)?;
-    sync_client::verbindung_merken(&store, url, email, &login.account_id, &login.session_token)?;
-    store.geraet_speichern(&Geraet {
-        id: geraet_id,
-        name: geraet.to_string(),
-        plattform: std::env::consts::OS.to_string(),
-        angelegt: now_ms(),
-        zuletzt_sync: None,
+    let (ak, _) = crypto::konto_entsperren(&login.header, pw.as_bytes()).map_err(|_| {
+        anyhow!("Der Dienst lieferte einen Konto-Header, der sich mit diesem Passwort nicht öffnen lässt")
     })?;
+    let (_, mut store) = konto::aus_login(home, login.header, geraet_id, geraet, &ak)?;
+    sync_client::verbindung_merken(&store, url, email, &login.account_id, &login.session_token)?;
     let r = sync_client::abgleichen(
         &mut store,
         &Client::new(url).with_token(&login.session_token),
@@ -586,11 +537,27 @@ fn sync_login(home: &Path, url: &str, email: &str, geraet: &str) -> Result<()> {
     Ok(())
 }
 
-fn sync(store: &mut Store, home: &Path, auth_key: &Key32, c: SyncCmd) -> Result<()> {
+fn passwort_abfragen(prompt: &str) -> Result<Zeroizing<String>> {
+    if let Ok(pw) = std::env::var("LOTSE_PASSWORD") {
+        return Ok(Zeroizing::new(pw));
+    }
+    let pw = rpassword::prompt_password(prompt).context("Passwort-Eingabe")?;
+    Ok(Zeroizing::new(pw))
+}
+
+/// Tresor-Schlüssel: mit Desktop-Schlüssel aus Schlüsselbund oder Umgebung, sonst ohne.
+fn vault_keys(ak: &Key32, geraet_id: Ulid) -> Result<VaultKeys> {
+    let dk = konto::desktop_key_aus_umgebung()?.or(konto::desktop_key_laden(geraet_id)?);
+    Ok(match dk {
+        Some(dk) => VaultKeys::with_desktop_key(ak, &dk),
+        None => VaultKeys::from_account_key(ak),
+    })
+}
+
+fn sync(store: &mut Store, konto: &konto::Konto, auth_key: &Key32, c: SyncCmd) -> Result<()> {
     match c {
         SyncCmd::Login { .. } => unreachable!("wird vor dem Öffnen behandelt"),
         SyncCmd::Register { url, email } => {
-            let konto = konto_lesen(home)?;
             let code = std::env::var("LOTSE_RECOVERY_CODE")
                 .map(Zeroizing::new)
                 .or_else(|_| {
@@ -673,32 +640,6 @@ fn sync(store: &mut Store, home: &Path, auth_key: &Key32, c: SyncCmd) -> Result<
         }
     }
     Ok(())
-}
-
-fn passwort_abfragen(prompt: &str) -> Result<Zeroizing<String>> {
-    if let Ok(pw) = std::env::var("LOTSE_PASSWORD") {
-        return Ok(Zeroizing::new(pw));
-    }
-    let pw = rpassword::prompt_password(prompt).context("Passwort-Eingabe")?;
-    Ok(Zeroizing::new(pw))
-}
-
-fn desktop_key_laden() -> Result<Option<DesktopKey>> {
-    // Die Desktop-App holt den Schlüssel aus dem OS-Schlüsselbund. Die CLI nimmt ihn aus der
-    // Umgebung; ohne ihn bleiben `nur_desktop`-Einträge unlesbar.
-    match std::env::var("LOTSE_DESKTOP_KEY") {
-        Ok(s) if !s.trim().is_empty() => Ok(Some(
-            DesktopKey::parse(&s).context("LOTSE_DESKTOP_KEY unlesbar")?,
-        )),
-        _ => Ok(None),
-    }
-}
-
-fn vault_keys(ak: &Key32) -> Result<VaultKeys> {
-    Ok(match desktop_key_laden()? {
-        Some(dk) => VaultKeys::with_desktop_key(ak, &dk),
-        None => VaultKeys::from_account_key(ak),
-    })
 }
 
 // ---------------------------------------------------------------- befehle
@@ -969,8 +910,8 @@ fn referenz(store: &mut Store, c: RefCmd) -> Result<()> {
     Ok(())
 }
 
-fn tresor(store: &mut Store, ak: &Key32, c: TresorCmd) -> Result<()> {
-    let keys = vault_keys(ak)?;
+fn tresor(store: &mut Store, ak: &Key32, geraet_id: Ulid, c: TresorCmd) -> Result<()> {
+    let keys = vault_keys(ak, geraet_id)?;
     match c {
         TresorCmd::Add {
             titel,
@@ -1078,7 +1019,7 @@ fn scan(store: &mut Store, wurzeln: Vec<PathBuf>, uebernehmen: bool) -> Result<(
     }
     if uebernehmen {
         for k in &neu {
-            let p = kandidat_uebernehmen(store, k)?;
+            let p = detect::uebernehmen(store, k)?;
             println!("Angelegt: {} ({})", p.titel, p.vorlage.anzeigename());
         }
     } else {
@@ -1099,57 +1040,7 @@ fn scan(store: &mut Store, wurzeln: Vec<PathBuf>, uebernehmen: bool) -> Result<(
     Ok(())
 }
 
-/// Legt aus einem Kandidaten ein Projekt an: Vorlage, Referenz auf den Ordner, Git-Historie
-/// als rückdatierte Notizen, README als Kurs-Vorschlag (als Notiz, nie automatisch als Kurs).
-fn kandidat_uebernehmen(store: &mut Store, k: &Kandidat) -> Result<Projekt> {
-    let jetzt = now_ms();
-    let mut p = Projekt::neu(&k.name, k.vorlage, jetzt);
-    if let Some(vorschlag) = k.readme.as_deref().and_then(detect::kurs_vorschlag) {
-        p.kurs = String::new();
-        store.projekt_speichern(&p)?;
-        store.notiz_speichern(&Notiz::neu(
-            p.id,
-            Quelle::Import,
-            Art::Offen,
-            format!("Kurs festlegen. Vorschlag aus README: »{vorschlag}«"),
-            jetzt,
-        ))?;
-    } else {
-        store.projekt_speichern(&p)?;
-        store.notiz_speichern(&Notiz::neu(
-            p.id,
-            Quelle::Import,
-            Art::Offen,
-            "Kurs festlegen: worum geht es, was ist das Ziel?",
-            jetzt,
-        ))?;
-    }
-    let pfad = Path::new(&k.pfad);
-    let typ = if k.hat_git {
-        ReferenzTyp::GitRepo
-    } else {
-        ReferenzTyp::Ordner
-    };
-    store.referenz_speichern(&Referenz::neu(p.id, typ, &k.pfad, Rolle::Material))?;
-    if k.hat_git {
-        let commits = git::log(pfad, None, 500)?;
-        for n in git::verdichten(p.id, &commits, Quelle::Import) {
-            store.notiz_speichern(&n)?;
-        }
-    }
-    store.notiz_speichern(&Notiz::neu(
-        p.id,
-        Quelle::Import,
-        Art::Log,
-        format!("Aus Ordner übernommen. Marken: {}", k.marken.join(", ")),
-        jetzt + 1,
-    ))?;
-    detect::marker_schreiben(pfad, p.id).ok();
-    store.kandidat_entfernen(&k.pfad)?;
-    Ok(p)
-}
-
-fn exportieren(store: &Store, ak: &Key32, c: ExportCmd) -> Result<()> {
+fn exportieren(store: &Store, ak: &Key32, geraet_id: Ulid, c: ExportCmd) -> Result<()> {
     match c {
         ExportCmd::Spiegel { ziel } => {
             let n = export::spiegel::schreiben(store, &ziel)?;
@@ -1159,7 +1050,7 @@ fn exportieren(store: &Store, ak: &Key32, c: ExportCmd) -> Result<()> {
             );
         }
         ExportCmd::Bundle { ziel } => {
-            let keys = vault_keys(ak)?;
+            let keys = vault_keys(ak, geraet_id)?;
             let pass = std::env::var("LOTSE_EXPORT_PASSPHRASE")
                 .map(Zeroizing::new)
                 .or_else(|_| passwort_abfragen("Passphrase für das Bundle: "))?;

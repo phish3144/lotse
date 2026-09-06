@@ -10,8 +10,8 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 |---|---|
 | `crates/lotse-core` | Rust-Kern: Modell, Krypto, Tresor, Sync-Umschläge, SQLCipher-Speicher, Erkennung, Git-Reader, Export. Feature `native` (Default) für alles mit Dateisystem; ohne Feature WASM-tauglich. |
 | `crates/lotse-cli` | Binary `lotse`: Schnellerfassung, Projekte, Tresor, Scan, Export. |
-| `apps/web` | Svelte 5 + Vite Oberfläche, läuft in Tauri und im Browser. Datenprovider-Schnittstelle in `src/lib/data/provider.ts`, derzeit Mock. |
-| `apps/desktop` | Tauri-2-Hülle (Gerüst; braucht GTK/WebKit zum Bauen). |
+| `apps/web` | Svelte 5 + Vite Oberfläche, läuft in Tauri und im Browser. `src/lib/data/provider.ts` ist die Schnittstelle; `tauri.ts` spricht den Kern, `mock.ts` liefert Beispieldaten im Browser. Zeitstempel werden nur in `tauri.ts` von Millisekunden zu ISO umgerechnet. |
+| `apps/desktop` | Tauri-2-Hülle: Kommandos in `src-tauri/src/lib.rs` spiegeln `apps/web/src/lib/data/provider.ts`. Braucht GTK/WebKit zum Bauen, wird nur in `release.yml` gebaut. |
 | `services/sync-worker` | Cloudflare Worker (TypeScript) + D1 + R2, implementiert `SYNC_PROTOCOL.md`. |
 | `site` | Landing Page: eine HTML-Datei, inline CSS/JS, keine Fremdressourcen. Deploy über `.github/workflows/pages.yml`. |
 | `scripts` | `make-icons.sh` und `pack-icons.py` erzeugen die Tauri-Icons aus `icon.svg`. |
@@ -20,6 +20,7 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 
 ```
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+scripts/sync-e2e.sh   # Sync-Client gegen wrangler dev
 cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 (cd apps/web && npm run check && npm test && npm run build)
 (cd services/sync-worker && npm run typecheck && npm test)
@@ -27,7 +28,7 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 
 ## Regeln, die aus dem Bedrohungsmodell folgen
 
-- `detect`, `export::spiegel`, `git` und künftige `watcher`, `mcp`, `ai` importieren **nie**
+- `detect`, `export::spiegel`, `git`, `watcher` und künftige `mcp`, `ai` importieren **nie**
   aus `vault`. Nur `export::bundle`, die Oberfläche und die CLI dürfen Tresor-Werte lesen.
 - Keine eigenen Krypto-Primitive. Nur RustCrypto, `age`, `zeroize`. Änderungen an der
   Komposition erhöhen `FORMAT_VERSION` und werden in `THREAT_MODEL.md` protokolliert.

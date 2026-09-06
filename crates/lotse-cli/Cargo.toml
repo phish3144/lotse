@@ -12,7 +12,7 @@ name = "lotse"
 path = "src/main.rs"
 
 [dependencies]
-lotse-core.workspace = true
+lotse-core = { workspace = true, features = ["keychain"] }
 clap.workspace = true
 anyhow.workspace = true
 dirs.workspace = true

@@ -1,12 +1,21 @@
 <script lang="ts">
+  import Entsperren from './lib/components/Entsperren.svelte';
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
+  import { echteDaten } from './lib/data/store';
   import { router } from './lib/router.svelte';
   import Hafen from './routes/Hafen.svelte';
   import OffenePunkte from './routes/OffenePunkte.svelte';
   import ProjektSeite from './routes/ProjektSeite.svelte';
   import Suche from './routes/Suche.svelte';
+
+  // In der Tauri-Hülle steht vor allem der Entsperr-Bildschirm; im Browser mit
+  // Beispieldaten entfällt er.
+  let entsperrt = $state(!echteDaten);
 </script>
 
+{#if !entsperrt}
+  <Entsperren fertig={() => (entsperrt = true)} />
+{:else}
 <div class="app-geruest">
   <header class="kopfzeile">
     <a class="logo" href="#/">Lotse</a>
@@ -33,6 +42,7 @@
   </main>
 </div>
 <Schnellerfassung />
+{/if}
 
 <style>
   .app-geruest {

@@ -18,10 +18,10 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | CLI `lotse` | läuft |
 | Web-Oberfläche (Svelte) | Gerüst mit Mock-Daten |
 | Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
-| Desktop-Hülle (Tauri 2) | Gerüst mit Icons und Release-Workflow, hier nicht gebaut (braucht GTK/WebKit) |
+| Desktop-Hülle (Tauri 2) | Kommandos für Konto, Einrichtung, Entsperren, Daten, Tresor und Sync angebunden; Oberfläche nutzt sie in der Hülle statt Beispieldaten. Hier nicht gebaut (braucht GTK/WebKit), erster CI-Build steht aus |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter (`lotse beobachten`) | läuft |
-| MCP-Server, Desktop-Anbindung der Oberfläche, WebAssembly-Client | offen |
+| MCP-Server, WebAssembly-Client für den Browser | offen |
 
 ## Ausprobieren (CLI)
 
@@ -42,7 +42,7 @@ export LOTSE_HOME=$PWD/.lotse-daten
 
 `init` zeigt einmalig den Wiederherstellungscode und den Desktop-Schlüssel. Beides gehört
 in den Passwortmanager. Einträge der Stufe »nur Desktop« brauchen den Desktop-Schlüssel
-(CLI: Umgebungsvariable `LOTSE_DESKTOP_KEY`; die Desktop-App nutzt den OS-Schlüsselbund).
+(aus dem OS-Schlüsselbund, sonst Umgebungsvariable `LOTSE_DESKTOP_KEY`).
 
 Das age-Bundle lässt sich ohne Lotse entschlüsseln: `age -d -o bundle.json backup.json.age`.
 
