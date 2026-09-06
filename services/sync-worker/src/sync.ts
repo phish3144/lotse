@@ -57,12 +57,18 @@ function validateEnvelope(raw: unknown): { ok: true; value: InboundEnvelope } | 
   }
   if (typeof r.nonce !== "string") return fail("invalid_nonce");
   const nonceBytes = tryBase64ToBytes(r.nonce);
-  if (!nonceBytes || nonceBytes.length !== NONCE_BYTES) return fail("invalid_nonce");
+  if (!nonceBytes) return fail("invalid_nonce");
   if (typeof r.ciphertext !== "string") return fail("invalid_ciphertext");
   const ciphertextBytes = tryBase64ToBytes(r.ciphertext);
   if (!ciphertextBytes) return fail("invalid_ciphertext");
   if (ciphertextBytes.length > MAX_CIPHERTEXT_BYTES) return fail("ciphertext_too_large");
-  if (r.deleted && ciphertextBytes.length !== 0) return fail("tombstone_ciphertext_not_empty");
+  if (r.deleted) {
+    // Tombstone: nonce und ciphertext sind leer (SYNC_PROTOCOL.md, Abschnitt 2).
+    if (ciphertextBytes.length !== 0) return fail("tombstone_ciphertext_not_empty");
+    if (nonceBytes.length !== 0) return fail("tombstone_nonce_not_empty");
+  } else if (nonceBytes.length !== NONCE_BYTES) {
+    return fail("invalid_nonce");
+  }
 
   return {
     ok: true,

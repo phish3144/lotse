@@ -11,6 +11,9 @@ use ulid::Ulid;
 use crate::crypto::{self, b64_bytes, Key32, Sealed};
 use crate::{Error, Result, FORMAT_VERSION};
 
+#[cfg(feature = "native")]
+pub mod client;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordKind {

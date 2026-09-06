@@ -390,8 +390,10 @@ pub struct KontoHeader {
     pub kdf: KdfParams,
     /// Account-Schlüssel, gewrappt mit dem Wrap-Schlüssel aus dem Passwort.
     pub wrapped_account_key: Sealed,
-    /// Account-Schlüssel, gewrappt mit dem Recovery Key.
-    pub wrapped_account_key_recovery: Sealed,
+    /// Account-Schlüssel, gewrappt mit dem Recovery Key. Fehlt lokal auf Geräten, die
+    /// per Login hinzukamen; der Dienst hält es und liefert es bei `/auth/recover`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapped_account_key_recovery: Option<Sealed>,
 }
 
 /// Ergebnis der Konto-Einrichtung.
@@ -418,11 +420,11 @@ pub fn konto_einrichten(password: &[u8], kdf: KdfParams) -> Result<NeuesKonto> {
         salt: salt.to_vec(),
         kdf,
         wrapped_account_key: wrap_key(&pk.wrap, &aad_account_key("password"), &account_key)?,
-        wrapped_account_key_recovery: wrap_key(
+        wrapped_account_key_recovery: Some(wrap_key(
             &recovery_key,
             &aad_account_key("recovery"),
             &account_key,
-        )?,
+        )?),
     };
     Ok(NeuesKonto {
         header,
@@ -462,11 +464,13 @@ pub fn konto_wiederherstellen(header: &KontoHeader, code: &RecoveryCode) -> Resu
         .try_into()
         .map_err(|_| Error::Crypto("Salt hat die falsche Länge"))?;
     let rk = code.derive_key(&salt, &header.kdf)?;
-    unwrap_key(
-        &rk,
-        &aad_account_key("recovery"),
-        &header.wrapped_account_key_recovery,
-    )
+    let wrapped = header
+        .wrapped_account_key_recovery
+        .as_ref()
+        .ok_or_else(|| {
+            Error::Invalid("Kein Wiederherstellungs-Wrapping auf diesem Gerät".into())
+        })?;
+    unwrap_key(&rk, &aad_account_key("recovery"), wrapped)
 }
 
 /// Neues Passwort setzen: nur das Wrapping wird erneuert, keine Neuverschlüsselung.

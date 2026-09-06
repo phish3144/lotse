@@ -34,3 +34,4 @@ clap = { version = "4", features = ["derive", "env"] }
 anyhow = "1"
 dirs = "6"
 rpassword = "7"
+ureq = { version = "2", features = ["json"] }

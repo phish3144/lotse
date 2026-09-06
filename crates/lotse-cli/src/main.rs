@@ -13,6 +13,7 @@ use lotse_core::detect;
 use lotse_core::export;
 use lotse_core::model::*;
 use lotse_core::store::Store;
+use lotse_core::sync::client::{self as sync_client, Client, Geraet as SyncGeraet};
 use lotse_core::vault::{DesktopKey, TresorEintrag, VaultKeys};
 use lotse_core::{git, now_ms};
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,11 @@ enum Cmd {
         /// alternativ Umgebungsvariable LOTSE_SKIP_CONFIRM)
         #[arg(long)]
         ohne_bestaetigung: bool,
+        /// Sofort beim Sync-Dienst registrieren (zusammen mit --email)
+        #[arg(long, requires = "email")]
+        sync_url: Option<String>,
+        #[arg(long)]
+        email: Option<String>,
     },
     /// Startseite: alle Projekte mit Auffälligkeit
     Hafen,
@@ -85,8 +91,36 @@ enum Cmd {
     Uebernehmen { pfad: PathBuf },
     #[command(subcommand)]
     Export(ExportCmd),
-    /// Sync-Stand anzeigen
-    Sync,
+    #[command(subcommand)]
+    Sync(SyncCmd),
+}
+
+#[derive(Subcommand)]
+enum SyncCmd {
+    /// Bestehendes lokales Konto beim Sync-Dienst registrieren (fragt den Wiederherstellungscode ab)
+    Register {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        email: String,
+    },
+    /// Neues Gerät an einem bestehenden Konto anmelden und alles herunterladen
+    Login {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        email: String,
+        #[arg(long, default_value = "Dieser Rechner")]
+        geraet: String,
+    },
+    /// Jetzt abgleichen: pushen, dann pullen
+    Jetzt,
+    /// Lokalen und entfernten Stand anzeigen
+    Status,
+    /// Geräte des Kontos auflisten
+    Geraete,
+    /// Ein Gerät widerrufen (seine Sitzungen verfallen)
+    Widerrufen { id: String },
 }
 
 #[derive(Subcommand)]
@@ -223,12 +257,23 @@ fn run() -> Result<()> {
     if let Cmd::Init {
         geraet,
         ohne_bestaetigung,
+        sync_url,
+        email,
     } = &cli.cmd
     {
-        return init(&home, geraet, *ohne_bestaetigung);
+        return init(
+            &home,
+            geraet,
+            *ohne_bestaetigung,
+            sync_url.as_deref(),
+            email.as_deref(),
+        );
+    }
+    if let Cmd::Sync(SyncCmd::Login { url, email, geraet }) = &cli.cmd {
+        return sync_login(&home, url, email, geraet);
     }
 
-    let (mut store, ak) = oeffnen(&home)?;
+    let (mut store, ak, auth_key) = oeffnen(&home)?;
     match cli.cmd {
         Cmd::Init { .. } => unreachable!(),
         Cmd::Hafen => hafen(&store),
@@ -288,17 +333,7 @@ fn run() -> Result<()> {
             Ok(())
         }
         Cmd::Export(c) => exportieren(&store, &ak, c),
-        Cmd::Sync => {
-            let s = store.sync_state()?;
-            println!("Ausstehende Änderungen: {}", store.ausstehend()?);
-            println!(
-                "Zuletzt gepusht: lokale Sequenz {}",
-                s.last_pushed_local_seq
-            );
-            println!("Zuletzt gepullt: Server-Sequenz {}", s.last_server_seq);
-            println!("Hinweis: Der Netzwerk-Abgleich läuft über die Desktop-App; die CLI zeigt nur den Stand.");
-            Ok(())
-        }
+        Cmd::Sync(c) => sync(&mut store, &home, &auth_key, c),
     }
 }
 
@@ -308,7 +343,13 @@ fn konto_pfad(home: &Path) -> PathBuf {
     home.join("konto.json")
 }
 
-fn init(home: &Path, geraet: &str, ohne_bestaetigung: bool) -> Result<()> {
+fn init(
+    home: &Path,
+    geraet: &str,
+    ohne_bestaetigung: bool,
+    sync_url: Option<&str>,
+    email: Option<&str>,
+) -> Result<()> {
     std::fs::create_dir_all(home)?;
     if konto_pfad(home).exists() {
         bail!("In {} ist bereits ein Konto eingerichtet", home.display());
@@ -347,7 +388,7 @@ fn init(home: &Path, geraet: &str, ohne_bestaetigung: bool) -> Result<()> {
 
     let geraet_id = Ulid::new();
     let k = Konto {
-        header: konto.header,
+        header: konto.header.clone(),
         geraet_id,
         geraet_name: geraet.to_string(),
     };
@@ -375,19 +416,194 @@ fn init(home: &Path, geraet: &str, ohne_bestaetigung: bool) -> Result<()> {
         now_ms(),
     ))?;
     println!("Eingerichtet in {}", home.display());
+    if let (Some(url), Some(email)) = (sync_url, email) {
+        let client = Client::new(url);
+        let sg = SyncGeraet {
+            id: geraet_id,
+            name: geraet.to_string(),
+            platform: "cli".into(),
+        };
+        let (account_id, token) = client
+            .register(
+                email,
+                &konto.auth_key,
+                &konto.recovery_auth_key,
+                &konto.header,
+                &sg,
+            )
+            .context("Registrierung beim Sync-Dienst")?;
+        sync_client::verbindung_merken(&store, url, email, &account_id, &token)?;
+        let r = sync_client::abgleichen(&mut store, &client.with_token(&token))?;
+        println!(
+            "Beim Sync-Dienst registriert ({url}), {} Datensätze gepusht.",
+            r.gepusht
+        );
+    }
     Ok(())
 }
 
-fn oeffnen(home: &Path) -> Result<(Store, Key32)> {
+fn oeffnen(home: &Path) -> Result<(Store, Key32, Key32)> {
     let konto: Konto = serde_json::from_str(
         &std::fs::read_to_string(konto_pfad(home))
             .with_context(|| format!("Kein Konto in {}. Zuerst `lotse init`.", home.display()))?,
     )?;
     let pw = passwort_abfragen("Master-Passwort: ")?;
-    let (ak, _auth) = crypto::konto_entsperren(&konto.header, pw.as_bytes())
+    let (ak, auth) = crypto::konto_entsperren(&konto.header, pw.as_bytes())
         .map_err(|_| anyhow!("Falsches Master-Passwort"))?;
     let store = Store::open(&home.join("lotse.db"), &ak, konto.geraet_id)?;
-    Ok((store, ak))
+    Ok((store, ak, auth))
+}
+
+fn konto_lesen(home: &Path) -> Result<Konto> {
+    Ok(serde_json::from_str(
+        &std::fs::read_to_string(konto_pfad(home))
+            .with_context(|| format!("Kein Konto in {}. Zuerst `lotse init`.", home.display()))?,
+    )?)
+}
+
+/// Neues Gerät: Passwort → Prelogin → Login → Konto-Datei → Speicher → Abgleich.
+fn sync_login(home: &Path, url: &str, email: &str, geraet: &str) -> Result<()> {
+    std::fs::create_dir_all(home)?;
+    if konto_pfad(home).exists() {
+        bail!(
+            "In {} ist bereits ein Konto eingerichtet; für ein bestehendes Konto `lotse sync register`",
+            home.display()
+        );
+    }
+    let client = Client::new(url);
+    let pre = client.prelogin(email).context("Prelogin")?;
+    let pw = passwort_abfragen("Master-Passwort des Kontos: ")?;
+    eprintln!("Leite Schlüssel ab …");
+    let stretched = crypto::derive_stretched(pw.as_bytes(), &pre.salt, &pre.kdf)?;
+    let pk = crypto::split_password_keys(&stretched);
+    let geraet_id = Ulid::new();
+    let sg = SyncGeraet {
+        id: geraet_id,
+        name: geraet.to_string(),
+        platform: "cli".into(),
+    };
+    let login = client
+        .login(email, &pk.auth, &sg)
+        .map_err(|e| anyhow!("Anmeldung fehlgeschlagen: {e}"))?;
+    let (ak, _) = crypto::konto_entsperren(&login.header, pw.as_bytes())
+        .map_err(|_| anyhow!("Der Dienst lieferte einen Konto-Header, der sich mit diesem Passwort nicht öffnen lässt"))?;
+    let k = Konto {
+        header: login.header,
+        geraet_id,
+        geraet_name: geraet.to_string(),
+    };
+    export::atomar_schreiben(
+        &konto_pfad(home),
+        serde_json::to_string_pretty(&k)?.as_bytes(),
+    )?;
+    let mut store = Store::open(&home.join("lotse.db"), &ak, geraet_id)?;
+    sync_client::verbindung_merken(&store, url, email, &login.account_id, &login.session_token)?;
+    store.geraet_speichern(&Geraet {
+        id: geraet_id,
+        name: geraet.to_string(),
+        plattform: std::env::consts::OS.to_string(),
+        angelegt: now_ms(),
+        zuletzt_sync: None,
+    })?;
+    let r = sync_client::abgleichen(
+        &mut store,
+        &Client::new(url).with_token(&login.session_token),
+    )?;
+    println!(
+        "Angemeldet als {email} auf Gerät »{geraet}«. {} Datensätze übernommen, {} Projekte lokal.",
+        r.uebernommen,
+        store.projekte()?.len()
+    );
+    Ok(())
+}
+
+fn sync(store: &mut Store, home: &Path, auth_key: &Key32, c: SyncCmd) -> Result<()> {
+    match c {
+        SyncCmd::Login { .. } => unreachable!("wird vor dem Öffnen behandelt"),
+        SyncCmd::Register { url, email } => {
+            let konto = konto_lesen(home)?;
+            let code = std::env::var("LOTSE_RECOVERY_CODE")
+                .map(Zeroizing::new)
+                .or_else(|_| {
+                    passwort_abfragen(
+                        "Wiederherstellungscode (für die Konto-Wiederherstellung beim Dienst): ",
+                    )
+                })?;
+            let code = RecoveryCode::parse(&code).context("Code nicht lesbar")?;
+            let salt: [u8; crypto::SALT_LEN] =
+                konto.header.salt.as_slice().try_into().context("Salt")?;
+            let rk = code.derive_key(&salt, &konto.header.kdf)?;
+            let recovery_auth = crypto::recovery_auth_key(&rk);
+            let sg = SyncGeraet {
+                id: konto.geraet_id,
+                name: konto.geraet_name.clone(),
+                platform: "cli".into(),
+            };
+            let client = Client::new(&url);
+            let (account_id, token) = client
+                .register(&email, auth_key, &recovery_auth, &konto.header, &sg)
+                .context("Registrierung beim Sync-Dienst")?;
+            sync_client::verbindung_merken(store, &url, &email, &account_id, &token)?;
+            let r = sync_client::abgleichen(store, &client.with_token(&token))?;
+            println!(
+                "Registriert als {email} bei {url}. {} Datensätze gepusht.",
+                r.gepusht
+            );
+        }
+        SyncCmd::Jetzt => {
+            let client = sync_client::client_aus_store(store)?;
+            let r = sync_client::abgleichen(store, &client)?;
+            println!(
+                "Gepusht {}, übernommen {}, verworfen {}, Konflikte {}. Server-Sequenz {}.",
+                r.gepusht, r.uebernommen, r.verworfen, r.konflikte, r.server_seq
+            );
+            if r.abgelehnt > 0 {
+                println!("Abgelehnt: {} (siehe Dienst-Antwort)", r.abgelehnt);
+            }
+        }
+        SyncCmd::Status => {
+            let s = store.sync_state()?;
+            println!("Ausstehende Änderungen: {}", store.ausstehend()?);
+            println!(
+                "Zuletzt gepusht: lokale Sequenz {}",
+                s.last_pushed_local_seq
+            );
+            println!("Zuletzt gepullt: Server-Sequenz {}", s.last_server_seq);
+            match sync_client::client_aus_store(store) {
+                Ok(client) => match client.status() {
+                    Ok(st) => println!(
+                        "Dienst {}: Sequenz {}, {} Datensätze, {} Byte Anhänge",
+                        client.base_url(),
+                        st.server_seq,
+                        st.record_count,
+                        st.blob_bytes
+                    ),
+                    Err(e) => println!("Dienst nicht erreichbar: {e}"),
+                },
+                Err(_) => println!(
+                    "Kein Sync eingerichtet (`lotse sync register` oder `lotse sync login`)."
+                ),
+            }
+        }
+        SyncCmd::Geraete => {
+            let client = sync_client::client_aus_store(store)?;
+            for g in client.geraete()? {
+                println!(
+                    "{}  {:<8} {:<24} zuletzt {}",
+                    g.id,
+                    g.platform,
+                    g.name,
+                    export::iso(g.last_seen_at)
+                );
+            }
+        }
+        SyncCmd::Widerrufen { id } => {
+            let client = sync_client::client_aus_store(store)?;
+            client.geraet_widerrufen(&id)?;
+            println!("Gerät {id} widerrufen.");
+        }
+    }
+    Ok(())
 }
 
 fn passwort_abfragen(prompt: &str) -> Result<Zeroizing<String>> {

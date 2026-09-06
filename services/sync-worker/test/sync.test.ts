@@ -93,7 +93,7 @@ describe("sync push/pull", () => {
   it("handles tombstones: deleted=true requires empty ciphertext and round-trips as deleted", async () => {
     const { session_token, deviceId } = await registerAccount();
     const id = crypto.randomUUID();
-    const tombstone = makeEnvelope({ id, device_id: deviceId, deleted: true, ciphertext: "" });
+    const tombstone = makeEnvelope({ id, device_id: deviceId, deleted: true, ciphertext: "", nonce: "" });
 
     const pushRes = await api("/v1/sync/push", {
       method: "POST",

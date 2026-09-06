@@ -41,6 +41,16 @@ pub enum Error {
     #[error("Dateisystem: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("Sync-Dienst antwortet {status} ({code}): {message}")]
+    Sync {
+        status: u16,
+        code: String,
+        message: String,
+    },
+
+    #[error("Netzwerk: {0}")]
+    Netz(String),
+
     #[error("{0}")]
     Other(String),
 }

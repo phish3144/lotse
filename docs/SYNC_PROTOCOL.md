@@ -36,8 +36,8 @@ im Client.
 
 - `ciphertext` = XChaCha20-Poly1305(Datensatz-Schlüssel, `nonce`, JSON des Klartext-
   Datensatzes, AAD). AAD = `format_version ‖ kind ‖ id` als UTF-8 mit `\x1f` als Trenner.
-- Bei `deleted = true` ist `ciphertext` leer; der Umschlag ist ein Tombstone und bleibt
-  dauerhaft (Kompaktierung siehe 7).
+- Bei `deleted = true` sind `nonce` und `ciphertext` leer; der Umschlag ist ein Tombstone und
+  bleibt dauerhaft (Kompaktierung siehe 7).
 - Der Dienst prüft nur: Base64 gültig, `ciphertext` ≤ 256 KiB, `kind` aus der erlaubten
   Liste, `hlc` wohlgeformt.
 - `server_seq` ist nur in Antworten des Dienstes gesetzt.

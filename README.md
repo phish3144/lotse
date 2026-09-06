@@ -17,10 +17,10 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Rust-Kern: Modell, Krypto, Tresor mit zwei Stufen, Sync-Umschläge, SQLCipher-Speicher mit Änderungsprotokoll und Volltextsuche, Projekterkennung, Git-Import, Spiegel- und age-Export | läuft, getestet |
 | CLI `lotse` | läuft |
 | Web-Oberfläche (Svelte) | Gerüst mit Mock-Daten |
-| Sync-Dienst (Cloudflare Worker) | Gerüst, siehe `services/sync-worker/README.md` |
+| Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
 | Desktop-Hülle (Tauri 2) | Gerüst mit Icons und Release-Workflow, hier nicht gebaut (braucht GTK/WebKit) |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
-| Ordner-Beobachter, MCP-Server, Netzwerk-Sync im Client | offen |
+| Ordner-Beobachter, MCP-Server | offen |
 
 ## Ausprobieren (CLI)
 
@@ -44,6 +44,21 @@ in den Passwortmanager. Einträge der Stufe »nur Desktop« brauchen den Desktop
 (CLI: Umgebungsvariable `LOTSE_DESKTOP_KEY`; die Desktop-App nutzt den OS-Schlüsselbund).
 
 Das age-Bundle lässt sich ohne Lotse entschlüsseln: `age -d -o bundle.json backup.json.age`.
+
+## Abgleich zwischen Geräten
+
+```
+# Erstes Gerät: Konto beim Dienst registrieren (fragt den Wiederherstellungscode ab)
+lotse sync register --url https://api.example.invalid --email du@example.invalid
+# Weiteres Gerät: anmelden, alles herunterladen
+lotse sync login --url https://api.example.invalid --email du@example.invalid --geraet "Laptop"
+lotse sync jetzt      # pushen, dann pullen
+lotse sync status     # lokal und entfernt
+lotse sync geraete    # Geräte des Kontos, `lotse sync widerrufen <id>` entzieht eines
+```
+
+Lokal testen: `scripts/sync-e2e.sh` startet den Dienst mit `wrangler dev` und lässt den
+End-to-End-Test des Kerns dagegen laufen. Der Dienst sieht dabei nur Umschläge.
 
 ## Landing Page und Veröffentlichungen
 
