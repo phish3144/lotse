@@ -1,0 +1,40 @@
+name = "lotse-sync-worker"
+main = "src/index.ts"
+compatibility_date = "2026-08-22"
+
+# --- Free-plan limits (see docs/SYNC_PROTOCOL.md section 8) ---------------
+#
+# | Grenze                    | Wert           | Folge im Design                              |
+# |----------------------------|----------------|-----------------------------------------------|
+# | D1 Schreibvorgänge/Tag     | 100 000 Zeilen | Client batcht (Debounce 2 s), ein Push = eine |
+# |                             |                | D1-Transaktion (db.batch) fuer alle Records.   |
+# | D1 Lesevorgänge/Tag        | 5 000 000 Zeilen | Pull nutzt den Index `records_seq`, kein     |
+# |                             |                | Full-Table-Scan.                               |
+# | Worker-Anfragen/Tag         | 100 000        | Sync-Intervall im Leerlauf 5 min ≈ 300         |
+# |                             |                | Anfragen/Tag/Gerät.                            |
+# | Worker-CPU/Anfrage          | 10 ms          | Kein Argon2id im Worker. Server hasht          |
+# |                             |                | `auth_key`/`recovery_auth_key` mit PBKDF2-     |
+# |                             |                | SHA256 (600 000 Iterationen) ueber WebCrypto;  |
+# |                             |                | die eigentliche Sicherheit traegt das          |
+# |                             |                | clientseitige Argon2id.                        |
+# | R2 Speicher                 | 10 GB          | Anhaenge > 25 MB werden clientseitig nur       |
+# |                             |                | referenziert, nicht automatisch hochgeladen.   |
+#
+# Auth-Endpunkte werden bewusst NICHT im Worker-Code rate-limitiert (siehe
+# src/auth.ts) -- das gehoert vor den Worker: Cloudflare WAF Rate Limiting
+# Rules auf /v1/auth/* (Dashboard oder `wrangler` Rulesets API), da das
+# Gratisplan-Budget an CPU-Zeit sonst durch PBKDF2-Berechnungen von
+# Angreifern aufgebraucht werden kann.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lotse"
+database_id = "00000000-0000-0000-0000-000000000000" # placeholder, replace after `wrangler d1 create lotse`
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "BLOBS"
+bucket_name = "lotse-blobs"
+
+[observability]
+enabled = true

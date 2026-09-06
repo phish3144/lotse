@@ -1,0 +1,24 @@
+[package]
+name = "lotse-cli"
+description = "Lotse Kommandozeile: Schnellerfassung, Projekte, Tresor, Export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "lotse"
+path = "src/main.rs"
+
+[dependencies]
+lotse-core.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+dirs.workspace = true
+rpassword.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ulid.workspace = true
+time.workspace = true
+zeroize.workspace = true

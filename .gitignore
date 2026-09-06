@@ -1,0 +1,31 @@
+# Rust
+/target
+**/target
+Cargo.lock.bak
+
+# Node
+node_modules
+dist
+.svelte-kit
+.wrangler
+*.tsbuildinfo
+
+# Lotse-Laufzeitdaten (nie einchecken)
+*.db
+*.db-wal
+*.db-shm
+konto.json
+*.age
+.lotse-projekt
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Tauri
+apps/desktop/src-tauri/gen
+apps/desktop/src-tauri/target

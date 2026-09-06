@@ -1,0 +1,146 @@
+# Lotse – Bedrohungsmodell und Kryptografie
+
+Stand: 2026-09-06. Dieses Dokument benennt, wogegen Lotse verteidigt, wogegen ausdrücklich
+nicht, und wie die Kryptografie aufgebaut ist. Jede Änderung an der Schlüsselhierarchie
+erhöht `FORMAT_VERSION` und wird hier protokolliert.
+
+## 1. Schutzgüter
+
+| Gut | Vertraulichkeit | Integrität | Verfügbarkeit |
+|---|---|---|---|
+| Tresor-Einträge (Zugangsdaten, Lizenzen, sensible Notizen) | hoch | hoch | mittel |
+| Logbücher, Kurs, Referenzen, Pfade | mittel | hoch | hoch |
+| Master-Passwort, Desktop-Schlüssel, Wiederherstellungscode | höchst | – | – |
+| Metadaten beim Sync (Zeitstempel, IDs, Größen, Gerätenamen) | niedrig | mittel | – |
+
+## 2. Angreifer und Szenarien
+
+### Verteidigt
+
+| Szenario | Antwort |
+|---|---|
+| **Laptop verloren oder gestohlen** (ausgeschaltet oder gesperrt) | Lokale Datenbank ist SQLCipher; Schlüssel nur im OS-Schlüsselbund bzw. aus Master-Passwort. Ohne Entsperren nichts lesbar. |
+| **Sync-Dienst kompromittiert** (Cloudflare-Konto, D1-Dump, R2-Bucket) | Nur Ciphertext, IDs, HLC-Zeitstempel, Größen, Gerätenamen. Kein Schlüsselmaterial außer dem passwort-gewrappten Account-Schlüssel, der ohne Passwort wertlos ist. |
+| **Passives Mitlesen im Netz** | TLS überall; zusätzlich ist der Inhalt bereits verschlüsselt. |
+| **Server versucht, Ciphertext zu manipulieren** | AEAD (XChaCha20-Poly1305) mit `id`, `kind`, `format_version` als Additional Authenticated Data; ein vertauschter oder veränderter Datensatz wird beim Entschlüsseln erkannt. |
+| **Angreifer kennt das Master-Passwort, aber sitzt an einem fremden Rechner** | `nur_desktop`-Einträge brauchen zusätzlich den Desktop-Schlüssel, der nie den Server oder Browser erreicht. |
+| **Blick über die Schulter** | Werte verdeckt bis Klick, Auto-Lock, Zwischenablage nach 20 s geleert. |
+| **Vergessenes Master-Passwort** | Wiederherstellungscode, beim Setup einmal angezeigt, mit Pflicht zur kalten Wiedereingabe vor Abschluss des Setups. |
+| **Geräteverlust bei aktiver Sitzung** | Gerät im Konto widerrufen; Sitzungstoken verfallen; Passwortwechsel wrappt den Account-Schlüssel neu. |
+| **Alte Backups/Sync-Snapshots eines gelöschten Tresor-Eintrags** | Envelope-Encryption pro Eintrag; Löschen vernichtet den Eintragsschlüssel (Crypto-Shredding). |
+| **Bösartige Abhängigkeit** | Nur RustCrypto/`age`/`zeroize`; Versionen gepinnt; `cargo-deny` und `cargo-audit` in CI; keine Fremdskripte in der Web-App. |
+| **Manipuliertes Update** | Tauri-Updater mit minisign-Signatur; privater Signaturschlüssel offline bzw. im Passwortmanager. |
+
+### Nicht verteidigt (bewusst, dokumentiert)
+
+| Szenario | Warum nicht |
+|---|---|
+| **Malware auf dem eigenen, entsperrten Gerät** | Wer den Prozess kontrolliert, liest den Speicher. Kein Client-Design ändert das. |
+| **Keylogger oder Bildschirmaufnahme auf einem fremden Rechner** | Das Master-Passwort und alle angezeigten `ueberall`-Werte sind dort kompromittierbar. Antwort ist die Stufe `nur_desktop` für das Wertvollste, nicht Kryptografie. |
+| **Kompromittierte Auslieferung des Web-Codes** (Cloudflare-Konto oder Build) | Web-Krypto ist nur so vertrauenswürdig wie der ausgelieferte Code. Minderung: Cloudflare-Konto mit Passkey/2FA, Deploy nur aus dem Repo, strikte CSP, `nur_desktop`. Restrisiko akzeptiert. |
+| **Verkehrsanalyse** (wann wurde wie viel synchronisiert) | Metadaten sind sichtbar; für einen persönlichen Dienst kein Schutzziel. |
+| **Erzwungene Herausgabe des Passworts** | Kein Duress-Modus, keine versteckten Tresore. |
+| **Klartext-Spiegel** | Opt-in, ausdrücklich unverschlüsselt, verlässt sich auf Festplattenverschlüsselung des OS. Wird beim Aktivieren so angezeigt. |
+
+## 3. Schlüsselhierarchie
+
+```
+Master-Passwort (MP)                  Wiederherstellungscode (RC, 128 Bit, Base32)
+        │                                      │
+   Argon2id(MP, salt_user)                Argon2id(RC, salt_user)
+        │                                      │
+   Stretched Key SK (32 B)                Recovery Key RK (32 B)
+        │
+   HKDF-SHA256(SK)
+   ├── info "lotse/auth"  → Auth-Schlüssel AK_auth (geht zum Server, wird dort nochmals gehasht)
+   └── info "lotse/wrap"  → Wrap-Schlüssel WK (bleibt lokal)
+
+Account-Schlüssel AK (32 B, zufällig)
+   ├── wrap(WK, AK)   → auf Server und lokal gespeichert
+   └── wrap(RK, AK)   → auf Server und lokal gespeichert
+
+HKDF-SHA256(AK)
+   ├── info "lotse/records"  → Datensatz-Schlüssel   (alle Sync-Datensätze außer Tresorwerten)
+   ├── info "lotse/local-db" → SQLCipher-Schlüssel   (lokale Datenbank)
+   ├── info "lotse/vault"    → Tresor-Schlüssel VK   (wrappt DEKs der Stufe `ueberall`)
+   └── info "lotse/blobs"    → Anhang-Schlüssel
+
+Desktop-Schlüssel DK (32 B, zufällig, einmal angezeigt, nur OS-Schlüsselbund)
+   HKDF-SHA256(AK ‖ DK, info "lotse/vault-desktop") → VK_desktop (wrappt DEKs der Stufe `nur_desktop`)
+
+Pro Tresor-Eintrag: DEK (32 B, zufällig)
+   Wert = XChaCha20-Poly1305(DEK, nonce, klartext, aad)
+   wrapped_dek = XChaCha20-Poly1305(VK oder VK_desktop, nonce, DEK, aad)
+```
+
+### Parameter
+
+| Baustein | Wahl | Anmerkung |
+|---|---|---|
+| Passwort-KDF | Argon2id, m = 64 MiB, t = 3, p = 1 | Untergrenze; Desktop kalibriert beim Setup auf ~500 ms und speichert die Parameter im Konto-Header. Browser nutzt dieselben Parameter (WASM). |
+| Salt | 16 B zufällig pro Konto | im Konto-Header, nicht geheim |
+| KDF-Ableitung | HKDF-SHA256 mit festen `info`-Strings | Domain Separation zwischen allen Verwendungen |
+| AEAD | XChaCha20-Poly1305, 24-Byte-Nonce zufällig | keine Nonce-Buchführung nötig |
+| AAD | `format_version ‖ kind ‖ record_id` | verhindert Vertauschen von Datensätzen |
+| Wrapping | AEAD mit Schlüssel als Klartext | kein eigenes Key-Wrap-Schema |
+| Zufall | `getrandom` (OS-CSPRNG, im Browser WebCrypto) | |
+| Speicher | `zeroize` auf allen Schlüssel-Typen, `Drop` überschreibt | |
+| Export | `age` mit Passphrase (scrypt) über ein JSON-Bundle | mit generischem `age`-CLI entschlüsselbar |
+
+### Was der Server speichert
+
+`account_id`, `email`, einen gesalzenen PBKDF2-SHA256-Hash von AK_auth (serverseitig nochmals
+gehasht, damit ein DB-Dump nicht als Login taugt; Argon2id läuft clientseitig), `salt_user`, KDF-Parameter, `wrap(WK, AK)`, `wrap(RK, AK)`,
+Geräte-Liste, Sitzungstoken (gehasht), Datensätze als `{id, kind, hlc, device_id, deleted,
+nonce, ciphertext, format_version, server_seq}`, Blobs als Ciphertext.
+
+Der Server speichert **nie**: MP, SK, WK, RK, AK, DK, VK, DEKs, Klartext irgendeines Feldes,
+Tresor-Titel im Klartext. (Tresor-Titel sind lokal im Klartext-Index, im Sync-Datensatz aber
+innerhalb des Ciphertexts.)
+
+## 4. Entsperren im Alltag
+
+- **Desktop:** Beim Setup wird AK zusätzlich mit einem zufälligen Geräteschlüssel gewrappt,
+  der im OS-Schlüsselbund liegt (Rust `keyring`: Keychain, Credential Manager, Secret
+  Service). Alltag: OS-Login bzw. Biometrie genügt. Master-Passwort wird verlangt bei:
+  Passwortwechsel, Geräte widerrufen, Wiederherstellungscode anzeigen, Export.
+  Auf Linux ohne Secret Service: Fallback auf Master-Passwort bei jedem Start.
+- **Web:** Immer Master-Passwort. Modus "fremder Rechner" (Default, wenn das Gerät unbekannt
+  ist): keine Persistenz in IndexedDB/localStorage, Schlüssel nur im Tab-Speicher, Auto-Lock
+  nach 5 Minuten Inaktivität und beim Verlassen des Tabs, `nur_desktop`-Einträge sind gar
+  nicht erst sichtbar.
+- **Auto-Lock** überall: Inaktivität (Desktop 15 min, Web 5 min), OS-Sperre, Tab-Verlust.
+- **Zwischenablage:** nach 20 s leeren, nur wenn der Inhalt seither unverändert ist.
+
+## 5. Web-Client-Härtung
+
+- `Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval';
+  connect-src 'self' https://api.<domain>; img-src 'self' data:; frame-ancestors 'none'`
+- Keine Fremdskripte, keine CDNs, keine Analytics.
+- Kein `innerHTML` für Nutzertext; sanitisierender Markdown-Renderer.
+- Cloudflare Access (Einmalcode per E-Mail) vor der App-Adresse. Die API-Adresse hat eigene
+  Authentifizierung (Auth-Schlüssel + Sitzungstoken) und Rate-Limiting.
+- Sitzungstoken: 32 B zufällig, serverseitig gehasht, Lebensdauer 30 Tage Desktop, 12 h Web,
+  an Geräte-ID gebunden, widerrufbar.
+
+## 6. Isolation innerhalb der App
+
+Der Tresor ist ein eigenes Modul in `lotse-core` (`vault`). Folgende Module haben
+**keinen** Import-Pfad dorthin, geprüft per Modulsichtbarkeit und CI-Lint:
+`watcher`, `detect`, `mcp`, `ai`, `export::mirror`, `export::site`.
+KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor dem Senden an.
+
+## 7. Betrieb und Konto-Sicherheit
+
+- Cloudflare- und GitHub-Konto mit Passkey oder TOTP (in Proton Pass).
+- Signaturschlüssel für Updates nie im Repo; öffentlicher Schlüssel im Tauri-Config.
+- Wiederherstellungscode und Desktop-Schlüssel gehören in Proton Pass. Das Setup sagt das
+  ausdrücklich und verlangt die kalte Wiedereingabe des Wiederherstellungscodes.
+- Backup ist der E2E-verschlüsselte Bestand auf dem Sync-Dienst plus optionaler
+  periodischer `age`-Export in einen Ordner der Wahl (z. B. Proton Drive).
+
+## 8. Formatversionen
+
+| `FORMAT_VERSION` | Datum | Inhalt |
+|---|---|---|
+| 1 | 2026-09-06 | Hierarchie wie oben. |

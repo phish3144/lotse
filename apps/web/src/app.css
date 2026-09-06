@@ -1,0 +1,84 @@
+/* Plain CSS, keine Utility-Frameworks. Helles Thema als Basis auf :root,
+   dunkles Thema ausschließlich über prefers-color-scheme – siehe artifact/
+   UI-Vorgaben: kein Fremdlayer, kein CSS-Framework. */
+
+:root {
+  --hintergrund: #f7f6f3;
+  --fg: #1c1b19;
+  --karten-hintergrund: #ffffff;
+  --rahmen: #ddd9d1;
+  --text-gedaempft: #6b675f;
+  --akzent: #1d5f8a;
+  --farbe-ruhig: #4c8c5b;
+  --farbe-auffaellig: #b8860b;
+  --farbe-ueberfaellig: #b0392f;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hintergrund: #17181a;
+    --fg: #eceae5;
+    --karten-hintergrund: #212327;
+    --rahmen: #35373b;
+    --text-gedaempft: #9a978f;
+    --akzent: #6fb3dd;
+    --farbe-ruhig: #7bc28c;
+    --farbe-auffaellig: #d9a441;
+    --farbe-ueberfaellig: #e0685c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--hintergrund);
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+a {
+  color: var(--akzent);
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  color: inherit;
+  background: var(--hintergrund);
+  border: 1px solid var(--rahmen);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.6rem;
+}
+
+input:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 2px solid var(--akzent);
+  outline-offset: 1px;
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content-Security-Policy nach THREAT_MODEL.md Abschnitt 5: keine Fremdskripte,
+      keine CDNs, keine Analytics. connect-src ist vorerst 'self'; die Sync-API-
+      Adresse wird ergänzt, sobald sie feststeht. style-src erlaubt 'unsafe-inline',
+      weil Svelte Komponenten-Styles als <style>-Element injiziert; das ist ein
+      geringes Risiko (keine Codeausführung) und bewusst getrennt von script-src.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <title>Lotse</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
