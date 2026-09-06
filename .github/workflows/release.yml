@@ -79,6 +79,8 @@ jobs:
 
   desktop:
     name: Desktop ${{ matrix.platform }} ${{ matrix.args }}
+    # Erst nach der CLI, damit nur ein Job das Release anlegt und der andere es findet.
+    needs: cli
     strategy:
       fail-fast: false
       matrix:
