@@ -196,6 +196,8 @@ impl Beobachter {
             if agg.geaendert.is_empty() {
                 continue;
             }
+            // Kein `or_default()`: `Ulid::default()` ist die Null-ULID, keine neue ID.
+            #[allow(clippy::unwrap_or_default)]
             let id = *self.notiz_ids.entry(k).or_insert_with(Ulid::new);
             let text = text_fuer(&agg);
             let notiz = match store.notiz(id)? {
