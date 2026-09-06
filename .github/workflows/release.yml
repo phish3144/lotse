@@ -1,0 +1,131 @@
+name: Release
+
+# Baut bei einem Tag `v*` die Desktop-Installer (Tauri) und die Kommandozeile für Windows,
+# macOS und Linux und hängt sie an ein GitHub-Release. Builds sind unsigniert; Signierung
+# und Notarisierung kommen mit der Verteilung an Dritte (docs/BUSINESS.md, Abschnitt 4).
+#
+# Auslösen: git tag v0.1.0 && git push origin v0.1.0
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cli:
+    name: CLI ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cli-${{ matrix.target }}
+      - name: Bauen
+        run: cargo build --release -p lotse-cli --target ${{ matrix.target }}
+      - name: Packen (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -e
+          name="lotse-cli-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p dist/"$name"
+          cp target/${{ matrix.target }}/release/lotse dist/"$name"/
+          cp README.md docs/CONCEPT.md docs/THREAT_MODEL.md dist/"$name"/
+          (cd dist && tar czf "$name.tar.gz" "$name")
+          (cd dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
+      - name: Packen (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "lotse-cli-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/lotse.exe" "dist/$name/"
+          Copy-Item README.md, docs/CONCEPT.md, docs/THREAT_MODEL.md "dist/$name/"
+          Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
+          (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File -Encoding ascii "dist/$name.zip.sha256"
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          prerelease: true
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+
+  desktop:
+    name: Desktop ${{ matrix.platform }} ${{ matrix.args }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: desktop-${{ matrix.platform }}-${{ matrix.args }}
+      - name: Linux-Abhängigkeiten
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev pkg-config
+      - run: npm ci --prefix apps/web
+      - run: npm ci --prefix apps/desktop
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "Lotse ${{ github.ref_name }}"
+          releaseBody: |
+            Unsignierte Vorab-Builds. Windows SmartScreen und macOS Gatekeeper warnen.
+            Prüfsummen liegen als `.sha256`-Dateien bei. Der Wiederherstellungscode und der
+            Desktop-Schlüssel werden beim Einrichten genau einmal angezeigt.
+          releaseDraft: false
+          prerelease: true
+          args: ${{ matrix.args }}

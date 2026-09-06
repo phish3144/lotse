@@ -13,6 +13,8 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 | `apps/web` | Svelte 5 + Vite Oberfläche, läuft in Tauri und im Browser. Datenprovider-Schnittstelle in `src/lib/data/provider.ts`, derzeit Mock. |
 | `apps/desktop` | Tauri-2-Hülle (Gerüst; braucht GTK/WebKit zum Bauen). |
 | `services/sync-worker` | Cloudflare Worker (TypeScript) + D1 + R2, implementiert `SYNC_PROTOCOL.md`. |
+| `site` | Landing Page: eine HTML-Datei, inline CSS/JS, keine Fremdressourcen. Deploy über `.github/workflows/pages.yml`. |
+| `scripts` | `make-icons.sh` und `pack-icons.py` erzeugen die Tauri-Icons aus `icon.svg`. |
 
 ## Prüfen vor jedem Commit
 
@@ -31,7 +33,9 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
   Komposition erhöhen `FORMAT_VERSION` und werden in `THREAT_MODEL.md` protokolliert.
 - Schlüssel sind `Key32` (zeroize on drop). Kein Schlüssel als `Vec<u8>` oder `String`
   herumreichen.
-- Keine Fremdskripte, CDNs, Fonts oder Analytics in `apps/web`. Kein `{@html}` für Nutzertext.
+- Keine Fremdskripte, CDNs, Fonts oder Analytics in `apps/web` und `site`. Kein `{@html}` für Nutzertext.
+- `site/index.html` behauptet nur, was in `crates/` läuft und getestet ist; Feature-Stand-Badges
+  (läuft / in Arbeit / geplant) bei jeder Änderung am Kern nachziehen.
 - Der Sync-Dienst loggt nie Bodies oder Tokens.
 
 ## Konventionen
