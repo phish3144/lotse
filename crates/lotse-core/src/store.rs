@@ -560,6 +560,17 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Ordner- und Repo-Referenzen, die auf diesem Gerät gelten (für den Beobachter).
+    pub fn ordner_referenzen(&self) -> Result<Vec<Referenz>> {
+        let mut st = self.conn.prepare(
+            "SELECT r.* FROM referenzen r JOIN projekte p ON p.id = r.projekt_id
+             WHERE r.deleted = 0 AND p.deleted = 0 AND r.typ IN ('ordner', 'git_repo')
+               AND (r.geraet_id IS NULL OR r.geraet_id = ?1)",
+        )?;
+        let rows = st.query_map(params![self.device_id.to_string()], Self::referenz_aus_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Prüft eine Referenz auf diesem Gerät (nur Pfade; URLs und Physisches bleiben
     /// `nicht_pruefbar`).
     pub fn referenz_pruefen(&mut self, id: Ulid) -> Result<Pruefstatus> {

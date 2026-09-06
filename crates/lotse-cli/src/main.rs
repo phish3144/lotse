@@ -15,6 +15,7 @@ use lotse_core::model::*;
 use lotse_core::store::Store;
 use lotse_core::sync::client::{self as sync_client, Client, Geraet as SyncGeraet};
 use lotse_core::vault::{DesktopKey, TresorEintrag, VaultKeys};
+use lotse_core::watcher::{self, Beobachter};
 use lotse_core::{git, now_ms};
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
@@ -93,6 +94,16 @@ enum Cmd {
     Export(ExportCmd),
     #[command(subcommand)]
     Sync(SyncCmd),
+    /// Wurzelordner beobachten und Änderungen verdichtet ins Logbuch schreiben (läuft bis Strg+C)
+    Beobachten {
+        /// Wurzelordner; ohne Angabe die gemerkten. Mit --merken dauerhaft speichern.
+        wurzeln: Vec<PathBuf>,
+        #[arg(long)]
+        merken: bool,
+        /// Sekunden zwischen zwei Schreibvorgängen ins Logbuch
+        #[arg(long, default_value_t = 30)]
+        intervall: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -334,7 +345,65 @@ fn run() -> Result<()> {
         }
         Cmd::Export(c) => exportieren(&store, &ak, c),
         Cmd::Sync(c) => sync(&mut store, &home, &auth_key, c),
+        Cmd::Beobachten {
+            wurzeln,
+            merken,
+            intervall,
+        } => beobachten(&mut store, wurzeln, merken, intervall),
     }
+}
+
+fn beobachten(
+    store: &mut Store,
+    wurzeln: Vec<PathBuf>,
+    merken: bool,
+    intervall: u64,
+) -> Result<()> {
+    let mut wurzeln: Vec<PathBuf> = wurzeln
+        .into_iter()
+        .map(|w| w.canonicalize().unwrap_or(w))
+        .collect();
+    if wurzeln.is_empty() {
+        wurzeln = watcher::wurzeln_laden(store)?;
+    } else if merken {
+        watcher::wurzeln_speichern(store, &wurzeln)?;
+    }
+    if wurzeln.is_empty() {
+        bail!("Keine Wurzelordner. Angeben, z. B. `lotse beobachten ~/Projekte --merken`");
+    }
+    let mut b = Beobachter::starten(store, wurzeln)?;
+    println!(
+        "Beobachte {} Wurzelordner, schreibe alle {intervall} s. Beenden mit Strg+C.",
+        b.wurzeln().len()
+    );
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let s2 = stop.clone();
+    ctrlc::set_handler(move || s2.store(true, std::sync::atomic::Ordering::SeqCst)).ok();
+    // Erster Durchlauf setzt den Git-Stand und findet Kandidaten.
+    let bilanz = b.schreiben(store)?;
+    if bilanz.kandidaten > 0 {
+        println!(
+            "Hafeneinfahrt: {} neue Kandidaten (`lotse hafen`)",
+            bilanz.kandidaten
+        );
+    }
+    while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+        let n = b.verarbeiten(std::time::Duration::from_secs(intervall.max(1)));
+        b.zuordnung_laden(store)?;
+        let bilanz = b.schreiben(store)?;
+        if n > 0 || bilanz.git_notizen > 0 || bilanz.kandidaten > 0 {
+            println!(
+                "{}  {n} Ereignisse, {} Datei-Notizen, {} Git-Notizen, {} Kandidaten",
+                export::iso(now_ms()),
+                bilanz.datei_notizen,
+                bilanz.git_notizen,
+                bilanz.kandidaten
+            );
+        }
+    }
+    b.schreiben(store)?;
+    println!("Beobachter beendet.");
+    Ok(())
 }
 
 // ------------------------------------------------------------------ konto

@@ -35,3 +35,4 @@ anyhow = "1"
 dirs = "6"
 rpassword = "7"
 ureq = { version = "2", features = ["json"] }
+ctrlc = "3"

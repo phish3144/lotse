@@ -20,7 +20,8 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
 | Desktop-Hülle (Tauri 2) | Gerüst mit Icons und Release-Workflow, hier nicht gebaut (braucht GTK/WebKit) |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
-| Ordner-Beobachter, MCP-Server | offen |
+| Ordner-Beobachter (`lotse beobachten`) | läuft |
+| MCP-Server, Desktop-Anbindung der Oberfläche, WebAssembly-Client | offen |
 
 ## Ausprobieren (CLI)
 

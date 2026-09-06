@@ -5,7 +5,7 @@
 //! (Desktop, CLI) und – ohne das Feature `native` – als WebAssembly im Browser.
 //!
 //! Modulgrenzen, die das Bedrohungsmodell verlangt (`docs/THREAT_MODEL.md`, Abschnitt 6):
-//! `detect`, `export::mirror` und spätere Module `watcher`, `mcp`, `ai` importieren
+//! `detect`, `export::spiegel`, `watcher` und spätere Module `mcp`, `ai` importieren
 //! niemals aus `vault`. Der Tresor wird ausschließlich von der Oberfläche und der CLI
 //! angesprochen.
 
@@ -25,6 +25,8 @@ pub mod export;
 pub mod git;
 #[cfg(feature = "native")]
 pub mod store;
+#[cfg(feature = "native")]
+pub mod watcher;
 
 pub use error::{Error, Result};
 

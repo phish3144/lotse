@@ -22,3 +22,4 @@ serde_json.workspace = true
 ulid.workspace = true
 time.workspace = true
 zeroize.workspace = true
+ctrlc.workspace = true
