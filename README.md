@@ -23,6 +23,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Ordner-Beobachter | läuft, in der CLI (`lotse beobachten`) und in der Desktop-App |
 | MCP-Server (`lotse mcp`) | läuft |
 | Remote-Git (GitHub: offene PRs, Issue-Zahl, Prüflauf) | läuft im Kern und in der App; GitLab folgt |
+| KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App |
 | WebAssembly-Client für den Browser | offen |
 
 ## Bekannte Grenzen

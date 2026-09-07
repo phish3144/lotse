@@ -28,7 +28,7 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 
 ## Regeln, die aus dem Bedrohungsmodell folgen
 
-- `detect`, `export::spiegel`, `forge`, `git`, `watcher` und künftige `ai` importieren **nie**
+- `ai`, `detect`, `export::spiegel`, `forge`, `git` und `watcher` importieren **nie**
   aus `vault`. Nur `export::bundle`, die Oberfläche und die CLI dürfen Tresor-Werte lesen.
 - Keine eigenen Krypto-Primitive. Nur RustCrypto, `age`, `zeroize`. Änderungen an der
   Komposition erhöhen `FORMAT_VERSION` und werden in `THREAT_MODEL.md` protokolliert.

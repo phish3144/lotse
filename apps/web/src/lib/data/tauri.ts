@@ -166,6 +166,38 @@ export const exportieren = {
   bundle: (ziel: string, passphrase: string) => invoke<BundleBilanz>('export_bundle', { ziel, passphrase }),
 };
 
+export interface KiStatus {
+  basis_url: string;
+  modell: string;
+  schluessel_eintrag?: string;
+  schluessel_feld?: string;
+  /** Antwortet unter der üblichen Adresse ein Ollama? Dann geht es ohne Schlüssel. */
+  ollama_da: boolean;
+}
+
+/** Die üblichen Ziele. Alles andere ist dieselbe Schnittstelle mit anderer Adresse. */
+export const KI_ZIELE = [
+  { name: 'Ollama (lokal, ohne Schlüssel)', url: 'http://localhost:11434/v1' },
+  { name: 'Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+  { name: 'Groq', url: 'https://api.groq.com/openai/v1' },
+  { name: 'Mistral', url: 'https://api.mistral.ai/v1' },
+  { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1' },
+] as const;
+
+/**
+ * Verdichtung des Briefs. Ein Ziel, austauschbar: Ollama lokal ohne Schlüssel, sonst
+ * jede OpenAI-kompatible Adresse. `anfrageText` liefert genau das, was gesendet würde –
+ * die Oberfläche zeigt es, bevor etwas das Gerät verlässt.
+ */
+export const ki = {
+  status: () => invoke<KiStatus>('ki_status'),
+  zielSetzen: (basisUrl: string, modell: string, schluesselEintrag: string, schluesselFeld: string) =>
+    invoke<void>('ki_ziel_setzen', { basisUrl, modell, schluesselEintrag, schluesselFeld }),
+  modelle: (basisUrl: string) => invoke<string[]>('ki_modelle', { basisUrl }),
+  anfrageText: (projektId: string) => invoke<string>('ki_anfrage_text', { projektId }),
+  verdichten: (eingabe: string) => invoke<string>('ki_verdichten', { eingabe }),
+};
+
 export interface ForgeProjekt {
   projekt_id: string;
   titel: string;

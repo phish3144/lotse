@@ -9,6 +9,7 @@
 //! niemals aus `vault`. Der Tresor wird ausschließlich von der Oberfläche und der CLI
 //! angesprochen.
 
+pub mod ai;
 pub mod brief;
 pub mod crypto;
 pub mod error;

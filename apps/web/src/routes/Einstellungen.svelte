@@ -7,11 +7,14 @@
     beobachter,
     exportieren,
     forge,
+    ki,
+    KI_ZIELE,
     konto,
     sync,
     system,
     type BeobachterStatus,
     type ForgeStatus,
+    type KiStatus,
     type GeraetInfo,
     type KontoStatus,
     type SyncErgebnis,
@@ -152,6 +155,42 @@
     }
   }
 
+  // --- KI ------------------------------------------------------------------
+  let kiStatus: KiStatus | null = $state(null);
+  let kiUrl: string = $state(KI_ZIELE[0].url);
+  let kiModell = $state('');
+  let kiModelle: string[] = $state([]);
+  let kiEintrag = $state('');
+  let kiFeld = $state('schluessel');
+  let kiLaeuft = $state(false);
+
+  const kiIstLokal = $derived(kiUrl.startsWith('http://localhost') || kiUrl.startsWith('http://127.0.0.1'));
+
+  async function kiModelleLaden() {
+    kiLaeuft = true;
+    try {
+      kiModelle = await ki.modelle(kiUrl);
+      if (kiModelle.length > 0 && !kiModelle.includes(kiModell)) kiModell = kiModelle[0];
+      meldungen.zeigen(`${kiModelle.length} Modelle gefunden.`);
+    } catch (e) {
+      kiModelle = [];
+      meldungen.fehler(e);
+    } finally {
+      kiLaeuft = false;
+    }
+  }
+
+  async function kiSpeichern(e: Event) {
+    e.preventDefault();
+    try {
+      await ki.zielSetzen(kiUrl, kiModell, kiEintrag, kiFeld.trim() || 'schluessel');
+      kiStatus = await ki.status();
+      meldungen.zeigen('Ziel gemerkt.');
+    } catch (e2) {
+      meldungen.fehler(e2);
+    }
+  }
+
   // --- Konto, Abgleich, Geräte ---------------------------------------------
   let kontoStatus: KontoStatus | null = $state(null);
   let syncStatus: SyncStatus | null = $state(null);
@@ -176,6 +215,11 @@
       forgeEintrag = forgeStatus.token_eintrag ?? '';
       forgeFeld = forgeStatus.token_feld ?? 'token';
       tresorEintraege = await provider.listAllVaultEntries();
+      kiStatus = await ki.status();
+      kiUrl = kiStatus.basis_url;
+      kiModell = kiStatus.modell;
+      kiEintrag = kiStatus.schluessel_eintrag ?? '';
+      kiFeld = kiStatus.schluessel_feld ?? 'schluessel';
     } catch (e) {
       meldungen.fehler(e);
     }
@@ -342,6 +386,80 @@
     </p>
   {:else}
     <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {/if}
+</section>
+
+<section aria-labelledby="ki-titel">
+  <h2 id="ki-titel">KI-Verdichtung</h2>
+  <p class="hinweis">
+    Fasst auf Wunsch zusammen, was seit dem letzten Besuch passiert ist – auf der Projektseite, pro Aufruf und nur
+    auf Klick. <strong>Vor dem Senden siehst du den vollständigen Text</strong>, der das Gerät verlassen würde. Der
+    Tresor ist für die KI unerreichbar, und das Ergebnis ist ein Vorschlag: es landet nur im Logbuch, wenn du es
+    übernimmst.
+  </p>
+  {#if !echteDaten}
+    <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {:else}
+    {#if kiStatus?.ollama_da}
+      <p class="ergebnis">Ollama läuft auf diesem Rechner. Damit bleibt alles lokal – kein Schlüssel, kein Konto.</p>
+    {:else}
+      <p class="hinweis klein">
+        Kein Ollama gefunden. Entweder <code>ollama pull llama3.2</code> ausführen, oder unten ein gehostetes Ziel
+        mit Schlüssel wählen.
+      </p>
+    {/if}
+
+    <form class="formular breit" onsubmit={kiSpeichern}>
+      <label>
+        <span>Ziel</span>
+        <select bind:value={kiUrl}>
+          {#each KI_ZIELE as z (z.url)}
+            <option value={z.url}>{z.name}</option>
+          {/each}
+        </select>
+      </label>
+
+      {#if !kiIstLokal}
+        <label>
+          <span>Schlüssel aus dem Tresor</span>
+          <select bind:value={kiEintrag}>
+            <option value="">Kein Eintrag gewählt</option>
+            {#each tresorEintraege as t (t.id)}
+              <option value={t.id}>{t.titel}</option>
+            {/each}
+          </select>
+          <small class="hinweis">
+            Den API-Schlüssel als Tresor-Eintrag anlegen und hier wählen. Er wird nur beim Aufruf gelesen.
+          </small>
+        </label>
+        <label>
+          <span>Feldname im Eintrag</span>
+          <input bind:value={kiFeld} type="text" placeholder="schluessel" />
+        </label>
+      {/if}
+
+      <label>
+        <span>Modell</span>
+        <div class="zeile">
+          {#if kiModelle.length > 0}
+            <select bind:value={kiModell}>
+              {#each kiModelle as m (m)}
+                <option value={m}>{m}</option>
+              {/each}
+            </select>
+          {:else}
+            <input bind:value={kiModell} type="text" placeholder="z. B. llama3.2" />
+          {/if}
+          <button type="button" onclick={kiModelleLaden} disabled={kiLaeuft}>
+            {kiLaeuft ? 'Frage …' : 'Modelle abrufen'}
+          </button>
+        </div>
+      </label>
+
+      <div class="aktionen">
+        <button type="submit" class="primaer" disabled={!kiModell.trim()}>Merken</button>
+      </div>
+    </form>
   {/if}
 </section>
 
@@ -704,6 +822,9 @@
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     overflow-wrap: anywhere;
+  }
+  .breit {
+    max-width: 34rem;
   }
   .repos {
     list-style: none;

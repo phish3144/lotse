@@ -35,7 +35,6 @@ Ein Feature kommt nur ins Produkt, wenn alle drei Fragen mit Ja beantwortet sind
 | Projekt-zu-Projekt-Kanten | Unterprojekte treten real mehrfach auf |
 | Feldweises Mergen beim Sync | zweiter realer Datenverlust durch Last-Writer-Wins |
 | Semantische Suche, Embeddings | Volltextsuche findet nachweislich nicht mehr |
-| KI-Verdichtung des Briefs | Brief regelmäßig länger als ein Bildschirm |
 | ICS-Kalender lesend | ein terminlastiges Projekt existiert real |
 | Proton-Pass-CLI-Anbindung | Verweise werden häufig angeklickt und nerven |
 | Rückfluss aus dem Klartext-Spiegel | Spiegel wird regelmäßig extern bearbeitet |
@@ -51,6 +50,7 @@ Ein Feature kommt nur ins Produkt, wenn alle drei Fragen mit Ja beantwortet sind
 
 | Feature | Auslöser laut Liste | Warum trotzdem |
 |---|---|---|
+| KI-Verdichtung des Briefs | „Brief regelmäßig länger als ein Bildschirm“ | Ausdrücklich vom Nutzer priorisiert. Aufnahmetest: Frage 1 ja (Wiedereinstieg), Frage 2 ja (nichts läuft von allein, jeder Aufruf ist ein Klick), Frage 3 nein. Der Grundsatz aus `CONCEPT.md` Abschnitt 9 ist eingehalten: Opt-in, vor jedem Senden ist der vollständige Text sichtbar, kein Tresor-Zugriff, und das Ergebnis landet nur im Logbuch, wenn der Mensch es übernimmt. |
 | Remote-Git (Issues, PRs, Prüflauf) per Abruf | „lokaler Git-Log reicht nachweislich nicht“ | Ausdrücklich vom Nutzer priorisiert, bevor der Auslöser eingetreten war. Bewusst überschrieben, nicht übersehen. Der Aufnahmetest ist dabei eingehalten: Frage 1 ja (Faden halten), Frage 2 ja (kein Pflegeaufwand, ein Knopf), Frage 3 nein. Issues werden **nicht** zu offenen Fäden — sonst wäre es die Ticketliste, die dauerhaft ausgeschlossen bleibt. |
 
 ## Abbruchkriterium

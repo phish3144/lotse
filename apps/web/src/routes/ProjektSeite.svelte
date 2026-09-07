@@ -4,7 +4,7 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { system } from '../lib/data/tauri';
+  import { ki, system } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -264,6 +264,55 @@
     }
   }
 
+  // --- KI-Verdichtung -------------------------------------------------------
+  // Erst zeigen, was gesendet würde, dann senden. Das Ergebnis ist ein Vorschlag;
+  // ins Logbuch kommt es nur, wenn der Mensch es übernimmt.
+  let kiText: string | null = $state(null);
+  let kiErgebnis: string | null = $state(null);
+  let kiLaeuft = $state(false);
+
+  async function kiVorbereiten() {
+    kiLaeuft = true;
+    kiErgebnis = null;
+    try {
+      kiText = await ki.anfrageText(id);
+    } catch (e) {
+      melde(e);
+    } finally {
+      kiLaeuft = false;
+    }
+  }
+
+  async function kiSenden() {
+    if (!kiText) return;
+    kiLaeuft = true;
+    try {
+      kiErgebnis = await ki.verdichten(kiText);
+    } catch (e) {
+      melde(e);
+    } finally {
+      kiLaeuft = false;
+    }
+  }
+
+  async function kiUebernehmen() {
+    if (!kiErgebnis) return;
+    try {
+      await provider.addNote(id, { quelle: 'ki', art: 'log', text: kiErgebnis });
+      kiText = null;
+      kiErgebnis = null;
+      datenVersion.bump();
+      meldungen.zeigen('Ins Logbuch übernommen.');
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  function kiVerwerfen() {
+    kiText = null;
+    kiErgebnis = null;
+  }
+
   // --- Tresor ---------------------------------------------------------------
   let tresorOffen = $state(false);
 
@@ -314,6 +363,34 @@
               {/each}
             </ul>
           </div>
+        {/if}
+
+        {#if echteDaten}
+          {#if !kiText}
+            <button type="button" class="schlicht ki-knopf" onclick={kiVorbereiten} disabled={kiLaeuft}>
+              {kiLaeuft ? 'Moment …' : 'Von der KI verdichten lassen'}
+            </button>
+          {:else}
+            <div class="ki">
+              <strong>Das würde gesendet:</strong>
+              <pre class="ki-text">{kiText}</pre>
+              {#if kiErgebnis}
+                <strong>Antwort:</strong>
+                <div class="ki-antwort"><NoteText text={kiErgebnis} /></div>
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kiVerwerfen}>Verwerfen</button>
+                  <button type="button" class="primaer" onclick={kiUebernehmen}>Ins Logbuch übernehmen</button>
+                </div>
+              {:else}
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kiVerwerfen}>Abbrechen</button>
+                  <button type="button" class="primaer" onclick={kiSenden} disabled={kiLaeuft}>
+                    {kiLaeuft ? 'Frage …' : 'Senden'}
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
         {/if}
       </section>
     {/if}
@@ -609,6 +686,40 @@
   .brief-aktivitaet ul {
     margin: 0.3rem 0 0;
     padding-left: 1.2rem;
+  }
+
+  .ki-knopf {
+    margin-top: 0.8rem;
+  }
+  .ki {
+    margin-top: 0.9rem;
+    padding-top: 0.8rem;
+    border-top: 1px dashed var(--rahmen);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.92rem;
+  }
+  .ki-text {
+    background: var(--hintergrund);
+    border-radius: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 14rem;
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
+  .ki-antwort {
+    background: var(--hintergrund);
+    border-radius: 0.4rem;
+    padding: 0.6rem 0.8rem;
+  }
+  .ki-aktionen {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.2rem;
   }
 
   .kopf {

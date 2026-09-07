@@ -901,6 +901,151 @@ fn beobachter_stoppen(state: State<AppState>) -> R<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------- KI
+
+const META_KI_URL: &str = "ki_basis_url";
+const META_KI_MODELL: &str = "ki_modell";
+const META_KI_EINTRAG: &str = "ki_schluessel_eintrag";
+const META_KI_FELD: &str = "ki_schluessel_feld";
+
+#[derive(Serialize)]
+struct KiStatus {
+    basis_url: String,
+    modell: String,
+    schluessel_eintrag: Option<String>,
+    schluessel_feld: Option<String>,
+    /// Antwortet unter der üblichen Adresse ein Ollama? Dann geht es ohne Schlüssel.
+    ollama_da: bool,
+}
+
+/// Liest den Schlüssel aus dem Tresor. Der Tresor-Zugriff gehört in die Hülle;
+/// das Modul `ai` bekommt den Schlüssel hereingereicht (siehe `CLAUDE.md`).
+fn ki_schluessel(s: &mut Sitzung) -> lotse_core::Result<Option<String>> {
+    let Some(id) = s.store.meta_get(META_KI_EINTRAG)?.filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    let feld = s
+        .store
+        .meta_get(META_KI_FELD)?
+        .unwrap_or_else(|| "schluessel".to_string());
+    let Ok(uid) = Ulid::from_string(&id) else {
+        return Ok(None);
+    };
+    let Some(e) = s.store.tresor_eintrag(uid)? else {
+        return Ok(None);
+    };
+    Ok(Some(e.feld_lesen(&s.vault, &feld)?.to_string()))
+}
+
+fn ki_ziel(s: &mut Sitzung) -> lotse_core::Result<lotse_core::ai::Ziel> {
+    let basis_url = s
+        .store
+        .meta_get(META_KI_URL)?
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| lotse_core::ai::OLLAMA_URL.to_string());
+    let modell = s.store.meta_get(META_KI_MODELL)?.unwrap_or_default();
+    let schluessel = ki_schluessel(s)?;
+    Ok(lotse_core::ai::Ziel {
+        basis_url,
+        modell,
+        schluessel,
+    })
+}
+
+#[tauri::command]
+fn ki_status(state: State<AppState>) -> R<KiStatus> {
+    let ziel = mit(&state, ki_ziel)?;
+    // Ein kurzer Blick, ob lokal etwas antwortet – damit die Oberfläche sagen kann
+    // „Ollama läuft" statt den Nutzer raten zu lassen.
+    let ollama_da = lotse_core::ai::erreichbar(lotse_core::ai::OLLAMA_URL);
+    let (eintrag, feld) = mit(&state, |s| {
+        Ok((
+            s.store.meta_get(META_KI_EINTRAG)?,
+            s.store.meta_get(META_KI_FELD)?,
+        ))
+    })?;
+    Ok(KiStatus {
+        basis_url: ziel.basis_url,
+        modell: ziel.modell,
+        schluessel_eintrag: eintrag,
+        schluessel_feld: feld,
+        ollama_da,
+    })
+}
+
+#[tauri::command]
+fn ki_ziel_setzen(
+    state: State<AppState>,
+    basis_url: String,
+    modell: String,
+    schluessel_eintrag: String,
+    schluessel_feld: String,
+) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_KI_URL, basis_url.trim())?;
+        s.store.meta_set(META_KI_MODELL, modell.trim())?;
+        s.store
+            .meta_set(META_KI_EINTRAG, schluessel_eintrag.trim())?;
+        s.store.meta_set(META_KI_FELD, schluessel_feld.trim())?;
+        Ok(())
+    })
+}
+
+/// Modelle eines Ziels, damit niemand einen Modellnamen abtippen muss.
+/// `basis_url` kommt aus dem Formular, der Schlüssel aus dem gemerkten Tresor-Eintrag.
+#[tauri::command]
+fn ki_modelle(state: State<AppState>, basis_url: String) -> R<Vec<String>> {
+    let schluessel = mit(&state, ki_schluessel)?;
+    let ziel = lotse_core::ai::Ziel {
+        basis_url: if basis_url.trim().is_empty() {
+            lotse_core::ai::OLLAMA_URL.to_string()
+        } else {
+            basis_url.trim().to_string()
+        },
+        modell: "egal".into(),
+        schluessel,
+    };
+    lotse_core::ai::modelle(&ziel).map_err(fehler)
+}
+
+/// Genau der Text, der gesendet würde. Die Oberfläche zeigt ihn, bevor etwas das
+/// Gerät verlässt – so verlangt es das Konzept.
+#[tauri::command]
+fn ki_anfrage_text(state: State<AppState>, projekt_id: String) -> R<String> {
+    let id = ulid(&projekt_id)?;
+    mit(&state, |s| {
+        let p = s
+            .store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?;
+        let b = s.store.brief(id, now_ms())?;
+        let mut lage = String::new();
+        if let Some(u) = &b.letzte_uebergabe {
+            lage.push_str("Letzte Übergabe: ");
+            lage.push_str(u);
+            lage.push('\n');
+        } else if let Some(n) = &b.letzte_notiz {
+            lage.push_str("Letzte Notiz: ");
+            lage.push_str(n);
+            lage.push('\n');
+        }
+        lage.push_str(&format!("Letzter Kontakt vor {} Tagen.\n", b.tage_seit));
+        for (quelle, anzahl) in &b.aktivitaet_seit_letztem_besuch {
+            lage.push_str(&format!("Seitdem {anzahl} Einträge aus Quelle {quelle}.\n"));
+        }
+        let faeden: Vec<String> = b.offene_faeden.iter().map(|n| n.text.clone()).collect();
+        Ok(lotse_core::ai::anfrage_text(&lage, &faeden, &p.titel))
+    })
+}
+
+/// Schickt genau den gezeigten Text und liefert die Zusammenfassung zurück. Sie wird
+/// nicht gespeichert – der Mensch entscheidet, ob sie ins Logbuch soll.
+#[tauri::command]
+fn ki_verdichten(state: State<AppState>, eingabe: String) -> R<String> {
+    let ziel = mit(&state, ki_ziel)?;
+    lotse_core::ai::verdichten(&ziel, &eingabe).map_err(fehler)
+}
+
 // --------------------------------------------------------------- Remote-Git
 
 /// Wo der GitHub-Token liegt: Kennung eines Tresor-Eintrags und Feldname. Der Token
@@ -1307,6 +1452,11 @@ pub fn run() {
             beobachter_status,
             beobachter_starten,
             beobachter_stoppen,
+            ki_status,
+            ki_ziel_setzen,
+            ki_modelle,
+            ki_anfrage_text,
+            ki_verdichten,
             forge_status,
             forge_token_setzen,
             forge_abfragen,
