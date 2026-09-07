@@ -143,7 +143,11 @@ fn zeitpunkt(wert: &str) -> Option<(String, Option<String>, bool)> {
     };
     let utc = z.ends_with('Z');
     let z = z.trim_end_matches('Z');
-    if z.len() < 4 || !z[..4].bytes().all(|b| b.is_ascii_digit()) {
+    // Über die Bytes prüfen, nicht schneiden: `z[..4]` würde bei „000ä" mitten in ein
+    // Zeichen fassen und die Abfrage abbrechen lassen. Sind die ersten vier Bytes
+    // Ziffern, sind die Schnitte darunter sicher.
+    let b = z.as_bytes();
+    if b.len() < 4 || !b[..4].iter().all(u8::is_ascii_digit) {
         return None;
     }
     Some((datum, Some(format!("{}:{}", &z[0..2], &z[2..4])), utc))
@@ -691,5 +695,22 @@ mod tests {
         assert_eq!(ohne_titel[0].titel, "Ohne Titel");
         // Unsinniges Datum: kein Termin, kein Fehler.
         assert!(lesen("BEGIN:VEVENT\r\nDTSTART:morgen\r\nSUMMARY:x\r\nEND:VEVENT\r\n").is_empty());
+        // Auch nicht bei Zeichen, die über mehrere Bytes gehen: ein Schnitt nach dem
+        // vierten Byte läge sonst mitten im „ä".
+        for wert in [
+            "20260101T000ä00",
+            "20260101Tä",
+            "2026ä101",
+            "20260101T",
+            "20260101TäääZ",
+        ] {
+            let ics = format!("BEGIN:VEVENT\r\nDTSTART:{wert}\r\nSUMMARY:x\r\nEND:VEVENT\r\n");
+            assert!(lesen(&ics).is_empty(), "{wert}");
+        }
+        // Emoji im Titel bleibt heil.
+        let mit_emoji = lesen(
+            "BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20260101\r\nSUMMARY:Neujahr 🎉\r\nEND:VEVENT\r\n",
+        );
+        assert_eq!(mit_emoji[0].titel, "Neujahr 🎉");
     }
 }
