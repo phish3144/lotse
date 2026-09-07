@@ -40,7 +40,7 @@ pub fn neuer_als(kandidat: &str, laufend: &str) -> bool {
     ordnung(kandidat) > ordnung(laufend)
 }
 
-fn ordnung(v: &str) -> (u64, u64, u64, u8, String) {
+fn ordnung(v: &str) -> (u64, u64, u64, u8, Vec<Stueck>) {
     let v = v.trim().trim_start_matches(['v', 'V']);
     let (kern, vorab) = match v.split_once('-') {
         Some((k, s)) => (k, Some(s)),
@@ -53,8 +53,35 @@ fn ordnung(v: &str) -> (u64, u64, u64, u8, String) {
         teile.next().unwrap_or(0),
         // Eine Vorabversion kommt vor der fertigen mit derselben Nummer.
         u8::from(vorab.is_none()),
-        vorab.unwrap_or("").to_string(),
+        vorab_stuecke(vorab.unwrap_or("")),
     )
+}
+
+/// Ein Stück einer Vorab-Kennung: Zahlen zählen als Zahlen, sonst gilt der Text.
+/// Sonst stünde `rc10` vor `rc2`, weil „1" kleiner ist als „2".
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Stueck {
+    Text(String),
+    Zahl(u64),
+}
+
+fn vorab_stuecke(s: &str) -> Vec<Stueck> {
+    let mut out = Vec::new();
+    let mut rest = s;
+    while !rest.is_empty() {
+        let ziffer = rest.starts_with(|c: char| c.is_ascii_digit());
+        let bis = rest
+            .find(|c: char| c.is_ascii_digit() != ziffer)
+            .unwrap_or(rest.len());
+        let (stueck, weiter) = rest.split_at(bis);
+        out.push(if ziffer {
+            Stueck::Zahl(stueck.parse().unwrap_or(0))
+        } else {
+            Stueck::Text(stueck.to_ascii_lowercase())
+        });
+        rest = weiter;
+    }
+    out
 }
 
 /// Sucht die Datei, die auf dieses System passt. `os` und `arch` sind die Werte von
@@ -71,18 +98,29 @@ pub fn passende_datei<'a>(v: &'a Veroeffentlichung, os: &str, arch: &str) -> Opt
             && !n.starts_with("lotse-cli-")
     };
     // Reihenfolge der Endungen je System: das Übliche zuerst.
-    let endungen: &[&str] = match (os, arch) {
-        ("windows", _) => &["-setup.exe", ".msi"],
-        ("macos", "aarch64") => &["aarch64.dmg", ".dmg"],
-        ("macos", _) => &["x64.dmg", ".dmg"],
-        ("linux", _) => &[".appimage", ".deb", ".rpm"],
-        _ => &[],
+    let endungen: &[&str] = match os {
+        "windows" => &["-setup.exe", ".msi"],
+        "macos" => &[".dmg"],
+        "linux" => &[".appimage", ".deb", ".rpm"],
+        _ => return None,
+    };
+    // Der Bau muss zur Architektur passen. Ein Intel-Mac kann mit einem Bau für Apple
+    // Silicon nichts anfangen; lieber gar keine Datei anbieten als die falsche.
+    let marken: &[&str] = match arch {
+        "x86_64" => &["x64", "x86_64", "amd64", "intel", "universal"],
+        "aarch64" => &["aarch64", "arm64", "universal"],
+        _ => return None,
+    };
+    let passt = |d: &&Datei| {
+        let n = d.name.to_ascii_lowercase();
+        marken.iter().any(|m| n.contains(m))
     };
     for endung in endungen {
         if let Some(d) = v
             .dateien
             .iter()
             .filter(brauchbar)
+            .filter(passt)
             .find(|d| d.name.to_ascii_lowercase().ends_with(endung))
         {
             return Some(d);
@@ -181,6 +219,10 @@ mod tests {
         assert!(!neuer_als("0.2.0-rc1", "0.2.0"));
         // Unsinn wird zu 0.0.0 und löst nie ein Update aus.
         assert!(!neuer_als("keine Version", "0.1.0"));
+        // Vorab-Kennungen zählen ihre Zahlen als Zahlen, nicht als Text.
+        assert!(neuer_als("1.0.0-rc10", "1.0.0-rc2"));
+        assert!(!neuer_als("1.0.0-rc2", "1.0.0-rc10"));
+        assert!(neuer_als("1.0.0-rc2", "1.0.0-beta9"));
     }
 
     /// `gh_releases.json` ist die Antwort von api.github.com für dieses Repo, gekürzt
@@ -229,6 +271,29 @@ mod tests {
         );
         // Für ein System ohne Bau gibt es nichts – und keine falsche Datei.
         assert_eq!(name("freebsd", "x86_64"), None);
+        // Für Linux auf ARM liegt in diesem Release nichts bereit. Ein amd64-AppImage
+        // anzubieten wäre schlimmer als nichts anzubieten.
+        assert_eq!(name("linux", "aarch64"), None);
+    }
+
+    /// Ein Bau für die falsche Architektur läuft nicht – auf Intel-Macs schon gar nicht.
+    #[test]
+    fn bietet_nie_die_falsche_architektur_an() {
+        let v = Veroeffentlichung {
+            version: "9.9.9".into(),
+            seite: "https://x.invalid".into(),
+            vorab: false,
+            dateien: vec![Datei {
+                name: "Lotse_9.9.9_aarch64.dmg".into(),
+                url: "https://x.invalid/a.dmg".into(),
+                bytes: 1,
+            }],
+        };
+        assert_eq!(
+            passende_datei(&v, "macos", "aarch64").map(|d| d.name.as_str()),
+            Some("Lotse_9.9.9_aarch64.dmg")
+        );
+        assert!(passende_datei(&v, "macos", "x86_64").is_none());
     }
 
     #[test]

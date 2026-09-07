@@ -19,6 +19,7 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 ## Prüfen vor jedem Commit
 
 ```
+scripts/modulgrenzen.sh   # kein Tresor-Zugriff aus den Modulen, die ihn nicht haben dürfen
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 scripts/sync-e2e.sh   # Sync-Client gegen wrangler dev
 cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
@@ -30,6 +31,7 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 
 - `ai`, `detect`, `export::spiegel`, `forge`, `git`, `kalender` und `watcher` importieren **nie**
   aus `vault`. Nur `export::bundle`, die Oberfläche und die CLI dürfen Tresor-Werte lesen.
+  `scripts/modulgrenzen.sh` prüft das und läuft in CI.
 - Keine eigenen Krypto-Primitive. Nur RustCrypto, `age`, `zeroize`. Änderungen an der
   Komposition erhöhen `FORMAT_VERSION` und werden in `THREAT_MODEL.md` protokolliert.
 - Schlüssel sind `Key32` (zeroize on drop). Kein Schlüssel als `Vec<u8>` oder `String`

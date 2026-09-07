@@ -179,6 +179,16 @@
   let updateStand: UpdateStand | null = $state(null);
   let updateLaeuft = $state(false);
 
+  // Ohne eigenes Fangen bliebe eine abgelehnte Zusage unbeachtet: der Klick täte
+  // scheinbar nichts.
+  async function oeffnen(ziel: string) {
+    try {
+      await system.oeffnen(ziel);
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
   async function updatePruefen() {
     updateLaeuft = true;
     try {
@@ -592,6 +602,7 @@
     den nächsten 90 Tagen kommt. Termine wandern nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
   </p>
   <p class="hinweis klein">
+    Geholt wird der Kalender, wenn du die Projektseite öffnest, und danach höchstens alle 15 Minuten neu.
     Uhrzeiten zeigt Lotse so, wie sie im Kalender stehen; ohne Zeitzonendatenbank wäre jede Umrechnung geraten.
     Wiederholungen rechnet es aus, solange die Regel einfach ist (täglich, wöchentlich, monatlich, jährlich, auch mit
     Wochentagen). Bei komplizierteren Regeln – „zweiter Montag im Monat“ – steht nur der erste Termin und der Hinweis,
@@ -749,12 +760,12 @@
       </p>
       <div class="zeile">
         {#if updateStand.datei_url}
-          <button type="button" class="primaer" onclick={() => system.oeffnen(updateStand!.datei_url!)}>
+          <button type="button" class="primaer" onclick={() => oeffnen(updateStand!.datei_url!)}>
             Herunterladen
           </button>
         {/if}
         {#if updateStand.seite}
-          <button type="button" onclick={() => system.oeffnen(updateStand!.seite!)}>Was ist neu</button>
+          <button type="button" onclick={() => oeffnen(updateStand!.seite!)}>Was ist neu</button>
         {/if}
       </div>
     {:else}

@@ -52,20 +52,26 @@ fn fehler(e: Error) -> String {
     e.to_string()
 }
 
+/// Nimmt eine Sperre, auch wenn sie vergiftet ist.
+///
+/// Vergiftet wird sie, wenn ein Thread beim Halten abstürzt. Rust hält die Sperre
+/// danach dauerhaft geschlossen – das würde die App bis zum Neustart unbrauchbar
+/// machen, und zwar mit der Meldung „Nicht entsperrt", die nach einer gesperrten
+/// Sitzung aussieht statt nach einem Fehler. Dahinter steht eine SQLite-Verbindung;
+/// halbfertige Schreibvorgänge macht die selbst rückgängig, der Schlüssel im Speicher
+/// bleibt gültig. Weiterarbeiten ist hier die bessere Antwort als aussperren.
+fn sperre<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|vergiftet| vergiftet.into_inner())
+}
+
 fn home(state: &State<AppState>) -> R<PathBuf> {
-    state
-        .home
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())?
+    sperre(&state.home)
         .clone()
         .ok_or_else(|| "Datenordner unbekannt".to_string())
 }
 
 fn mit<T>(state: &State<AppState>, f: impl FnOnce(&mut Sitzung) -> lotse_core::Result<T>) -> R<T> {
-    let mut guard = state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())?;
+    let mut guard = sperre(&state.sitzung);
     let s = guard
         .as_mut()
         .ok_or_else(|| "Nicht entsperrt".to_string())?;
@@ -89,7 +95,7 @@ struct KontoStatus {
 #[tauri::command]
 fn konto_status(state: State<AppState>) -> R<KontoStatus> {
     let h = home(&state)?;
-    let entsperrt = state.sitzung.lock().map(|g| g.is_some()).unwrap_or(false);
+    let entsperrt = sperre(&state.sitzung).is_some();
     let geraet = konto::lesen(&h).ok().map(|k| k.geraet_name);
     Ok(KontoStatus {
         eingerichtet: konto::existiert(&h),
@@ -121,10 +127,7 @@ fn einrichten(state: State<AppState>, passwort: String, geraet: String) -> R<Geh
         desktop_schluessel: e.desktop_key.display().to_string(),
         schluesselbund,
     };
-    *state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *sperre(&state.sitzung) = Some(Sitzung {
         store: e.store,
         account_key: e.account_key,
         auth_key: e.auth_key,
@@ -171,10 +174,7 @@ fn entsperren(
         Some(dk) => VaultKeys::with_desktop_key(&u.account_key, dk),
         None => VaultKeys::from_account_key(&u.account_key),
     };
-    *state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *sperre(&state.sitzung) = Some(Sitzung {
         store: u.store,
         account_key: u.account_key,
         auth_key: u.auth_key,
@@ -262,10 +262,7 @@ fn konto_wiederherstellen(state: State<AppState>, code: String, neues_passwort: 
         Some(dk) => VaultKeys::with_desktop_key(&ak, &dk),
         None => VaultKeys::from_account_key(&ak),
     };
-    *state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *sperre(&state.sitzung) = Some(Sitzung {
         store,
         account_key: ak,
         auth_key: w.auth_key,
@@ -339,10 +336,7 @@ fn passwort_aendern(
 
     // Ohne eingerichteten Abgleich gibt es nichts zu melden; das ist kein Fehler.
     let dienst = {
-        let mut guard = state
-            .sitzung
-            .lock()
-            .map_err(|_| "Zustand gesperrt".to_string())?;
+        let mut guard = sperre(&state.sitzung);
         let s = guard
             .as_mut()
             .ok_or_else(|| "Nicht entsperrt".to_string())?;
@@ -368,10 +362,7 @@ fn passwort_aendern(
 
     // Erst wenn beides steht, gilt der neue Schlüssel auch für die laufende Sitzung.
     {
-        let mut guard = state
-            .sitzung
-            .lock()
-            .map_err(|_| "Zustand gesperrt".to_string())?;
+        let mut guard = sperre(&state.sitzung);
         if let Some(s) = guard.as_mut() {
             s.auth_key = w.auth_key;
         }
@@ -384,10 +375,7 @@ fn passwort_aendern(
 fn sperren(state: State<AppState>) -> R<()> {
     // Erst den Beobachter anhalten: er greift sonst weiter auf die Sitzung zu.
     beobachter_stoppen(state.clone())?;
-    *state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = None;
+    *sperre(&state.sitzung) = None;
     Ok(())
 }
 
@@ -687,10 +675,7 @@ fn export_bundle(state: State<AppState>, ziel: String, passphrase: String) -> R<
     // laufen ohne Sperre – sonst hinge die ganze Oberfläche am Export, „Sperren“
     // eingeschlossen.
     let b = {
-        let mut guard = state
-            .sitzung
-            .lock()
-            .map_err(|_| "Zustand gesperrt".to_string())?;
+        let mut guard = sperre(&state.sitzung);
         let s = guard
             .as_mut()
             .ok_or_else(|| "Nicht entsperrt".to_string())?;
@@ -743,11 +728,7 @@ struct BeobachterBilanz {
 
 #[tauri::command]
 fn beobachter_status(state: State<AppState>) -> R<BeobachterStatus> {
-    let laeuft = state
-        .beobachter
-        .lock()
-        .map(|g| g.is_some())
-        .unwrap_or(false);
+    let laeuft = sperre(&state.beobachter).is_some();
     let wurzeln = mit(&state, |s| lotse_core::watcher::wurzeln_laden(&s.store))?;
     Ok(BeobachterStatus {
         laeuft,
@@ -791,10 +772,7 @@ fn beobachter_starten(
     // Anhalten und Ablegen unter einer einzigen Sperre. Sonst könnten zwei fast
     // gleichzeitige Starts – ein Doppelklick genügt – einen Beobachter zurücklassen,
     // dessen Stop-Schalter niemand mehr hält.
-    let mut handle = state
-        .beobachter
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())?;
+    let mut handle = sperre(&state.beobachter);
     if let Some(vorheriger) = handle.take() {
         vorheriger.stop.store(true, Ordering::SeqCst);
     }
@@ -808,9 +786,7 @@ fn beobachter_starten(
 
         // Start braucht den Speicher nur lesend und nur kurz.
         let mut b = {
-            let Ok(mut guard) = zustand.sitzung.lock() else {
-                return;
-            };
+            let mut guard = sperre(&zustand.sitzung);
             let Some(s) = guard.as_mut() else { return };
             match lotse_core::watcher::Beobachter::starten(&s.store, pfade_thread) {
                 Ok(b) => b,
@@ -823,9 +799,7 @@ fn beobachter_starten(
 
         // Erster Durchlauf setzt den Git-Stand und findet Kandidaten.
         let schreiben = |b: &mut lotse_core::watcher::Beobachter| -> bool {
-            let Ok(mut guard) = zustand.sitzung.lock() else {
-                return false;
-            };
+            let mut guard = sperre(&zustand.sitzung);
             // Gesperrtes Konto beendet die Beobachtung.
             let Some(s) = guard.as_mut() else {
                 return false;
@@ -889,14 +863,12 @@ fn beobachter_starten(
         // eigenen: nach Anhalten und sofortigem Neustart läuft schon ein anderer
         // Thread, und dessen Eintrag darf dieser hier nicht wegräumen.
         {
-            let ergebnis = zustand.beobachter.lock();
-            if let Ok(mut g) = ergebnis {
-                let ist_meiner = g
-                    .as_ref()
-                    .is_some_and(|h| std::sync::Arc::ptr_eq(&h.stop, &stop_thread));
-                if ist_meiner {
-                    *g = None;
-                }
+            let mut g = sperre(&zustand.beobachter);
+            let ist_meiner = g
+                .as_ref()
+                .is_some_and(|h| std::sync::Arc::ptr_eq(&h.stop, &stop_thread));
+            if ist_meiner {
+                *g = None;
             }
         }
     });
@@ -916,12 +888,7 @@ fn beobachter_starten(
 #[tauri::command]
 fn beobachter_stoppen(state: State<AppState>) -> R<()> {
     use std::sync::atomic::Ordering;
-    if let Some(h) = state
-        .beobachter
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())?
-        .take()
-    {
+    if let Some(h) = sperre(&state.beobachter).take() {
         h.stop.store(true, Ordering::SeqCst);
     }
     Ok(())
@@ -1082,12 +1049,16 @@ const META_FORGE_FELD: &str = "forge_token_feld";
 const META_FORGE_EINTRAG_GITLAB: &str = "forge_token_gitlab_eintrag";
 const META_FORGE_FELD_GITLAB: &str = "forge_token_gitlab_feld";
 
-/// Die beiden Schlüssel zum Hoster.
-fn forge_meta_schluessel(anbieter: &str) -> (&'static str, &'static str) {
+/// Die beiden Schlüssel zum Hoster. Ein unbekannter Name ist ein Fehler und wird
+/// nicht stillschweigend zu GitHub – sonst landete ein GitLab-Token unter dem
+/// GitHub-Zeiger und würde später an GitHub geschickt.
+fn forge_meta_schluessel(anbieter: &str) -> R<(&'static str, &'static str)> {
     if anbieter.eq_ignore_ascii_case("gitlab") {
-        (META_FORGE_EINTRAG_GITLAB, META_FORGE_FELD_GITLAB)
+        Ok((META_FORGE_EINTRAG_GITLAB, META_FORGE_FELD_GITLAB))
+    } else if anbieter.eq_ignore_ascii_case("github") {
+        Ok((META_FORGE_EINTRAG, META_FORGE_FELD))
     } else {
-        (META_FORGE_EINTRAG, META_FORGE_FELD)
+        Err(format!("Unbekannter Hoster: {anbieter}"))
     }
 }
 
@@ -1194,7 +1165,7 @@ fn forge_token_setzen(
     eintrag_id: String,
     feld: String,
 ) -> R<()> {
-    let (k_eintrag, k_feld) = forge_meta_schluessel(&anbieter);
+    let (k_eintrag, k_feld) = forge_meta_schluessel(&anbieter)?;
     mit(&state, |s| {
         s.store.meta_set(k_eintrag, eintrag_id.trim())?;
         s.store.meta_set(k_feld, feld.trim())?;
@@ -1221,7 +1192,7 @@ struct ForgeErgebnis {
 /// Holt den Token eines Hosters aus dem Tresor. Der Tresor-Zugriff passiert hier in der
 /// Hülle; das Modul `forge` bekommt den Token hereingereicht (siehe `CLAUDE.md`).
 fn forge_token(state: &State<AppState>, anbieter: lotse_core::forge::Anbieter) -> R<Option<String>> {
-    let (k_eintrag, k_feld) = forge_meta_schluessel(anbieter.as_str());
+    let (k_eintrag, k_feld) = forge_meta_schluessel(anbieter.as_str())?;
     mit(state, |s| {
         let Some(id) = s.store.meta_get(k_eintrag)?.filter(|v| !v.is_empty()) else {
             return Ok(None);
@@ -1501,17 +1472,13 @@ fn heute() -> String {
 /// im App-Zustand und ist nach dem Beenden weg – Termine gehören dem Kalender, nicht
 /// Lotse (siehe `kalender.rs`).
 fn kalender_holen(state: &State<AppState>, ziel: &str) -> lotse_core::Result<String> {
-    if let Ok(cache) = state.kalender.lock() {
-        if let Some((geholt, ics)) = cache.get(ziel) {
-            if now_ms() - geholt < KALENDER_FRISCHE_MS {
-                return Ok(ics.clone());
-            }
+    if let Some((geholt, ics)) = sperre(&state.kalender).get(ziel) {
+        if now_ms() - geholt < KALENDER_FRISCHE_MS {
+            return Ok(ics.clone());
         }
     }
     let ics = lotse_core::kalender::holen(ziel)?;
-    if let Ok(mut cache) = state.kalender.lock() {
-        cache.insert(ziel.to_string(), (now_ms(), ics.clone()));
-    }
+    sperre(&state.kalender).insert(ziel.to_string(), (now_ms(), ics.clone()));
     Ok(ics)
 }
 
@@ -1766,10 +1733,7 @@ async fn sync_login(
     )
     .map_err(fehler)?;
     let vault = VaultKeys::from_account_key(&ak);
-    *state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *sperre(&state.sitzung) = Some(Sitzung {
         store,
         account_key: ak,
         auth_key: auth,
@@ -1790,9 +1754,8 @@ pub fn run() {
         .setup(|app| {
             let fallback = app.path().app_data_dir().ok();
             let home = konto::standard_home(fallback).unwrap_or_else(|| PathBuf::from("."));
-            if let Ok(mut h) = app.state::<AppState>().home.lock() {
-                *h = Some(home);
-            }
+            let zustand = app.state::<AppState>();
+            *sperre(&zustand.home) = Some(home);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

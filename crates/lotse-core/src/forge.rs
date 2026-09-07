@@ -53,8 +53,11 @@ pub struct RepoZeiger {
     pub repo: String,
 }
 
-/// Schneidet Host und Schema ab und sagt, wer die Gegenseite ist.
+/// Schneidet Host und Schema ab und sagt, wer die Gegenseite ist. Schema und Host
+/// werden ohne Rücksicht auf Groß- und Kleinschreibung verglichen – `GitHub.com` ist
+/// dieselbe Adresse wie `github.com`, der Rest des Pfades bleibt, wie er ist.
 fn wegweiser(z: &str) -> Option<(Anbieter, &str)> {
+    let klein = z.to_ascii_lowercase();
     for anbieter in [Anbieter::GitHub, Anbieter::GitLab] {
         let host = anbieter.host();
         for muster in [
@@ -64,8 +67,8 @@ fn wegweiser(z: &str) -> Option<(Anbieter, &str)> {
             format!("ssh://git@{host}/"),
             format!("{host}/"),
         ] {
-            if let Some(rest) = z.strip_prefix(&muster) {
-                return Some((anbieter, rest));
+            if klein.starts_with(&muster) {
+                return Some((anbieter, &z[muster.len()..]));
             }
         }
     }
@@ -79,6 +82,9 @@ impl RepoZeiger {
     /// Fehler, sondern heißt nur: dazu gibt es keine Gegenseite.
     pub fn erkennen(ziel: &str) -> Option<RepoZeiger> {
         let (anbieter, rest) = wegweiser(ziel.trim())?;
+        // Aus dem Browser kopierte Adressen tragen oft einen Anker oder Parameter mit;
+        // beides gehört nicht zum Repo-Namen.
+        let rest = rest.split(['?', '#']).next().unwrap_or(rest);
         // GitLab hängt seine Weboberfläche hinter `/-/` an: `.../repo/-/issues/3`.
         let rest = rest.split("/-/").next().unwrap_or(rest);
         let rest = rest.trim_start_matches('/').trim_end_matches('/');
@@ -200,6 +206,9 @@ impl Ci {
 pub struct Stand {
     pub offene_issues: usize,
     pub offene_prs: usize,
+    /// Die Liste war voll: es sind mindestens so viele, womöglich mehr. Ohne diese
+    /// Markierung stünde eine zu kleine Zahl im Logbuch, die wie eine genaue aussieht.
+    pub mehr_prs: bool,
     /// Titel der offenen Pull Requests, für die Notiz.
     pub pr_titel: Vec<String>,
     pub ci: Ci,
@@ -207,6 +216,10 @@ pub struct Stand {
 }
 
 // --------------------------------------------------------------- Abfrage
+
+/// So viele offene Pull- bzw. Merge-Requests werden geholt. Mehr wäre für eine Zeile im
+/// Logbuch sinnlos; dass es mehr sein können, sagt `Stand::mehr_prs`.
+const SEITE: usize = 100;
 
 pub(crate) fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
@@ -314,6 +327,7 @@ mod github {
             // GitHub zählt Pull Requests bei den Issues mit; hier sollen sie getrennt stehen.
             offene_issues: repo.open_issues_count.saturating_sub(offene_prs),
             offene_prs,
+            mehr_prs: offene_prs >= super::SEITE,
             pr_titel: prs
                 .into_iter()
                 .map(|p| {
@@ -335,7 +349,7 @@ mod github {
         let repo: RepoWire = hole(a, &basis, anbieter, token)?;
         let prs: Vec<PrWire> = hole(
             a,
-            &format!("{basis}/pulls?state=open&per_page=20"),
+            &format!("{basis}/pulls?state=open&per_page={}", super::SEITE),
             anbieter,
             token,
         )?;
@@ -419,6 +433,7 @@ mod gitlab {
             // GitLab zählt Merge Requests **nicht** bei den Issues mit; kein Abzug.
             offene_issues: issues.map(|i| i.statistics.counts.opened).unwrap_or(0),
             offene_prs: mrs.len(),
+            mehr_prs: mrs.len() >= super::SEITE,
             pr_titel: mrs
                 .into_iter()
                 .map(|m| {
@@ -440,7 +455,10 @@ mod gitlab {
         let projekt: ProjektWire = hole(a, &basis, anbieter, token)?;
         let mrs: Vec<MrWire> = hole(
             a,
-            &format!("{basis}/merge_requests?state=opened&per_page=20"),
+            &format!(
+                "{basis}/merge_requests?state=opened&per_page={}",
+                super::SEITE
+            ),
             anbieter,
             token,
         )?;
@@ -491,6 +509,8 @@ pub fn notiz(projekt_id: Ulid, zeiger: &RepoZeiger, stand: &Stand, jetzt_ms: i64
         };
         zeilen.push(if stand.offene_prs == 1 {
             format!("- 1 offener {art}:")
+        } else if stand.mehr_prs {
+            format!("- mindestens {} offene {art}s:", stand.offene_prs)
         } else {
             format!("- {} offene {art}s:", stand.offene_prs)
         });
@@ -873,10 +893,69 @@ mod tests {
     }
 
     #[test]
+    fn erkennt_adressen_unabhaengig_von_der_schreibweise() {
+        for ziel in [
+            "https://GitHub.com/phish3144/lotse",
+            "HTTPS://GITHUB.COM/phish3144/lotse",
+            "git@GitHub.com:phish3144/lotse.git",
+        ] {
+            let z = RepoZeiger::erkennen(ziel).unwrap_or_else(|| panic!("{ziel}"));
+            // Der Host ist unempfindlich, der Repo-Name nicht: GitHub unterscheidet dort
+            // Groß- und Kleinschreibung nicht, zeigt sie aber so an, wie sie steht.
+            assert_eq!(z.anzeige(), "phish3144/lotse", "{ziel}");
+        }
+    }
+
+    #[test]
+    fn wirft_anker_und_parameter_weg() {
+        for ziel in [
+            "https://github.com/phish3144/lotse#readme",
+            "https://github.com/phish3144/lotse?utm_source=x",
+            "https://github.com/phish3144/lotse.git?ref=1",
+            "https://github.com/phish3144/lotse/tree/main",
+        ] {
+            assert_eq!(
+                RepoZeiger::erkennen(ziel).map(|z| z.anzeige()).as_deref(),
+                Some("phish3144/lotse"),
+                "{ziel}"
+            );
+        }
+        assert_eq!(
+            RepoZeiger::erkennen("https://gitlab.com/gruppe/lotse?ref=1")
+                .map(|z| z.anzeige())
+                .as_deref(),
+            Some("gruppe/lotse")
+        );
+    }
+
+    #[test]
+    fn sagt_mindestens_wenn_die_liste_voll_war() {
+        let repo = RepoWire {
+            default_branch: "main".into(),
+            open_issues_count: 200,
+        };
+        let prs: Vec<PrWire> = (0..100)
+            .map(|i| PrWire {
+                title: format!("PR {i}"),
+                draft: None,
+            })
+            .collect();
+        let stand = github::stand_aus(repo, prs, None);
+        assert!(stand.mehr_prs);
+        let n = notiz(Ulid::new(), &zeiger(), &stand, 1).unwrap();
+        assert!(
+            n.text.contains("mindestens 100 offene Pull Requests"),
+            "{}",
+            n.text
+        );
+    }
+
+    #[test]
     fn schweigt_wenn_es_nichts_zu_sagen_gibt() {
         let stand = Stand {
             offene_issues: 0,
             offene_prs: 0,
+            mehr_prs: false,
             pr_titel: vec![],
             ci: Ci::Gruen,
             standard_branch: "main".into(),
@@ -889,6 +968,7 @@ mod tests {
         let stand = Stand {
             offene_issues: 3,
             offene_prs: 2,
+            mehr_prs: false,
             pr_titel: vec!["Sync-Client".into(), "Landing Page (Entwurf)".into()],
             ci: Ci::Rot,
             standard_branch: "main".into(),
@@ -908,6 +988,7 @@ mod tests {
         let stand = Stand {
             offene_issues: 0,
             offene_prs: 7,
+            mehr_prs: false,
             pr_titel: (1..=7).map(|i| format!("PR {i}")).collect(),
             ci: Ci::Gruen,
             standard_branch: "main".into(),
@@ -923,6 +1004,7 @@ mod tests {
         let stand = Stand {
             offene_issues: 0,
             offene_prs: 2,
+            mehr_prs: false,
             pr_titel: vec!["Eins".into(), "Zwei".into()],
             ci: Ci::Gruen,
             standard_branch: "main".into(),
@@ -937,6 +1019,7 @@ mod tests {
         let stand = Stand {
             offene_issues: 1,
             offene_prs: 1,
+            mehr_prs: false,
             pr_titel: vec!["Eins".into()],
             ci: Ci::Unbekannt,
             standard_branch: "main".into(),

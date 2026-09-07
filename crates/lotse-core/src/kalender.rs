@@ -52,6 +52,9 @@ pub struct Regel {
     pub bis: Option<String>,
     /// `BYDAY` bei wöchentlichem Takt: Wochentage 0 = Montag.
     pub wochentage: Vec<u8>,
+    /// `WKST`: mit welchem Tag die Woche anfängt, 0 = Montag. Entscheidet bei
+    /// `INTERVAL > 1`, welche Tage noch zur selben Woche gehören.
+    pub wochenstart: u8,
     /// `false`, wenn die Regel Teile enthält, die Lotse nicht ausrechnet (etwa
     /// `BYDAY=2MO` oder `BYSETPOS`). Dann wird nichts hochgerechnet, sondern nur
     /// gesagt, dass sich der Termin wiederholt. Lieber keine Angabe als eine falsche.
@@ -160,6 +163,7 @@ fn regel(wert: &str) -> Option<Regel> {
     let mut anzahl = None;
     let mut bis = None;
     let mut wochentage = Vec::new();
+    let mut wochenstart = 0u8;
     let mut genau = true;
 
     for teil in wert.split(';') {
@@ -193,6 +197,10 @@ fn regel(wert: &str) -> Option<Regel> {
                     }
                 }
             }
+            "WKST" => match wochentag(v) {
+                Some(n) => wochenstart = n,
+                None => genau = false,
+            },
             // Alles Weitere verschiebt oder filtert Termine auf eine Art, die hier
             // nicht nachgebaut wird.
             "BYMONTHDAY" | "BYMONTH" | "BYSETPOS" | "BYWEEKNO" | "BYYEARDAY" => genau = false,
@@ -209,6 +217,7 @@ fn regel(wert: &str) -> Option<Regel> {
         anzahl,
         bis,
         wochentage,
+        wochenstart,
         genau,
     })
 }
@@ -300,6 +309,7 @@ impl Roh {
 // ------------------------------------------------------------- Ausrechnen
 
 /// Sicherheitsnetze gegen Kalender, die täglich bis in alle Ewigkeit wiederholen.
+/// `MAX_VORKOMMEN` begrenzt die Ausgabe, `MAX_SCHRITTE` die Rechnerei je Termin.
 const MAX_VORKOMMEN: usize = 400;
 const MAX_SCHRITTE: i64 = 2000;
 
@@ -319,6 +329,19 @@ fn plus_monate(d: time::Date, n: i64) -> Option<time::Date> {
     let jahr = i32::try_from(gesamt.div_euclid(12)).ok()?;
     let monat = u8::try_from(gesamt.rem_euclid(12) + 1).ok()?;
     time::Date::from_calendar_date(jahr, time::Month::try_from(monat).ok()?, d.day()).ok()
+}
+
+/// Anfang der Woche, in der `d` liegt, gemessen an `wochenstart` (0 = Montag).
+fn wochen_anker(d: time::Date, wochenstart: u8) -> Option<time::Date> {
+    let versatz =
+        (i64::from(d.weekday().number_days_from_monday()) + 7 - i64::from(wochenstart)) % 7;
+    d.checked_sub(time::Duration::days(versatz))
+}
+
+/// Ganze Monate zwischen zwei Daten, für den Sprung ans Fenster.
+fn monate_zwischen(a: time::Date, b: time::Date) -> i64 {
+    (i64::from(b.year()) - i64::from(a.year())) * 12
+        + (i64::from(b.month() as u8) - i64::from(a.month() as u8))
 }
 
 /// Alle Vorkommen eines Termins im Fenster `[von, bis]`, beide `JJJJ-MM-TT` und
@@ -346,7 +369,9 @@ pub fn vorkommen(t: &Termin, von: &str, bis: &str) -> Vec<Termin> {
         einzeln(&mut out);
         return out;
     };
-    let (Some(start), Some(fenster_ende)) = (datum_lesen(&t.datum), datum_lesen(bis)) else {
+    let (Some(start), Some(fenster_anfang), Some(fenster_ende)) =
+        (datum_lesen(&t.datum), datum_lesen(von), datum_lesen(bis))
+    else {
         einzeln(&mut out);
         return out;
     };
@@ -355,19 +380,40 @@ pub fn vorkommen(t: &Termin, von: &str, bis: &str) -> Vec<Termin> {
         Some(u) if u < fenster_ende => u,
         _ => fenster_ende,
     };
-    let grenze = r.anzahl.map(|n| n as usize).unwrap_or(MAX_VORKOMMEN);
     let mut wochentage = r.wochentage.clone();
     wochentage.sort_unstable();
     wochentage.dedup();
 
     let tage = |n: i64| time::Duration::days(n);
+    let intervall = i64::from(r.intervall.max(1));
+
+    // Ohne `COUNT` wird bis ans Fenster vorgesprungen. Sonst zählte eine tägliche Reihe,
+    // die vor Jahren begann, ihr Sicherheitsnetz auf, lange bevor sie beim Fenster
+    // ankäme – und der Termin verschwände ganz.
+    //
+    // Mit `COUNT` wird von vorn gezählt, denn `COUNT` zählt ab dem ersten Vorkommen
+    // (RFC 5545) und muss deshalb auch die Vorkommen vor dem Fenster mitzählen.
+    let erster_schritt = if r.anzahl.is_some() {
+        0
+    } else {
+        let abstand = match r.takt {
+            Takt::Taeglich => (fenster_anfang - start).whole_days() / intervall,
+            Takt::Woechentlich => (fenster_anfang - start).whole_days() / (7 * intervall),
+            Takt::Monatlich => monate_zwischen(start, fenster_anfang) / intervall,
+            Takt::Jaehrlich => monate_zwischen(start, fenster_anfang) / (12 * intervall),
+        };
+        // Einen Schritt zurück, damit an der Kante nichts verloren geht.
+        (abstand - 1).max(0)
+    };
+
+    let grenze = r.anzahl.map(|n| n as usize).unwrap_or(usize::MAX);
     let mut gezaehlt = 0usize;
 
-    for schritt in 0..MAX_SCHRITTE {
+    for schritt in erster_schritt..erster_schritt.saturating_add(MAX_SCHRITTE) {
         if gezaehlt >= grenze || out.len() >= MAX_VORKOMMEN {
             break;
         }
-        let versatz = i64::from(r.intervall) * schritt;
+        let versatz = intervall * schritt;
         // `anker` entscheidet über den Abbruch, `treffer` sind die Tage dieses Schritts.
         // Bei Monats- und Jahrestakt kann ein Schritt ausfallen (31. Februar); dann ist
         // die Reihe nicht zu Ende, nur dieser Schritt.
@@ -381,16 +427,20 @@ pub fn vorkommen(t: &Termin, von: &str, bis: &str) -> Vec<Termin> {
                 (d, d.into_iter().collect())
             }
             Takt::Woechentlich => {
-                // Mit BYDAY zählt die Woche, nicht der einzelne Tag: erst zum Montag
-                // dieser Woche, dann die genannten Wochentage.
-                let woche = start.checked_add(tage(versatz * 7)).and_then(|d| {
-                    d.checked_sub(tage(i64::from(d.weekday().number_days_from_monday())))
-                });
+                // Mit BYDAY zählt die Woche, nicht der einzelne Tag: erst zum Anfang
+                // dieser Woche (WKST), dann die genannten Wochentage.
+                let woche = start
+                    .checked_add(tage(versatz * 7))
+                    .and_then(|d| wochen_anker(d, r.wochenstart));
                 let treffer = woche
                     .map(|w| {
                         wochentage
                             .iter()
-                            .filter_map(|n| w.checked_add(tage(i64::from(*n))))
+                            .filter_map(|n| {
+                                let ab_wochenstart =
+                                    (i64::from(*n) + 7 - i64::from(r.wochenstart)) % 7;
+                                w.checked_add(tage(ab_wochenstart))
+                            })
                             .collect()
                     })
                     .unwrap_or_default();
@@ -408,6 +458,10 @@ pub fn vorkommen(t: &Termin, von: &str, bis: &str) -> Vec<Termin> {
         if anker.is_some_and(|a| a > ende) {
             break;
         }
+        // Innerhalb eines Schritts der Reihe nach: mit WKST kann der erste Wochentag
+        // ein Sonntag sein, der vor dem Montag liegt.
+        let mut treffer = treffer;
+        treffer.sort_unstable();
         for tag in treffer {
             // BYDAY kann Tage vor dem Beginn erzeugen; die zählen nicht mit.
             if tag < start || tag > ende {
@@ -608,6 +662,7 @@ mod tests {
                 anzahl: None,
                 bis: None,
                 wochentage: vec![],
+                wochenstart: 0,
                 genau: true,
             }),
         };
@@ -633,6 +688,7 @@ mod tests {
                 anzahl: None,
                 bis: None,
                 wochentage: vec![],
+                wochenstart: 0,
                 genau: true,
             }),
         };
@@ -641,6 +697,75 @@ mod tests {
             .map(|t| t.datum)
             .collect();
         assert_eq!(v, ["2024-02-29", "2028-02-29"]);
+    }
+
+    /// Eine tägliche Reihe ohne COUNT, die vor Jahren begann, muss heute noch
+    /// auftauchen. Vorher zählte das Sicherheitsnetz die Vorkommen vor dem Fenster mit
+    /// und brach ab, bevor es überhaupt beim Fenster ankam – der Termin verschwand.
+    #[test]
+    fn alte_reihe_ohne_count_taucht_noch_auf() {
+        let t = lesen("BEGIN:VEVENT\r\nDTSTART:20180101T090000\r\nSUMMARY:Täglich\r\nRRULE:FREQ=DAILY\r\nEND:VEVENT\r\n");
+        let v = vorkommen(&t[0], "2026-09-07", "2026-09-09");
+        let daten: Vec<String> = v.into_iter().map(|t| t.datum).collect();
+        assert_eq!(daten, ["2026-09-07", "2026-09-08", "2026-09-09"]);
+
+        // Auch wöchentlich, auch monatlich, auch mit Intervall.
+        let w = lesen("BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20180101\r\nSUMMARY:Woche\r\nRRULE:FREQ=WEEKLY;INTERVAL=2\r\nEND:VEVENT\r\n");
+        assert!(!vorkommen(&w[0], "2026-09-01", "2026-09-30").is_empty());
+        let m = lesen("BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20000115\r\nSUMMARY:Monat\r\nRRULE:FREQ=MONTHLY\r\nEND:VEVENT\r\n");
+        assert_eq!(
+            vorkommen(&m[0], "2026-09-01", "2026-09-30")
+                .into_iter()
+                .map(|t| t.datum)
+                .collect::<Vec<_>>(),
+            ["2026-09-15"]
+        );
+    }
+
+    /// `COUNT` zählt ab dem ersten Vorkommen, auch über das Fenster hinaus: eine Reihe
+    /// mit `COUNT=3` ist nach dem dritten Termin zu Ende und darf später nicht wieder
+    /// auftauchen.
+    #[test]
+    fn count_zaehlt_ab_dem_ersten_vorkommen() {
+        let t = lesen("BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20260101\r\nSUMMARY:Dreimal\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEND:VEVENT\r\n");
+        assert_eq!(vorkommen(&t[0], "2026-01-01", "2026-12-31").len(), 3);
+        // Das Fenster fängt nach dem dritten Vorkommen an: nichts mehr.
+        assert!(vorkommen(&t[0], "2026-02-01", "2026-12-31").is_empty());
+    }
+
+    /// `WKST` entscheidet bei `INTERVAL > 1`, welche Tage noch zur selben Woche gehören.
+    /// Ohne Beachtung lagen die Termine hinter dem Wochenstart eine Woche zu spät.
+    #[test]
+    fn beachtet_den_wochenstart() {
+        // 2026-09-06 ist ein Sonntag. Mit WKST=SU gehören Sonntag und der folgende
+        // Montag in dieselbe Woche.
+        let t = lesen("BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20260906\r\nSUMMARY:Wkst\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO;WKST=SU\r\nEND:VEVENT\r\n");
+        let daten: Vec<String> = vorkommen(&t[0], "2026-09-01", "2026-10-15")
+            .into_iter()
+            .map(|t| t.datum)
+            .collect();
+        assert_eq!(
+            daten,
+            [
+                "2026-09-06",
+                "2026-09-07",
+                "2026-09-20",
+                "2026-09-21",
+                "2026-10-04",
+                "2026-10-05"
+            ]
+        );
+
+        // Ohne WKST bleibt es beim Montag als Wochenanfang.
+        let ohne = lesen("BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20260907\r\nSUMMARY:Ohne\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE\r\nEND:VEVENT\r\n");
+        let daten: Vec<String> = vorkommen(&ohne[0], "2026-09-01", "2026-09-30")
+            .into_iter()
+            .map(|t| t.datum)
+            .collect();
+        assert_eq!(
+            daten,
+            ["2026-09-07", "2026-09-09", "2026-09-21", "2026-09-23"]
+        );
     }
 
     #[test]

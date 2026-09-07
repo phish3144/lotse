@@ -56,9 +56,24 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
   monatlich, jährlich samt Intervall, Anzahl, Stichtag und Wochentagen: ja. „Zweiter
   Montag im Monat“ und Verwandtes: dann steht nur der erste Termin da, mit dem Hinweis,
   dass er sich wiederholt.
-- **Der selbsttätige Abruf hängt am Ordner-Beobachter.** Läuft der nicht, passiert nichts
-  von allein. Das ist Absicht: ein zweiter Hintergrundthread, der ohne sichtbaren Grund
-  ins Netz geht, wäre schlechter zu durchschauen als einer.
+- **Der selbsttätige Abruf der Gegenseite hängt am Ordner-Beobachter.** Läuft der
+  nicht, fragt Lotse GitHub und GitLab nur auf Knopfdruck. Das ist Absicht: ein
+  zweiter Hintergrundthread, der ohne sichtbaren Grund ins Netz geht, wäre schlechter
+  zu durchschauen als einer.
+
+## Wann Lotse von allein ins Netz geht
+
+Vollständig, damit nichts überrascht. Alles andere passiert nur auf Knopfdruck.
+
+| Wann | Wohin | Abschaltbar |
+|---|---|---|
+| Beim Entsperren der App, höchstens einmal am Tag | Veröffentlichungen dieses Projekts auf GitHub (Update-Hinweis) | ja, *Einstellungen → Version und Updates* |
+| Beim Öffnen einer Projektseite, die eine Kalender-Referenz hat, höchstens alle 15 Minuten je Adresse | Die eingetragene Kalenderadresse | ja, indem die Referenz entfernt wird |
+| Im Ordner-Beobachter, höchstens alle 30 Minuten | GitHub bzw. GitLab zu den erkannten Repos | ja, ausgeschaltet bis eingeschaltet, *Einstellungen → GitHub und GitLab* |
+| Beim Abgleich | Der eingerichtete Sync-Dienst | ja, kein Abgleich eingerichtet = keine Verbindung |
+
+Die KI-Verdichtung sendet nur, wenn jemand auf *Senden* drückt, und zeigt vorher den
+vollständigen Text. Telemetrie gibt es nicht, auch keine anonyme.
 
 ## Ausprobieren (CLI)
 

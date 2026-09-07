@@ -126,9 +126,9 @@ innerhalb des Ciphertexts.)
 ## 6. Isolation innerhalb der App
 
 Der Tresor ist ein eigenes Modul in `lotse-core` (`vault`). Folgende Module haben
-**keinen** Import-Pfad dorthin, geprüft per Modulsichtbarkeit und CI-Lint:
-`watcher`, `detect`, `mcp`, `ai`, `forge`, `git`, `kalender`, `export::mirror`,
-`export::site`. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
+**keinen** Import-Pfad dorthin, geprüft von `scripts/modulgrenzen.sh` bei jedem
+CI-Lauf: `watcher`, `detect`, `mcp`, `ai`, `forge`, `git`, `kalender`, `update`,
+`export::spiegel`. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
 Module holen sie nie selbst.
 KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor dem Senden an.
 
@@ -148,6 +148,11 @@ und Kontoschlüssel verlässt das Gerät nie.
 Kehrseite, ausdrücklich: Auf einem System ohne eingerichteten Wurzelspeicher (manche
 minimalen Container) schlagen alle HTTPS-Abrufe fehl. Auf Desktop-Systemen — dem Ziel
 dieser App — gibt es diesen Fall nicht.
+
+Welche dieser Verbindungen ohne Zutun des Nutzers entstehen, steht vollständig in
+`README.md` unter »Wann Lotse von allein ins Netz geht«. Jede davon ist abschaltbar,
+keine überträgt Inhalte: der Update-Hinweis und die Abfrage der Gegenseite senden nur
+die Anfrage selbst, der Kalender wird gelesen, nicht beschrieben.
 
 ## 7. Betrieb und Konto-Sicherheit
 
