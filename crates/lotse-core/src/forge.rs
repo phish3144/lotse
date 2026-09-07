@@ -208,7 +208,7 @@ pub struct Stand {
 
 // --------------------------------------------------------------- Abfrage
 
-fn agent() -> ureq::Agent {
+pub(crate) fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(20))
         .user_agent(concat!("lotse/", env!("CARGO_PKG_VERSION")))
@@ -217,7 +217,7 @@ fn agent() -> ureq::Agent {
 
 /// Ein GET mit den Kopfzeilen des jeweiligen Hosters. `kopf` trägt den Token: GitHub
 /// nimmt `Authorization: Bearer`, GitLab `PRIVATE-TOKEN`.
-fn hole<T: serde::de::DeserializeOwned>(
+pub(crate) fn hole<T: serde::de::DeserializeOwned>(
     agent: &ureq::Agent,
     url: &str,
     anbieter: Anbieter,

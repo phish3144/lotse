@@ -29,7 +29,7 @@ erhöht `FORMAT_VERSION` und wird hier protokolliert.
 | **Geräteverlust bei aktiver Sitzung** | Gerät im Konto widerrufen; Sitzungstoken verfallen; Passwortwechsel wrappt den Account-Schlüssel neu. |
 | **Alte Backups/Sync-Snapshots eines gelöschten Tresor-Eintrags** | Envelope-Encryption pro Eintrag; Löschen vernichtet den Eintragsschlüssel (Crypto-Shredding). |
 | **Bösartige Abhängigkeit** | Nur RustCrypto/`age`/`zeroize`; Versionen gepinnt; `cargo-deny` und `cargo-audit` in CI; keine Fremdskripte in der Web-App. |
-| **Manipuliertes Update** | Tauri-Updater mit minisign-Signatur; privater Signaturschlüssel offline bzw. im Passwortmanager. |
+| **Manipuliertes Update** | Solange die Bauten unsigniert sind, aktualisiert sich Lotse **nicht** selbst: es nennt nur die neue Version und die Datei dazu, herunterladen und installieren tut der Mensch. Ein Programm, das sich selbst mit unsignierten Binärdaten überschreibt, wäre der bequemste Angriffsweg überhaupt. Sobald signierte Bauten existieren (Tauri-Updater mit minisign, privater Schlüssel offline bzw. im Passwortmanager), kann daraus ein echter Updater werden. |
 
 ### Nicht verteidigt (bewusst, dokumentiert)
 

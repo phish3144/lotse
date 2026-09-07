@@ -1,0 +1,97 @@
+[
+ {
+  "tag_name": "v0.2.0",
+  "name": "Lotse v0.2.0",
+  "prerelease": true,
+  "draft": false,
+  "html_url": "https://github.com/phish3144/lotse/releases/tag/v0.2.0",
+  "published_at": "2026-09-07T09:55:58Z",
+  "assets": [
+   {
+    "name": "Lotse-0.2.0-1.x86_64.rpm",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse-0.2.0-1.x86_64.rpm",
+    "size": 9991637
+   },
+   {
+    "name": "lotse-cli-v0.2.0-aarch64-apple-darwin.tar.gz",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-aarch64-apple-darwin.tar.gz",
+    "size": 4873973
+   },
+   {
+    "name": "lotse-cli-v0.2.0-aarch64-apple-darwin.tar.gz.sha256",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-aarch64-apple-darwin.tar.gz.sha256",
+    "size": 111
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-apple-darwin.tar.gz",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-apple-darwin.tar.gz",
+    "size": 4699462
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-apple-darwin.tar.gz.sha256",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-apple-darwin.tar.gz.sha256",
+    "size": 110
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-pc-windows-msvc.zip",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-pc-windows-msvc.zip",
+    "size": 4632697
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-pc-windows-msvc.zip.sha256",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-pc-windows-msvc.zip.sha256",
+    "size": 111
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+    "size": 6542522
+   },
+   {
+    "name": "lotse-cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/lotse-cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256",
+    "size": 115
+   },
+   {
+    "name": "Lotse_0.2.0_aarch64.dmg",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_aarch64.dmg",
+    "size": 7106370
+   },
+   {
+    "name": "Lotse_0.2.0_amd64.AppImage",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_amd64.AppImage",
+    "size": 86985208
+   },
+   {
+    "name": "Lotse_0.2.0_amd64.deb",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_amd64.deb",
+    "size": 9992232
+   },
+   {
+    "name": "Lotse_0.2.0_x64-setup.exe",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_x64-setup.exe",
+    "size": 4755795
+   },
+   {
+    "name": "Lotse_0.2.0_x64.dmg",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_x64.dmg",
+    "size": 6975389
+   },
+   {
+    "name": "Lotse_0.2.0_x64_en-US.msi",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_0.2.0_x64_en-US.msi",
+    "size": 6762496
+   },
+   {
+    "name": "Lotse_aarch64.app.tar.gz",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_aarch64.app.tar.gz",
+    "size": 6983080
+   },
+   {
+    "name": "Lotse_x64.app.tar.gz",
+    "browser_download_url": "https://github.com/phish3144/lotse/releases/download/v0.2.0/Lotse_x64.app.tar.gz",
+    "size": 6857704
+   }
+  ]
+ }
+]

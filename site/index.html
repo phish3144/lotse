@@ -731,7 +731,7 @@ Zeit      6. September 2026, 21:14</pre></div>
     <div class="places">
       <div class="place reveal">
         <div class="h"><h3>Desktop-App</h3><span class="tag acc">Vorschau 0.2</span></div>
-        <p>Hafen, Brief, Logbuch, offene Fäden, Tresor mit beiden Stufen, Ordner-Beobachter, Stand von GitHub und GitLab, Termine aus deinem Kalender, Suche und Export. Windows, macOS und Linux.</p>
+        <p>Hafen, Brief, Logbuch, offene Fäden, Tresor mit beiden Stufen, Ordner-Beobachter, Stand von GitHub und GitLab, Termine aus deinem Kalender, Suche und Export. Sagt Bescheid, wenn eine neue Version da ist. Windows, macOS und Linux.</p>
         <div class="m">läuft komplett lokal · Daten in einer verschlüsselten Datei</div>
       </div>
       <div class="link" aria-hidden="true"><div class="env"></div></div>
@@ -816,7 +816,7 @@ export LOTSE_HOME=~/.lotse
       <details class="q reveal"><summary>Was passiert, wenn ich mein Passwort vergesse?</summary><p>Du nutzt den Wiederherstellungscode, den Lotse beim Einrichten einmal anzeigt. Bewahre ihn im Passwortmanager auf. Ohne Passwort und ohne Code kann niemand die Daten öffnen, auch wir nicht.</p></details>
       <details class="q reveal"><summary>Ersetzt Lotse meinen Passwortmanager?</summary><p>Nein, und das soll es auch nicht. Web-Logins gehören weiter in Proton Pass, Bitwarden oder 1Password. Lotse hält, was zu einem Projekt gehört und sonst in einer Textdatei landen würde: der Router vom Bauprojekt, der API-Schlüssel der Website, der Kundenzugang.</p></details>
       <details class="q reveal"><summary>Wie fertig ist das Ganze?</summary><p>Eine frühe Vorschau. Der Kern (Speicher, Verschlüsselung, Tresor, Sync, Erkennung, Beobachter, Abruf von GitHub und GitLab) ist getestet und läuft in der Kommandozeile. Die Desktop-App bindet ihn an und wächst gerade; Systemleiste, automatisches Sperren und Updates folgen. Der Zugriff aus dem Browser ist der nächste große Schritt.</p></details>
-      <details class="q reveal"><summary>Warum sind die Installer unsigniert?</summary><p>Signaturzertifikate kosten Geld und Zeit, die im Moment in die Anwendung gehen. Der Quellcode ist öffentlich, jeder Build entsteht nachvollziehbar aus ihm, und neben jedem Archiv liegt eine Prüfsumme.</p></details>
+      <details class="q reveal"><summary>Warum sind die Installer unsigniert?</summary><p>Signaturzertifikate kosten Geld und Zeit, die im Moment in die Anwendung gehen. Der Quellcode ist öffentlich, jeder Build entsteht nachvollziehbar aus ihm, und neben jedem Archiv liegt eine Prüfsumme. Solange das so ist, ersetzt sich Lotse nicht selbst: es sagt nur Bescheid, wenn eine neue Version da ist, und nennt die Datei für dein System. Den letzten Schritt machst du.</p></details>
     </div>
   </div>
 </section>

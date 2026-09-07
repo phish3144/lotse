@@ -96,6 +96,8 @@ enum Cmd {
     Sync(SyncCmd),
     /// MCP-Server über stdin/stdout für KI-Assistenten (z. B. `claude mcp add lotse -- lotse mcp`)
     Mcp,
+    /// Nachsehen, ob es eine neuere Version gibt (lädt nichts herunter)
+    Update,
     /// Anstehende Termine aus abonnierten Kalendern (.ics) zeigen
     Termine {
         /// Nur dieses Projekt; ohne Angabe alle mit Kalender-Referenz
@@ -293,6 +295,10 @@ fn run() -> Result<()> {
     if let Cmd::Sync(SyncCmd::Login { url, email, geraet }) = &cli.cmd {
         return sync_login(&home, url, email, geraet);
     }
+    // Nachsehen, ob es eine neuere Version gibt, geht ohne Konto und ohne Passwort.
+    if let Cmd::Update = &cli.cmd {
+        return update_pruefen();
+    }
 
     let konto::Entsperrt {
         konto: konto_daten,
@@ -301,7 +307,7 @@ fn run() -> Result<()> {
         auth_key,
     } = oeffnen(&home)?;
     match cli.cmd {
-        Cmd::Init { .. } => unreachable!(),
+        Cmd::Init { .. } | Cmd::Update => unreachable!(),
         Cmd::Hafen => hafen(&store),
         Cmd::Log {
             text,
@@ -382,6 +388,31 @@ fn run() -> Result<()> {
     }
 }
 
+/// Sieht nach, ob es eine neuere Version gibt. Lädt nichts und führt nichts aus –
+/// die Installer sind unsigniert (siehe `docs/THREAT_MODEL.md`).
+fn update_pruefen() -> Result<()> {
+    let laufend = env!("CARGO_PKG_VERSION");
+    let repo = lotse_core::update::eigenes_repo();
+    // Solange es nur Vorabversionen gibt, wären fertige Versionen eine leere Liste.
+    let Some(v) = lotse_core::update::neueste(&repo, true)? else {
+        println!("Version {laufend}. Keine Veröffentlichung gefunden.");
+        return Ok(());
+    };
+    if !lotse_core::update::neuer_als(&v.version, laufend) {
+        println!("Version {laufend} ist die neueste.");
+        return Ok(());
+    }
+    let vorab = if v.vorab { " (Vorabversion)" } else { "" };
+    println!("Version {} ist da{vorab}, hier läuft {laufend}.", v.version);
+    if let Some(d) =
+        lotse_core::update::passende_datei(&v, std::env::consts::OS, std::env::consts::ARCH)
+    {
+        println!("  {}  {}", d.name, d.url);
+    }
+    println!("  Alle Dateien: {}", v.seite);
+    Ok(())
+}
+
 /// Zeigt, was ansteht: Termine aus den Kalender-Referenzen der Projekte. Lotse
 /// schreibt sie nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
 fn termine(store: &Store, projekt: Option<&str>, tage: i64) -> Result<()> {
@@ -441,9 +472,12 @@ fn termine(store: &Store, projekt: Option<&str>, tage: i64) -> Result<()> {
 }
 
 /// Zeiger auf den Tresor-Eintrag mit dem Token – dieselben Schlüssel wie in der App,
-/// damit beide Oberflächen dieselbe Einstellung nutzen.
+/// damit beide Oberflächen dieselbe Einstellung nutzen. Je Hoster getrennt: ein Token
+/// für GitHub wird nie an GitLab geschickt.
 const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
 const META_FORGE_FELD: &str = "forge_token_feld";
+const META_FORGE_EINTRAG_GITLAB: &str = "forge_token_gitlab_eintrag";
+const META_FORGE_FELD_GITLAB: &str = "forge_token_gitlab_feld";
 
 /// Holt den Stand von GitHub oder GitLab. Den Token liefert entweder die Umgebung
 /// (`LOTSE_FORGE_TOKEN`) oder der in der App hinterlegte Tresor-Eintrag.
@@ -475,16 +509,26 @@ fn gegenseite(
         );
     }
 
-    let token = match std::env::var("LOTSE_FORGE_TOKEN")
-        .ok()
-        .filter(|t| !t.is_empty())
-    {
-        Some(t) => Some(t),
-        None => forge_token_aus_tresor(store, ak, geraet_id)?,
-    };
+    // Je Hoster ein eigener Token, aus der Umgebung oder aus dem Tresor.
+    let mut token_github = None;
+    let mut token_gitlab = None;
+    for anbieter in ziele.iter().map(|(_, z, _)| z.anbieter) {
+        let ziel = match anbieter {
+            forge::Anbieter::GitHub => &mut token_github,
+            forge::Anbieter::GitLab => &mut token_gitlab,
+        };
+        if ziel.is_none() {
+            *ziel = Some(forge_token(store, ak, geraet_id, anbieter)?);
+        }
+    }
 
     for (p, z, h) in ziele {
-        let stand = match forge::abfragen(&z, token.as_deref()) {
+        let token = match z.anbieter {
+            forge::Anbieter::GitHub => &token_github,
+            forge::Anbieter::GitLab => &token_gitlab,
+        };
+        let token = token.as_ref().and_then(|t| t.as_deref());
+        let stand = match forge::abfragen(&z, token) {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("{}: {e}", z.anzeige());
@@ -520,12 +564,27 @@ fn gegenseite(
     Ok(())
 }
 
-/// Liest den Token aus dem Tresor, falls in der App ein Eintrag hinterlegt wurde.
-fn forge_token_aus_tresor(store: &Store, ak: &Key32, geraet_id: Ulid) -> Result<Option<String>> {
-    let Some(id) = store
-        .meta_get(META_FORGE_EINTRAG)?
-        .filter(|v| !v.is_empty())
-    else {
+/// Den Token eines Hosters: erst aus der Umgebung, sonst aus dem Tresor-Eintrag, den
+/// die App hinterlegt hat.
+fn forge_token(
+    store: &Store,
+    ak: &Key32,
+    geraet_id: Ulid,
+    anbieter: lotse_core::forge::Anbieter,
+) -> Result<Option<String>> {
+    use lotse_core::forge::Anbieter;
+    let (umgebung, k_eintrag, k_feld) = match anbieter {
+        Anbieter::GitHub => ("LOTSE_GITHUB_TOKEN", META_FORGE_EINTRAG, META_FORGE_FELD),
+        Anbieter::GitLab => (
+            "LOTSE_GITLAB_TOKEN",
+            META_FORGE_EINTRAG_GITLAB,
+            META_FORGE_FELD_GITLAB,
+        ),
+    };
+    if let Some(t) = std::env::var(umgebung).ok().filter(|t| !t.is_empty()) {
+        return Ok(Some(t));
+    }
+    let Some(id) = store.meta_get(k_eintrag)?.filter(|v| !v.is_empty()) else {
         return Ok(None);
     };
     let Ok(uid) = Ulid::from_string(&id) else {
@@ -535,7 +594,7 @@ fn forge_token_aus_tresor(store: &Store, ak: &Key32, geraet_id: Ulid) -> Result<
         return Ok(None);
     };
     let feld = store
-        .meta_get(META_FORGE_FELD)?
+        .meta_get(k_feld)?
         .unwrap_or_else(|| "token".to_string());
     let keys = vault_keys(ak, geraet_id)?;
     Ok(Some(e.feld_lesen(&keys, &feld)?.to_string()))

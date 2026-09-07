@@ -12,6 +12,7 @@
     konto,
     sync,
     system,
+    update,
     type BeobachterStatus,
     type ForgeStatus,
     type KiStatus,
@@ -19,6 +20,7 @@
     type KontoStatus,
     type SyncErgebnis,
     type SyncStatus,
+    type UpdateStand,
   } from '../lib/data/tauri';
   import { datumText } from '../lib/format';
   import { meldungen } from '../lib/meldung.svelte';
@@ -122,14 +124,18 @@
   let tresorEintraege: { id: string; titel: string; felder: { name: string }[] }[] = $state([]);
   let forgeEintrag = $state('');
   let forgeFeld = $state('token');
+  let forgeEintragGitlab = $state('');
+  let forgeFeldGitlab = $state('token');
   let forgeLaeuft = $state(false);
 
-  async function forgeVerbinden(e: Event) {
-    e.preventDefault();
+  // Je Hoster eine eigene Bindung: ein GitHub-Token darf nie bei GitLab landen.
+  async function forgeVerbinden(anbieter: 'GitHub' | 'GitLab') {
+    const eintrag = anbieter === 'GitHub' ? forgeEintrag : forgeEintragGitlab;
+    const feld = (anbieter === 'GitHub' ? forgeFeld : forgeFeldGitlab).trim() || 'token';
     try {
-      await forge.tokenSetzen(forgeEintrag, forgeFeld.trim() || 'token');
+      await forge.tokenSetzen(anbieter, eintrag, feld);
       forgeStatus = await forge.status();
-      meldungen.zeigen(forgeEintrag ? 'Token hinterlegt.' : 'Token-Bindung gelöst.');
+      meldungen.zeigen(eintrag ? `Token für ${anbieter} hinterlegt.` : `Token-Bindung für ${anbieter} gelöst.`);
     } catch (e2) {
       meldungen.fehler(e2);
     }
@@ -166,6 +172,31 @@
       meldungen.fehler(e);
     } finally {
       forgeLaeuft = false;
+    }
+  }
+
+  // --- Version und Updates --------------------------------------------------
+  let updateStand: UpdateStand | null = $state(null);
+  let updateLaeuft = $state(false);
+
+  async function updatePruefen() {
+    updateLaeuft = true;
+    try {
+      updateStand = await update.pruefen(true);
+      if (!updateStand.neu) meldungen.zeigen('Diese Version ist die neueste.');
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      updateLaeuft = false;
+    }
+  }
+
+  async function updateAutomatischUmschalten(an: boolean) {
+    try {
+      await update.automatischSetzen(an);
+      updateStand = await update.pruefen(false);
+    } catch (e) {
+      meldungen.fehler(e);
     }
   }
 
@@ -228,6 +259,9 @@
       forgeStatus = await forge.status();
       forgeEintrag = forgeStatus.token_eintrag ?? '';
       forgeFeld = forgeStatus.token_feld ?? 'token';
+      forgeEintragGitlab = forgeStatus.token_eintrag_gitlab ?? '';
+      forgeFeldGitlab = forgeStatus.token_feld_gitlab ?? 'token';
+      updateStand = await update.pruefen(false);
       tresorEintraege = await provider.listAllVaultEntries();
       kiStatus = await ki.status();
       kiUrl = kiStatus.basis_url;
@@ -504,19 +538,29 @@
         </li>
       {/each}
     </ul>
-    <form class="zeile" onsubmit={forgeVerbinden}>
-      <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem Token">
-        <option value="">Ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
+    <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitHub'); }}>
+      <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem GitHub-Token">
+        <option value="">GitHub ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
         {#each tresorEintraege as t (t.id)}
-          <option value={t.id}>{t.titel}</option>
+          <option value={t.id}>GitHub: {t.titel}</option>
         {/each}
       </select>
       <input bind:value={forgeFeld} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
       <button type="submit">Merken</button>
     </form>
+    <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitLab'); }}>
+      <select bind:value={forgeEintragGitlab} aria-label="Tresor-Eintrag mit dem GitLab-Token">
+        <option value="">GitLab ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
+        {#each tresorEintraege as t (t.id)}
+          <option value={t.id}>GitLab: {t.titel}</option>
+        {/each}
+      </select>
+      <input bind:value={forgeFeldGitlab} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
+      <button type="submit">Merken</button>
+    </form>
     <p class="hinweis klein">
-      Für private Repos und ein größeres Kontingent: einen Token als Tresor-Eintrag anlegen und hier wählen. Lotse
-      liest ihn nur beim Abfragen und schickt ihn nur an den Hoster, zu dem das Repo gehört.
+      Für private Repos und ein größeres Kontingent: einen Token als Tresor-Eintrag anlegen und hier wählen – je
+      Hoster getrennt, damit ein GitHub-Token nie bei GitLab landet. Lotse liest ihn nur beim Abfragen.
     </p>
     <label class="schalter">
       <input
@@ -530,7 +574,7 @@
       Dann fragt Lotse die Gegenseite selbsttätig ab, solange der Beobachter läuft – höchstens alle 30 Minuten,
       damit das Kontingent reicht.
       {#if forgeStatus.zuletzt}
-        Zuletzt: {new Date(forgeStatus.zuletzt).toLocaleString('de-DE')}.
+        Zuletzt versucht: {new Date(forgeStatus.zuletzt).toLocaleString('de-DE')}.
       {/if}
     </p>
     <button type="button" class="primaer" onclick={forgeAbfragen} disabled={forgeLaeuft}>
@@ -681,7 +725,61 @@
     {/if}
   </section>
 
-  <section aria-labelledby="geraet-titel">
+  <section aria-labelledby="update-titel">
+  <h2 id="update-titel">Version und Updates</h2>
+  {#if !echteDaten}
+    <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {:else if !updateStand}
+    <p class="hinweis">Lade Status…</p>
+  {:else}
+    <dl class="werte">
+      <dt>Diese Version</dt>
+      <dd>{updateStand.laufend}</dd>
+      {#if updateStand.zuletzt}
+        <dt>Zuletzt nachgesehen</dt>
+        <dd>{new Date(updateStand.zuletzt).toLocaleString('de-DE')}</dd>
+      {/if}
+    </dl>
+    {#if updateStand.neu}
+      <p class="hinweis">
+        <strong>Version {updateStand.neu} ist da{updateStand.vorab ? ' (Vorabversion)' : ''}.</strong>
+        {#if updateStand.datei}
+          Für dieses System: <code>{updateStand.datei}</code>.
+        {/if}
+      </p>
+      <div class="zeile">
+        {#if updateStand.datei_url}
+          <button type="button" class="primaer" onclick={() => system.oeffnen(updateStand!.datei_url!)}>
+            Herunterladen
+          </button>
+        {/if}
+        {#if updateStand.seite}
+          <button type="button" onclick={() => system.oeffnen(updateStand!.seite!)}>Was ist neu</button>
+        {/if}
+      </div>
+    {:else}
+      <p class="hinweis">Keine neuere Version bekannt.</p>
+    {/if}
+    <label class="schalter">
+      <input
+        type="checkbox"
+        checked={updateStand.automatisch}
+        onchange={(e) => updateAutomatischUmschalten(e.currentTarget.checked)}
+      />
+      Beim Entsperren nachsehen, höchstens einmal am Tag
+    </label>
+    <p class="hinweis klein">
+      Nachsehen heißt: eine Anfrage an die Veröffentlichungen dieses Projekts auf GitHub. GitHub sieht dabei die
+      IP-Adresse, sonst nichts – kein Konto, keine Kennung, keine Nutzungsdaten. Heruntergeladen und installiert wird
+      nichts von allein: die Installer sind unsigniert, deshalb bleibt der letzte Schritt bewusst deiner.
+    </p>
+    <button type="button" onclick={updatePruefen} disabled={updateLaeuft}>
+      {updateLaeuft ? 'Sehe nach …' : 'Jetzt nachsehen'}
+    </button>
+  {/if}
+</section>
+
+<section aria-labelledby="geraet-titel">
     <h2 id="geraet-titel">Dieses Gerät</h2>
     {#if kontoStatus}
       <dl class="werte">

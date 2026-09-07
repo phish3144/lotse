@@ -34,6 +34,8 @@ pub mod mcp;
 #[cfg(feature = "native")]
 pub mod store;
 #[cfg(feature = "native")]
+pub mod update;
+#[cfg(feature = "native")]
 pub mod watcher;
 
 pub use error::{Error, Result};

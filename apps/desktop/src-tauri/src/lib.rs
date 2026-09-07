@@ -1074,11 +1074,24 @@ fn ki_verdichten(state: State<AppState>, eingabe: String) -> R<String> {
 
 // --------------------------------------------------------------- Remote-Git
 
-/// Wo der GitHub-Token liegt: Kennung eines Tresor-Eintrags und Feldname. Der Token
-/// selbst steht nie hier, nur der Zeiger darauf.
+/// Wo der Token liegt: Kennung eines Tresor-Eintrags und Feldname, je Hoster getrennt.
+/// Der Token selbst steht nie hier, nur der Zeiger darauf – und ein Token für GitHub
+/// wird nie an GitLab geschickt, auch nicht versehentlich.
 const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
 const META_FORGE_FELD: &str = "forge_token_feld";
-/// „Von allein mitlaufen“: der Beobachter fragt GitHub in großem Abstand mit ab.
+const META_FORGE_EINTRAG_GITLAB: &str = "forge_token_gitlab_eintrag";
+const META_FORGE_FELD_GITLAB: &str = "forge_token_gitlab_feld";
+
+/// Die beiden Schlüssel zum Hoster.
+fn forge_meta_schluessel(anbieter: &str) -> (&'static str, &'static str) {
+    if anbieter.eq_ignore_ascii_case("gitlab") {
+        (META_FORGE_EINTRAG_GITLAB, META_FORGE_FELD_GITLAB)
+    } else {
+        (META_FORGE_EINTRAG, META_FORGE_FELD)
+    }
+}
+
+/// „Von allein mitlaufen“: der Beobachter fragt die Gegenseite in großem Abstand mit ab.
 const META_FORGE_AUTO: &str = "forge_auto";
 /// Zeitpunkt der letzten Abfrage, damit ein Neustart nicht sofort wieder anfragt.
 const META_FORGE_ZULETZT: &str = "forge_zuletzt";
@@ -1102,10 +1115,12 @@ struct ForgeProjekt {
 
 #[derive(Serialize)]
 struct ForgeStatus {
-    /// Projekte mit einem erkannten GitHub-Repo.
+    /// Projekte mit einem erkannten Repo auf der Gegenseite.
     projekte: Vec<ForgeProjekt>,
     token_eintrag: Option<String>,
     token_feld: Option<String>,
+    token_eintrag_gitlab: Option<String>,
+    token_feld_gitlab: Option<String>,
     auto: bool,
     zuletzt: Option<i64>,
 }
@@ -1159,6 +1174,8 @@ fn forge_status(state: State<AppState>) -> R<ForgeStatus> {
             projekte,
             token_eintrag: s.store.meta_get(META_FORGE_EINTRAG)?,
             token_feld: s.store.meta_get(META_FORGE_FELD)?,
+            token_eintrag_gitlab: s.store.meta_get(META_FORGE_EINTRAG_GITLAB)?,
+            token_feld_gitlab: s.store.meta_get(META_FORGE_FELD_GITLAB)?,
             auto: s.store.meta_get(META_FORGE_AUTO)?.as_deref() == Some("1"),
             zuletzt: s
                 .store
@@ -1168,12 +1185,19 @@ fn forge_status(state: State<AppState>) -> R<ForgeStatus> {
     })
 }
 
-/// Merkt sich, welcher Tresor-Eintrag den Token hält. Leere Kennung löst die Bindung.
+/// Merkt sich, welcher Tresor-Eintrag den Token für einen Hoster hält. Leere Kennung
+/// löst die Bindung.
 #[tauri::command]
-fn forge_token_setzen(state: State<AppState>, eintrag_id: String, feld: String) -> R<()> {
+fn forge_token_setzen(
+    state: State<AppState>,
+    anbieter: String,
+    eintrag_id: String,
+    feld: String,
+) -> R<()> {
+    let (k_eintrag, k_feld) = forge_meta_schluessel(&anbieter);
     mit(&state, |s| {
-        s.store.meta_set(META_FORGE_EINTRAG, eintrag_id.trim())?;
-        s.store.meta_set(META_FORGE_FELD, feld.trim())?;
+        s.store.meta_set(k_eintrag, eintrag_id.trim())?;
+        s.store.meta_set(k_feld, feld.trim())?;
         Ok(())
     })
 }
@@ -1194,20 +1218,17 @@ struct ForgeErgebnis {
     fehler: Vec<String>,
 }
 
-/// Holt den Token aus dem Tresor. Der Tresor-Zugriff passiert hier in der Hülle; das
-/// Modul `forge` bekommt den Token hereingereicht (siehe `CLAUDE.md`).
-fn forge_token(state: &State<AppState>) -> R<Option<String>> {
+/// Holt den Token eines Hosters aus dem Tresor. Der Tresor-Zugriff passiert hier in der
+/// Hülle; das Modul `forge` bekommt den Token hereingereicht (siehe `CLAUDE.md`).
+fn forge_token(state: &State<AppState>, anbieter: lotse_core::forge::Anbieter) -> R<Option<String>> {
+    let (k_eintrag, k_feld) = forge_meta_schluessel(anbieter.as_str());
     mit(state, |s| {
-        let Some(id) = s
-            .store
-            .meta_get(META_FORGE_EINTRAG)?
-            .filter(|v| !v.is_empty())
-        else {
+        let Some(id) = s.store.meta_get(k_eintrag)?.filter(|v| !v.is_empty()) else {
             return Ok(None);
         };
         let feld = s
             .store
-            .meta_get(META_FORGE_FELD)?
+            .meta_get(k_feld)?
             .unwrap_or_else(|| "token".to_string());
         let Ok(uid) = Ulid::from_string(&id) else {
             return Ok(None);
@@ -1231,8 +1252,23 @@ fn forge_lauf(
     use std::sync::atomic::Ordering;
     let angehalten = || abbruch.is_some_and(|a| a.load(Ordering::SeqCst));
 
-    let token = forge_token(state)?;
     let ziele = forge_ziele(state, nur)?;
+    let versuche = ziele.len();
+
+    // Je Hoster ein Token, einmal geholt. Ein Token für GitHub geht nie an GitLab.
+    let mut token_github = None;
+    let mut token_gitlab = None;
+    for anbieter in ziele.iter().map(|(_, z, _)| z.anbieter) {
+        match anbieter {
+            lotse_core::forge::Anbieter::GitHub if token_github.is_none() => {
+                token_github = Some(forge_token(state, anbieter)?)
+            }
+            lotse_core::forge::Anbieter::GitLab if token_gitlab.is_none() => {
+                token_gitlab = Some(forge_token(state, anbieter)?)
+            }
+            _ => {}
+        }
+    }
 
     let mut notizen = 0usize;
     let mut fehler = Vec::new();
@@ -1242,8 +1278,13 @@ fn forge_lauf(
         if angehalten() {
             break;
         }
+        let token = match z.anbieter {
+            lotse_core::forge::Anbieter::GitHub => &token_github,
+            lotse_core::forge::Anbieter::GitLab => &token_gitlab,
+        };
+        let token = token.as_ref().and_then(|t| t.as_deref());
         // Ohne gehaltene Sperre abfragen: das geht übers Netz und dauert.
-        match lotse_core::forge::abfragen(&z, token.as_deref()) {
+        match lotse_core::forge::abfragen(&z, token) {
             Ok(stand) => {
                 abgefragt += 1;
                 if angehalten() {
@@ -1258,7 +1299,11 @@ fn forge_lauf(
         }
     }
 
-    if abgefragt > 0 && !angehalten() {
+    // Der Zeitpunkt zählt den Versuch, nicht den Erfolg – und nur bei einem vollen
+    // Durchlauf. Sonst liefe der Beobachter ohne Netz alle zwanzig Sekunden wieder los,
+    // und eine Abfrage für ein einzelnes Projekt würde den nächsten vollen Durchlauf
+    // verschieben.
+    if nur.is_none() && versuche > 0 && !angehalten() {
         mit(state, |s| {
             s.store.meta_set(META_FORGE_ZULETZT, &now_ms().to_string())
         })?;
@@ -1313,6 +1358,107 @@ fn forge_faellig(state: &State<AppState>) -> bool {
         Ok(now_ms() - zuletzt >= FORGE_ABSTAND_MS)
     });
     entscheidung.unwrap_or(false)
+}
+
+// ------------------------------------------------------------------ Update
+
+/// Ob beim Start nachgesehen wird. Gesetzt heißt „nein"; ohne Eintrag wird nachgesehen.
+const META_UPDATE_AUS: &str = "update_aus";
+/// Zeitpunkt der letzten Prüfung, damit nicht jeder Start anfragt.
+const META_UPDATE_ZULETZT: &str = "update_zuletzt";
+const UPDATE_ABSTAND_MS: i64 = 24 * 60 * 60 * 1000;
+
+#[derive(Serialize, Clone)]
+struct UpdateStand {
+    /// Laufende Version dieser App.
+    laufend: String,
+    /// Neuere Version, falls es eine gibt.
+    neu: Option<String>,
+    /// Seite mit allen Dateien und dem Änderungstext.
+    seite: Option<String>,
+    /// Datei für dieses System, falls es eine gibt.
+    datei: Option<String>,
+    datei_url: Option<String>,
+    datei_bytes: Option<u64>,
+    vorab: bool,
+    /// Wird beim Start nachgesehen?
+    automatisch: bool,
+    zuletzt: Option<i64>,
+}
+
+fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Sieht nach, ob es eine neuere Version gibt. Lädt nichts und führt nichts aus:
+/// die Installer sind unsigniert, deshalb bleibt das Herunterladen Sache des Menschen
+/// (siehe `docs/THREAT_MODEL.md`).
+#[tauri::command]
+fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateStand> {
+    let (automatisch, zuletzt) = mit(&state, |s| {
+        Ok((
+            s.store.meta_get(META_UPDATE_AUS)?.as_deref() != Some("1"),
+            s.store
+                .meta_get(META_UPDATE_ZULETZT)?
+                .and_then(|v| v.parse::<i64>().ok()),
+        ))
+    })?;
+    let laufend = app_version();
+    let leer = UpdateStand {
+        laufend: laufend.clone(),
+        neu: None,
+        seite: None,
+        datei: None,
+        datei_url: None,
+        datei_bytes: None,
+        vorab: false,
+        automatisch,
+        zuletzt,
+    };
+
+    let erzwingen = erzwingen.unwrap_or(false);
+    if !erzwingen {
+        // Ohne ausdrücklichen Wunsch nur, wenn es eingeschaltet und lange genug her ist.
+        if !automatisch || zuletzt.is_some_and(|z| now_ms() - z < UPDATE_ABSTAND_MS) {
+            return Ok(leer);
+        }
+    }
+
+    // Solange es nur Vorabversionen gibt, wären fertige Versionen eine leere Liste.
+    let gefunden = lotse_core::update::neueste(&lotse_core::update::eigenes_repo(), true)
+        .map_err(fehler)?;
+    let jetzt = now_ms();
+    mit(&state, |s| {
+        s.store.meta_set(META_UPDATE_ZULETZT, &jetzt.to_string())
+    })?;
+
+    let Some(v) = gefunden.filter(|v| lotse_core::update::neuer_als(&v.version, &laufend)) else {
+        return Ok(UpdateStand {
+            zuletzt: Some(jetzt),
+            ..leer
+        });
+    };
+    let datei = lotse_core::update::passende_datei(&v, std::env::consts::OS, std::env::consts::ARCH);
+    Ok(UpdateStand {
+        laufend,
+        neu: Some(v.version.clone()),
+        seite: Some(v.seite.clone()),
+        datei: datei.map(|d| d.name.clone()),
+        datei_url: datei.map(|d| d.url.clone()),
+        datei_bytes: datei.map(|d| d.bytes),
+        vorab: v.vorab,
+        automatisch,
+        zuletzt: Some(jetzt),
+    })
+}
+
+/// Schaltet das Nachsehen beim Start ein oder aus.
+#[tauri::command]
+fn update_automatisch_setzen(state: State<AppState>, an: bool) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_UPDATE_AUS, if an { "0" } else { "1" })?;
+        Ok(())
+    })
 }
 
 // ------------------------------------------------------------------ Kalender
@@ -1699,6 +1845,8 @@ pub fn run() {
             forge_projekt,
             forge_abfragen,
             kalender_termine,
+            update_pruefen,
+            update_automatisch_setzen,
             oeffnen,
             tresor_liste,
             tresor_anlegen,

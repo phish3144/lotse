@@ -210,8 +210,12 @@ export interface ForgeProjekt {
 
 export interface ForgeStatus {
   projekte: ForgeProjekt[];
+  /** Zeiger auf den Tresor-Eintrag mit dem GitHub-Token. */
   token_eintrag?: string;
   token_feld?: string;
+  /** Getrennt davon der GitLab-Token: ein Token geht nie an den falschen Hoster. */
+  token_eintrag_gitlab?: string;
+  token_feld_gitlab?: string;
   /** Läuft der Ordner-Beobachter, fragt er GitHub in großem Abstand mit ab. */
   auto: boolean;
   zuletzt?: number;
@@ -229,10 +233,35 @@ export interface ForgeErgebnis {
  */
 export const forge = {
   status: () => invoke<ForgeStatus>('forge_status'),
-  tokenSetzen: (eintragId: string, feld: string) => invoke<void>('forge_token_setzen', { eintragId, feld }),
+  tokenSetzen: (anbieter: 'GitHub' | 'GitLab', eintragId: string, feld: string) =>
+    invoke<void>('forge_token_setzen', { anbieter, eintragId, feld }),
   autoSetzen: (an: boolean) => invoke<void>('forge_auto_setzen', { an }),
   projekt: (projektId: string) => invoke<ForgeProjekt | null>('forge_projekt', { projektId }),
   abfragen: (projektId?: string) => invoke<ForgeErgebnis>('forge_abfragen', { projektId: projektId ?? null }),
+};
+
+export interface UpdateStand {
+  /** Version, die gerade läuft. */
+  laufend: string;
+  /** Neuere Version, falls es eine gibt. */
+  neu?: string;
+  seite?: string;
+  datei?: string;
+  datei_url?: string;
+  datei_bytes?: number;
+  vorab: boolean;
+  automatisch: boolean;
+  zuletzt?: number;
+}
+
+/**
+ * Update: nachsehen, ob es eine neuere Version gibt. Lotse lädt nichts herunter und
+ * führt nichts aus – die Installer sind unsigniert, deshalb bleibt das Herunterladen
+ * ein bewusster Schritt im Browser.
+ */
+export const update = {
+  pruefen: (erzwingen?: boolean) => invoke<UpdateStand>('update_pruefen', { erzwingen: erzwingen ?? null }),
+  automatischSetzen: (an: boolean) => invoke<void>('update_automatisch_setzen', { an }),
 };
 
 export interface Termin {

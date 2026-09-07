@@ -4,7 +4,7 @@
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
   import Sprung from './lib/components/Sprung.svelte';
   import { echteDaten } from './lib/data/store';
-  import type { BeobachterBilanz } from './lib/data/tauri';
+  import { update, type BeobachterBilanz } from './lib/data/tauri';
   import { datenVersion } from './lib/data/version.svelte';
   import { erfassung } from './lib/erfassung.svelte';
   import { meldungen } from './lib/meldung.svelte';
@@ -45,6 +45,25 @@
     return () => {
       entsorgt = true;
       abmelden?.();
+    };
+  });
+
+  // Nach dem Entsperren einmal nachsehen, ob es eine neuere Version gibt. Die Hülle
+  // entscheidet, ob daraus wirklich eine Anfrage wird: nur wenn eingeschaltet und der
+  // letzte Blick mehr als einen Tag her ist.
+  let neueVersion: { version: string; seite: string } | null = $state(null);
+
+  $effect(() => {
+    if (!echteDaten || !entsperrt) return;
+    let gilt = true;
+    update
+      .pruefen()
+      .then((u) => {
+        if (gilt && u.neu && u.seite) neueVersion = { version: u.neu, seite: u.seite };
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
     };
   });
 
@@ -99,6 +118,15 @@
         </button>
       </div>
     </header>
+    {#if neueVersion}
+      <div class="update-band">
+        <span>Version {neueVersion.version} ist da.</span>
+        <a href="#/einstellungen" onclick={() => (neueVersion = null)}>Ansehen</a>
+        <button type="button" class="schlicht" onclick={() => (neueVersion = null)} aria-label="Hinweis schließen">
+          ✕
+        </button>
+      </div>
+    {/if}
     <main>
       {#if router.current.segmente.length === 0}
         <Hafen />
@@ -129,6 +157,20 @@
     max-width: 64rem;
     margin: 0 auto;
     padding: 0 1.25rem 3rem;
+  }
+  .update-band {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: -0.5rem 0 1.25rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--rahmen);
+    border-radius: 0.5rem;
+    background: var(--karten-hintergrund);
+    font-size: 0.9rem;
+  }
+  .update-band button {
+    margin-left: auto;
   }
   .kopfzeile {
     display: flex;

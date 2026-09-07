@@ -18,13 +18,14 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | CLI `lotse` | läuft |
 | Web-Oberfläche (Svelte) | Gerüst mit Mock-Daten |
 | Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
-| Desktop-Hülle (Tauri 2) | läuft. Anlegen, erfassen, Fäden abhaken, Status mit Übergabe, Projektkopf bearbeiten, Referenzen anlegen/prüfen/öffnen, Tresor lesen/anlegen/löschen, Ordner scannen und laufend beobachten, Stand von GitHub/GitLab holen, KI-Verdichtung des Briefs, Export (Spiegel und age-Bundle), Abgleich mit Geräteverwaltung, Passwortwechsel und Konto-Wiederherstellung. Offen: Tray, Auto-Lock, signierter Updater, MCP aus der entsperrten Sitzung |
+| Desktop-Hülle (Tauri 2) | läuft. Anlegen, erfassen, Fäden abhaken, Status mit Übergabe, Projektkopf bearbeiten, Referenzen anlegen/prüfen/öffnen, Tresor lesen/anlegen/löschen, Ordner scannen und laufend beobachten, Stand von GitHub/GitLab holen, Termine aus abonnierten Kalendern, KI-Verdichtung des Briefs, Update-Hinweis, Export (Spiegel und age-Bundle), Abgleich mit Geräteverwaltung, Passwortwechsel und Konto-Wiederherstellung. Offen: Tray, Auto-Lock, selbsttätiger signierter Updater, MCP aus der entsperrten Sitzung |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter | läuft, in der CLI (`lotse beobachten`) und in der Desktop-App |
 | MCP-Server (`lotse mcp`) | läuft |
 | Remote-Git (GitHub und GitLab: offene PRs/MRs, Issue-Zahl, Prüflauf) | läuft im Kern, in der App und in der CLI (`lotse gegenseite`) |
 | KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App |
 | Kalender lesend (iCalendar/.ics, auch `webcal://`) | läuft im Kern, in der App und in der CLI (`lotse termine`) |
+| Update-Hinweis (neue Version erkennen, Datei fürs System nennen) | läuft in der App und in der CLI (`lotse update`); lädt bewusst nichts herunter |
 | WebAssembly-Client für den Browser | offen |
 
 ## Bekannte Grenzen
@@ -76,6 +77,7 @@ export LOTSE_HOME=$PWD/.lotse-daten
 ./target/debug/lotse export bundle backup.json.age
 ./target/debug/lotse gegenseite --trocken
 ./target/debug/lotse termine --tage 30
+./target/debug/lotse update
 ```
 
 `gegenseite` sucht zu jedem Projekt ein Repo bei GitHub oder GitLab – entweder aus einer
@@ -89,6 +91,12 @@ GitHub und GitLab* hinterlegt.
 `termine` liest die Kalender, die als Referenz am Projekt hängen (Typ `url` oder `datei`,
 Adresse auf `.ics` oder `webcal://`), und zeigt, was ansteht. Geschrieben wird dabei
 nichts: Termine bleiben im Kalender.
+
+`update` sieht bei den Veröffentlichungen dieses Projekts nach, ob es eine neuere
+Version gibt, und nennt die Datei für dieses System. Heruntergeladen und installiert wird
+nichts von allein – die Installer sind unsigniert, deshalb bleibt der letzte Schritt
+bewusst beim Menschen. Die Desktop-App zeigt denselben Hinweis beim Entsperren, höchstens
+einmal am Tag, abschaltbar unter *Einstellungen → Version und Updates*.
 
 `init` zeigt einmalig den Wiederherstellungscode und den Desktop-Schlüssel. Beides gehört
 in den Passwortmanager. Einträge der Stufe »nur Desktop« brauchen den Desktop-Schlüssel
@@ -134,7 +142,11 @@ kostenlosen GitHub-Konto muss das Repository dafür öffentlich sein; alternativ
 
 `.github/workflows/release.yml` baut bei einem Tag `v*` die Kommandozeile und die
 Desktop-Installer für Windows, macOS und Linux und hängt sie an ein GitHub-Release. Die
-Landing Page zeigt die neueste Veröffentlichung automatisch an. Builds sind unsigniert.
+Landing Page zeigt die neueste Veröffentlichung automatisch an. Builds sind unsigniert;
+solange das so ist, sagt die App nur Bescheid, statt sich selbst zu ersetzen. Für einen
+selbsttätigen Updater fehlt genau ein Stück: ein Signaturschlüsselpaar
+(`npm exec tauri signer generate`), der öffentliche Teil in `tauri.conf.json`, der private
+als Repository-Secret `TAURI_SIGNING_PRIVATE_KEY` für `release.yml`.
 
 ```
 git tag v0.1.0 && git push origin v0.1.0
