@@ -7,6 +7,7 @@ import type {
   NotizArt,
   Projekt,
   ProjektStatus,
+  Pruefstatus,
   Referenz,
   TresorEintrag,
   VorlagenId,
@@ -53,6 +54,7 @@ interface RohTreffer {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 const isoOpt = (ms?: number): string | undefined => (ms === undefined || ms === null ? undefined : iso(ms));
+const ms = (isoText: string): number => new Date(isoText).getTime();
 
 const projekt = (p: RohProjekt): Projekt => ({ ...p, angelegt: iso(p.angelegt), zuletzt_beruehrt: iso(p.zuletzt_beruehrt) });
 const notiz = (n: RohNotiz): Notiz => ({ ...n, ts: iso(n.ts), erledigt_am: isoOpt(n.erledigt_am) });
@@ -106,6 +108,35 @@ export const konto = {
 /** Tresor-Werte werden nie im Provider gehalten; genau ein Feld auf Klick. */
 export const tresorFeldLesen = (id: Id, feld: string) => invoke<string>('tresor_feld_lesen', { id, feld });
 
+export interface SyncStatus {
+  eingerichtet: boolean;
+  url?: string;
+  email?: string;
+  ausstehend: number;
+  last_server_seq: number;
+  last_sync_ms?: number;
+}
+
+export interface SyncErgebnis {
+  gepusht: number;
+  uebernommen: number;
+  verworfen: number;
+  konflikte: number;
+}
+
+/**
+ * Abgleich zwischen Geräten. Belang der Hülle, nicht der Datenschicht – deshalb neben
+ * `konto` und nicht im `DataProvider`.
+ */
+export const sync = {
+  status: () => invoke<SyncStatus>('sync_status'),
+  jetzt: () => invoke<SyncErgebnis>('sync_jetzt'),
+  registrieren: (url: string, email: string, code: string) => invoke<void>('sync_register', { url, email, code }),
+};
+
+/** Ist auf diesem Gerät die Tresor-Stufe »nur Desktop« lesbar? */
+export const kannNurDesktop = () => invoke<boolean>('kann_nur_desktop');
+
 export function createTauriProvider(): DataProvider {
   return {
     async listProjects() {
@@ -115,6 +146,16 @@ export function createTauriProvider(): DataProvider {
       const p = await invoke<RohProjekt | null>('projekt', { id });
       return p ? projekt(p) : undefined;
     },
+    async createProject(titel, vorlage, kurs) {
+      return projekt(await invoke<RohProjekt>('projekt_anlegen', { titel, vorlage, kurs: kurs ?? null }));
+    },
+    async saveProject(p) {
+      const roh: RohProjekt = { ...p, angelegt: ms(p.angelegt), zuletzt_beruehrt: ms(p.zuletzt_beruehrt) };
+      return projekt(await invoke<RohProjekt>('projekt_speichern', { projekt: roh }));
+    },
+    async postkorb() {
+      return projekt(await invoke<RohProjekt>('postkorb'));
+    },
     async listNotes(projectId) {
       return (await invoke<RohNotiz[]>('notizen', { projektId: projectId })).map(notiz);
     },
@@ -122,13 +163,16 @@ export function createTauriProvider(): DataProvider {
       const art: NotizArt = note.art;
       return notiz(await invoke<RohNotiz>('notiz_anlegen', { projektId: projectId, text: note.text, art }));
     },
-    async setStatus(projectId, status: ProjektStatus, uebergabeText) {
+    async completeThread(noteId) {
+      await invoke<void>('faden_erledigen', { id: noteId });
+    },
+    async setStatus(projectId, status: ProjektStatus, uebergabeText, wiedervorlage) {
       return projekt(
         await invoke<RohProjekt>('status_setzen', {
           projektId: projectId,
           status,
           uebergabe: uebergabeText ?? null,
-          wiedervorlage: null,
+          wiedervorlage: wiedervorlage ?? null,
         }),
       );
     },
@@ -138,8 +182,29 @@ export function createTauriProvider(): DataProvider {
     async listReferences(projectId) {
       return (await invoke<RohReferenz[]>('referenzen', { projektId: projectId })).map(referenz);
     },
+    async addReference(projectId, typ, ziel, rolle) {
+      return referenz(await invoke<RohReferenz>('referenz_anlegen', { projektId: projectId, typ, ziel, rolle }));
+    },
+    async checkReference(id) {
+      return invoke<Pruefstatus>('referenz_pruefen', { id });
+    },
     async listVaultEntries(projectId) {
       return (await invoke<RohTresorEintrag[]>('tresor_liste', { projektId: projectId })).map(tresor);
+    },
+    async listAllVaultEntries() {
+      return (await invoke<RohTresorEintrag[]>('tresor_liste', { projektId: null })).map(tresor);
+    },
+    async addVaultEntry(titel, projektIds, stufe, felder) {
+      // Der Kern nimmt die Felder als Paare entgegen; die Klartextwerte gehen genau
+      // einmal über diese Grenze und werden hier nicht behalten.
+      const paare = felder.map((f) => [f.name, f.wert] as [string, string]);
+      return tresor(await invoke<RohTresorEintrag>('tresor_anlegen', { titel, projektIds, stufe, felder: paare }));
+    },
+    async readVaultField(id, feld) {
+      return tresorFeldLesen(id, feld);
+    },
+    async deleteVaultEntry(id) {
+      await invoke<void>('tresor_loeschen', { id });
     },
     async search(query) {
       const treffer = await invoke<RohTreffer[]>('suche', { anfrage: query });
@@ -176,6 +241,12 @@ export function createTauriProvider(): DataProvider {
     },
     async confirmCandidate(candidateId, titel) {
       return projekt(await invoke<RohProjekt>('kandidat_uebernehmen', { pfad: candidateId, titel: titel ?? null }));
+    },
+    async rejectCandidate(candidateId) {
+      await invoke<void>('kandidat_verwerfen', { pfad: candidateId });
+    },
+    async scan(wurzeln) {
+      return (await invoke<RohKandidat[]>('scan', { wurzeln })).map(kandidat);
     },
   };
 }

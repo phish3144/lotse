@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use lotse_core::brief::Brief;
-use lotse_core::crypto::{Key32, KdfParams, RecoveryCode};
+use lotse_core::crypto::{KdfParams, Key32, RecoveryCode};
 use lotse_core::konto;
 use lotse_core::model::*;
 use lotse_core::store::{HafenKarte, Store, Treffer};
@@ -57,7 +57,9 @@ fn mit<T>(state: &State<AppState>, f: impl FnOnce(&mut Sitzung) -> lotse_core::R
         .sitzung
         .lock()
         .map_err(|_| "Zustand gesperrt".to_string())?;
-    let s = guard.as_mut().ok_or_else(|| "Nicht entsperrt".to_string())?;
+    let s = guard
+        .as_mut()
+        .ok_or_else(|| "Nicht entsperrt".to_string())?;
     f(s).map_err(fehler)
 }
 
@@ -78,11 +80,7 @@ struct KontoStatus {
 #[tauri::command]
 fn konto_status(state: State<AppState>) -> R<KontoStatus> {
     let h = home(&state)?;
-    let entsperrt = state
-        .sitzung
-        .lock()
-        .map(|g| g.is_some())
-        .unwrap_or(false);
+    let entsperrt = state.sitzung.lock().map(|g| g.is_some()).unwrap_or(false);
     let geraet = konto::lesen(&h).ok().map(|k| k.geraet_name);
     Ok(KontoStatus {
         eingerichtet: konto::existiert(&h),
@@ -105,7 +103,8 @@ struct Geheimnisse {
 fn einrichten(state: State<AppState>, passwort: String, geraet: String) -> R<Geheimnisse> {
     let h = home(&state)?;
     let passwort = Zeroizing::new(passwort);
-    let e = konto::einrichten(&h, passwort.as_bytes(), &geraet, KdfParams::default()).map_err(fehler)?;
+    let e = konto::einrichten(&h, passwort.as_bytes(), &geraet, KdfParams::default())
+        .map_err(fehler)?;
     let schluesselbund = konto::desktop_key_speichern(e.konto.geraet_id, &e.desktop_key).is_ok();
     let vault = VaultKeys::with_desktop_key(&e.account_key, &e.desktop_key);
     let geheim = Geheimnisse {
@@ -113,7 +112,10 @@ fn einrichten(state: State<AppState>, passwort: String, geraet: String) -> R<Geh
         desktop_schluessel: e.desktop_key.display().to_string(),
         schluesselbund,
     };
-    *state.sitzung.lock().map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
         store: e.store,
         account_key: e.account_key,
         auth_key: e.auth_key,
@@ -137,10 +139,15 @@ fn wiederherstellungscode_pruefen(state: State<AppState>, code: String) -> R<boo
 }
 
 #[tauri::command]
-fn entsperren(state: State<AppState>, passwort: String, desktop_schluessel: Option<String>) -> R<()> {
+fn entsperren(
+    state: State<AppState>,
+    passwort: String,
+    desktop_schluessel: Option<String>,
+) -> R<()> {
     let h = home(&state)?;
     let passwort = Zeroizing::new(passwort);
-    let u = konto::entsperren(&h, passwort.as_bytes()).map_err(|_| "Falsches Master-Passwort".to_string())?;
+    let u = konto::entsperren(&h, passwort.as_bytes())
+        .map_err(|_| "Falsches Master-Passwort".to_string())?;
     let dk = match desktop_schluessel.filter(|s| !s.trim().is_empty()) {
         Some(s) => {
             let dk = lotse_core::vault::DesktopKey::parse(&s).map_err(fehler)?;
@@ -155,7 +162,10 @@ fn entsperren(state: State<AppState>, passwort: String, desktop_schluessel: Opti
         Some(dk) => VaultKeys::with_desktop_key(&u.account_key, dk),
         None => VaultKeys::from_account_key(&u.account_key),
     };
-    *state.sitzung.lock().map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
         store: u.store,
         account_key: u.account_key,
         auth_key: u.auth_key,
@@ -168,7 +178,10 @@ fn entsperren(state: State<AppState>, passwort: String, desktop_schluessel: Opti
 
 #[tauri::command]
 fn sperren(state: State<AppState>) -> R<()> {
-    *state.sitzung.lock().map_err(|_| "Zustand gesperrt".to_string())? = None;
+    *state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = None;
     Ok(())
 }
 
@@ -196,7 +209,12 @@ fn projekt(state: State<AppState>, id: String) -> R<Option<Projekt>> {
 }
 
 #[tauri::command]
-fn projekt_anlegen(state: State<AppState>, titel: String, vorlage: String, kurs: Option<String>) -> R<Projekt> {
+fn projekt_anlegen(
+    state: State<AppState>,
+    titel: String,
+    vorlage: String,
+    kurs: Option<String>,
+) -> R<Projekt> {
     let v = Vorlage::parse(&vorlage).unwrap_or(Vorlage::Generisch);
     mit(&state, |s| {
         let mut p = Projekt::neu(titel, v, now_ms());
@@ -212,6 +230,12 @@ fn projekt_speichern(state: State<AppState>, projekt: Projekt) -> R<Projekt> {
         s.store.projekt_speichern(&projekt)?;
         Ok(projekt)
     })
+}
+
+/// Auffangprojekt für Gedanken ohne Zuordnung. Wird beim ersten Zugriff angelegt.
+#[tauri::command]
+fn postkorb(state: State<AppState>) -> R<Projekt> {
+    mit(&state, |s| s.store.postkorb())
 }
 
 #[tauri::command]
@@ -233,7 +257,12 @@ fn notiz(state: State<AppState>, id: String) -> R<Option<Notiz>> {
 }
 
 #[tauri::command]
-fn notiz_anlegen(state: State<AppState>, projekt_id: String, text: String, art: String) -> R<Notiz> {
+fn notiz_anlegen(
+    state: State<AppState>,
+    projekt_id: String,
+    text: String,
+    art: String,
+) -> R<Notiz> {
     let id = ulid(&projekt_id)?;
     let art = Art::parse(&art).unwrap_or(Art::Log);
     mit(&state, |s| {
@@ -260,8 +289,13 @@ fn status_setzen(
     let id = ulid(&projekt_id)?;
     let st = Status::parse(&status).ok_or_else(|| format!("Unbekannter Status {status}"))?;
     mit(&state, |s| {
-        s.store
-            .status_setzen(id, st, uebergabe.as_deref(), wiedervorlage.as_deref(), Quelle::Mensch)?;
+        s.store.status_setzen(
+            id,
+            st,
+            uebergabe.as_deref(),
+            wiedervorlage.as_deref(),
+            Quelle::Mensch,
+        )?;
         s.store
             .projekt(id)?
             .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))
@@ -285,7 +319,13 @@ fn referenzen(state: State<AppState>, projekt_id: String) -> R<Vec<Referenz>> {
 }
 
 #[tauri::command]
-fn referenz_anlegen(state: State<AppState>, projekt_id: String, typ: String, ziel: String, rolle: String) -> R<Referenz> {
+fn referenz_anlegen(
+    state: State<AppState>,
+    projekt_id: String,
+    typ: String,
+    ziel: String,
+    rolle: String,
+) -> R<Referenz> {
     let id = ulid(&projekt_id)?;
     let typ = ReferenzTyp::parse(&typ).ok_or_else(|| "Unbekannter Referenztyp".to_string())?;
     let rolle = Rolle::parse(&rolle).unwrap_or(Rolle::Material);
@@ -363,7 +403,10 @@ fn tresor_anlegen(
     let pids: Vec<Ulid> = projekt_ids.iter().map(|p| ulid(p)).collect::<R<_>>()?;
     let stufe = Stufe::parse(&stufe).unwrap_or(Stufe::Ueberall);
     mit(&state, |s| {
-        let refs: Vec<(&str, &str)> = felder.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let refs: Vec<(&str, &str)> = felder
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         let e = TresorEintrag::neu(&s.vault, titel, pids, stufe, &refs, now_ms())?;
         s.store.tresor_speichern(&e)?;
         Ok(e)
@@ -440,7 +483,12 @@ async fn sync_jetzt(state: State<'_, AppState>) -> R<SyncErgebnis> {
 
 /// Bestehendes Konto beim Dienst registrieren. Braucht den Wiederherstellungscode.
 #[tauri::command]
-async fn sync_register(state: State<'_, AppState>, url: String, email: String, code: String) -> R<()> {
+async fn sync_register(
+    state: State<'_, AppState>,
+    url: String,
+    email: String,
+    code: String,
+) -> R<()> {
     let h = home(&state)?;
     let konto = konto::lesen(&h).map_err(fehler)?;
     let code = RecoveryCode::parse(&code).map_err(fehler)?;
@@ -459,7 +507,8 @@ async fn sync_register(state: State<'_, AppState>, url: String, email: String, c
             name: s.geraet_name.clone(),
             platform: "desktop".into(),
         };
-        let (account_id, token) = client.register(&email, &s.auth_key, &recovery_auth, &konto.header, &g)?;
+        let (account_id, token) =
+            client.register(&email, &s.auth_key, &recovery_auth, &konto.header, &g)?;
         sync_client::verbindung_merken(&s.store, &url, &email, &account_id, &token)?;
         sync_client::abgleichen(&mut s.store, &client.with_token(&token))?;
         Ok(())
@@ -468,12 +517,19 @@ async fn sync_register(state: State<'_, AppState>, url: String, email: String, c
 
 /// Neues Gerät an bestehendem Konto anmelden (ersetzt die Einrichtung).
 #[tauri::command]
-async fn sync_login(state: State<'_, AppState>, url: String, email: String, passwort: String, geraet: String) -> R<()> {
+async fn sync_login(
+    state: State<'_, AppState>,
+    url: String,
+    email: String,
+    passwort: String,
+    geraet: String,
+) -> R<()> {
     let h = home(&state)?;
     let passwort = Zeroizing::new(passwort);
     let client = sync_client::Client::new(&url);
     let pre = client.prelogin(&email).map_err(fehler)?;
-    let stretched = lotse_core::crypto::derive_stretched(passwort.as_bytes(), &pre.salt, &pre.kdf).map_err(fehler)?;
+    let stretched = lotse_core::crypto::derive_stretched(passwort.as_bytes(), &pre.salt, &pre.kdf)
+        .map_err(fehler)?;
     let pk = lotse_core::crypto::split_password_keys(&stretched);
     let geraet_id = Ulid::new();
     let g = sync_client::Geraet {
@@ -484,11 +540,26 @@ async fn sync_login(state: State<'_, AppState>, url: String, email: String, pass
     let login = client.login(&email, &pk.auth, &g).map_err(fehler)?;
     let (ak, auth) = lotse_core::crypto::konto_entsperren(&login.header, passwort.as_bytes())
         .map_err(|_| "Konto-Header lässt sich mit diesem Passwort nicht öffnen".to_string())?;
-    let (_, mut store) = konto::aus_login(&h, login.header, geraet_id, &geraet, &ak).map_err(fehler)?;
-    sync_client::verbindung_merken(&store, &url, &email, &login.account_id, &login.session_token).map_err(fehler)?;
-    sync_client::abgleichen(&mut store, &sync_client::Client::new(&url).with_token(&login.session_token)).map_err(fehler)?;
+    let (_, mut store) =
+        konto::aus_login(&h, login.header, geraet_id, &geraet, &ak).map_err(fehler)?;
+    sync_client::verbindung_merken(
+        &store,
+        &url,
+        &email,
+        &login.account_id,
+        &login.session_token,
+    )
+    .map_err(fehler)?;
+    sync_client::abgleichen(
+        &mut store,
+        &sync_client::Client::new(&url).with_token(&login.session_token),
+    )
+    .map_err(fehler)?;
     let vault = VaultKeys::from_account_key(&ak);
-    *state.sitzung.lock().map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+    *state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
         store,
         account_key: ak,
         auth_key: auth,
@@ -525,6 +596,7 @@ pub fn run() {
             projekt,
             projekt_anlegen,
             projekt_speichern,
+            postkorb,
             brief,
             notizen,
             notiz,

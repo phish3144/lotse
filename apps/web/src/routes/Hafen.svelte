@@ -3,7 +3,9 @@
   import ProjektKarte from '../lib/components/ProjektKarte.svelte';
   import { provider } from '../lib/data/store';
   import { datenVersion } from '../lib/data/version.svelte';
-  import { VORLAGEN_LABEL } from '../lib/data/mock';
+  import { erfassung } from '../lib/erfassung.svelte';
+  import { VORLAGEN_LABEL } from '../lib/format';
+  import NeuesProjekt from '../lib/components/NeuesProjekt.svelte';
   import type { Kandidat, Notiz, Projekt } from '../lib/data/types';
 
   interface Eintrag {
@@ -31,12 +33,30 @@
   });
 
   let bestaetigtWirdGerade: string | undefined = $state(undefined);
+  let neuesProjektOffen = $state(false);
+  let fehlerText: string | null = $state(null);
 
   async function bestaetigen(kandidat: Kandidat) {
     bestaetigtWirdGerade = kandidat.id;
+    fehlerText = null;
     try {
       await provider.confirmCandidate(kandidat.id);
       datenVersion.bump();
+    } catch (e) {
+      fehlerText = e instanceof Error ? e.message : String(e);
+    } finally {
+      bestaetigtWirdGerade = undefined;
+    }
+  }
+
+  async function verwerfen(kandidat: Kandidat) {
+    bestaetigtWirdGerade = kandidat.id;
+    fehlerText = null;
+    try {
+      await provider.rejectCandidate(kandidat.id);
+      datenVersion.bump();
+    } catch (e) {
+      fehlerText = e instanceof Error ? e.message : String(e);
     } finally {
       bestaetigtWirdGerade = undefined;
     }
@@ -50,6 +70,20 @@
 </script>
 
 <svelte:head><title>Hafen · Lotse</title></svelte:head>
+
+<NeuesProjekt bind:offen={neuesProjektOffen} />
+
+<div class="seiten-kopf">
+  <h1>Hafen</h1>
+  <div class="kopf-aktionen">
+    <button type="button" onclick={() => erfassung.oeffnen()}>Erfassen</button>
+    <button type="button" class="primaer" onclick={() => (neuesProjektOffen = true)}>Neues Projekt</button>
+  </div>
+</div>
+
+{#if fehlerText}
+  <p class="hinweis fehler">{fehlerText}</p>
+{/if}
 
 {#await datenPromise}
   <p class="hinweis">Lade Hafen…</p>
@@ -85,12 +119,34 @@
                 {kandidat.pfad} · Vorlage: {VORLAGEN_LABEL[kandidat.vorlage_vorschlag]} · Marke: {kandidat.erkennungsmarke}
               </div>
             </div>
-            <button type="button" onclick={() => bestaetigen(kandidat)} disabled={bestaetigtWirdGerade === kandidat.id}>
-              {bestaetigtWirdGerade === kandidat.id ? 'Bestätige …' : 'Bestätigen'}
-            </button>
+            <div class="kandidat-aktionen">
+              <button type="button" onclick={() => verwerfen(kandidat)} disabled={bestaetigtWirdGerade === kandidat.id}>
+                Verwerfen
+              </button>
+              <button
+                type="button"
+                class="primaer"
+                onclick={() => bestaetigen(kandidat)}
+                disabled={bestaetigtWirdGerade === kandidat.id}
+              >
+                {bestaetigtWirdGerade === kandidat.id ? 'Moment …' : 'Übernehmen'}
+              </button>
+            </div>
           </li>
         {/each}
       </ul>
+    </section>
+  {/if}
+
+  {#if eintraege.length === 0 && kandidaten.length === 0}
+    <section class="leer">
+      <h2>Noch nichts an Bord</h2>
+      <p class="hinweis">
+        Lege ein Projekt von Hand an, oder lass Lotse deine Ordner durchsuchen: unter
+        <a href="#/einstellungen">Einstellungen</a> einen Wurzelordner angeben, dann erscheinen die Funde hier in der
+        Hafeneinfahrt.
+      </p>
+      <p class="hinweis">Ein Gedanke ohne Projekt geht jederzeit mit <kbd>Strg</kbd>+<kbd>K</kbd> in den Postkorb.</p>
     </section>
   {/if}
 
@@ -133,6 +189,64 @@
 {/await}
 
 <style>
+  .seiten-kopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  .seiten-kopf h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  .kopf-aktionen {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .kopf-aktionen button,
+  .kandidat-aktionen button {
+    border: 1px solid var(--rahmen);
+    background: var(--karten-hintergrund);
+    color: inherit;
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.85rem;
+  }
+  .kopf-aktionen button:hover,
+  .kandidat-aktionen button:hover {
+    border-color: var(--akzent);
+  }
+  .kopf-aktionen .primaer,
+  .kandidat-aktionen .primaer {
+    border-color: var(--akzent);
+    color: var(--akzent);
+    font-weight: 600;
+  }
+  .kandidat-aktionen {
+    display: flex;
+    gap: 0.4rem;
+    flex: none;
+  }
+  .leer {
+    border: 1px dashed var(--rahmen);
+    border-radius: 0.6rem;
+    padding: 1.2rem 1.3rem;
+  }
+  .leer h2 {
+    margin-top: 0;
+  }
+  .leer p + p {
+    margin-top: 0.5rem;
+  }
+  kbd {
+    font-family: inherit;
+    font-size: 0.85em;
+    border: 1px solid var(--rahmen);
+    border-radius: 0.25rem;
+    padding: 0.05em 0.35em;
+  }
+
   section,
   .gruppe {
     margin-bottom: 2rem;

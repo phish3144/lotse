@@ -18,7 +18,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | CLI `lotse` | läuft |
 | Web-Oberfläche (Svelte) | Gerüst mit Mock-Daten |
 | Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
-| Desktop-Hülle (Tauri 2) | Kommandos für Konto, Einrichtung, Entsperren, Daten, Tresor und Sync angebunden; Oberfläche nutzt sie in der Hülle statt Beispieldaten. Hier nicht gebaut (braucht GTK/WebKit), erster CI-Build steht aus |
+| Desktop-Hülle (Tauri 2) | läuft. Oberfläche kann anlegen, erfassen, Fäden abhaken, Status mit Übergabe wechseln, Projektkopf bearbeiten, Referenzen anlegen und prüfen, Tresor lesen/anlegen/löschen, Ordner scannen, abgleichen. Offen: Ordner-Beobachter, Tray, Auto-Lock, signierter Updater |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter (`lotse beobachten`) | läuft |
 | MCP-Server (`lotse mcp`) | läuft |

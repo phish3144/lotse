@@ -1,74 +1,79 @@
 <script lang="ts">
-  // Globale Schnellerfassung: Strg/Cmd+K öffnet ein einzelnes Eingabefeld.
-  // "@projektname" ordnet einem Projekt zu, sonst landet der Gedanke im Postkorb.
-  // Enter speichert sofort über den Provider, kein Dialog davor (CONCEPT.md Abschnitt 4).
-  import { provider, POSTKORB_PROJEKT_ID } from '../data/store';
+  // Globale Schnellerfassung: ein einzelnes Eingabefeld, Enter speichert sofort.
+  // "@projektname" ordnet einem Projekt zu, sonst landet der Gedanke im Postkorb –
+  // nie in einem Dialog (CONCEPT.md Abschnitt 4). Strg/Cmd+K öffnet und schließt.
+  import { provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
-  import type { Projekt } from '../data/types';
+  import { erfassung } from '../erfassung.svelte';
+  import { ART_LABEL } from '../format';
+  import type { NotizArt, Projekt } from '../data/types';
 
-  let offen = $state(false);
+  const ARTEN: NotizArt[] = ['log', 'offen', 'entscheidung'];
+
   let eingabe = $state('');
   let wirdGespeichert = $state(false);
+  let fehler: string | null = $state(null);
   let projekte: Projekt[] = $state([]);
-  let zielTitel = $state('');
   let inputEl: HTMLInputElement | undefined = $state();
 
-  async function oeffnen() {
-    offen = true;
-    eingabe = '';
-    zielTitel = '';
-    projekte = await provider.listProjects();
-  }
+  // Beim Öffnen: Vorbelegung übernehmen, Projektliste für die @-Auflösung holen.
+  $effect(() => {
+    if (!erfassung.offen) return;
+    eingabe = erfassung.vorbelegung;
+    fehler = null;
+    void provider.listProjects().then((liste) => (projekte = liste));
+  });
 
-  function schliessen() {
-    offen = false;
-  }
+  $effect(() => {
+    if (erfassung.offen && inputEl) {
+      inputEl.focus();
+      // Cursor ans Ende, damit man hinter "@Projekt " einfach weitertippt.
+      const laenge = inputEl.value.length;
+      inputEl.setSelectionRange(laenge, laenge);
+    }
+  });
 
   function aufTastenkuerzel(e: KeyboardEvent) {
-    const istModifier = e.metaKey || e.ctrlKey;
-    if (istModifier && e.key.toLowerCase() === 'k') {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      if (offen) {
-        schliessen();
-      } else {
-        void oeffnen();
-      }
-    } else if (e.key === 'Escape' && offen) {
-      schliessen();
+      erfassung.umschalten();
+    } else if (e.key === 'Escape' && erfassung.offen) {
+      erfassung.schliessen();
     }
   }
 
-  $effect(() => {
-    if (offen) {
-      inputEl?.focus();
-    }
-  });
-
-  function ziel(text: string): { projektId: string; text: string; projektTitel: string } {
-    if (text.startsWith('@')) {
-      const [, roheProjektangabe, ...rest] = text.match(/^@(\S+)\s*(.*)$/s) ?? [];
-      const name = (roheProjektangabe ?? '').toLowerCase();
-      const gefunden = projekte.find((p) => p.titel.toLowerCase().includes(name));
-      if (gefunden) {
-        return { projektId: gefunden.id, text: rest.join(' ').trim() || text, projektTitel: gefunden.titel };
-      }
-    }
-    return { projektId: POSTKORB_PROJEKT_ID, text, projektTitel: 'Postkorb' };
+  /** Löst "@name rest" gegen die Projektliste auf. Ohne Treffer bleibt der Text ganz. */
+  function ziel(text: string): { projekt?: Projekt; text: string } {
+    const treffer = text.match(/^@(\S+)\s*([\s\S]*)$/);
+    if (!treffer) return { text };
+    const name = treffer[1].toLowerCase();
+    const rest = treffer[2].trim();
+    const passt =
+      projekte.find((p) => p.titel.toLowerCase() === name) ??
+      projekte.find((p) => p.titel.toLowerCase().startsWith(name)) ??
+      projekte.find((p) => p.titel.toLowerCase().includes(name));
+    if (!passt) return { text };
+    return { projekt: passt, text: rest || text };
   }
 
-  $effect(() => {
-    zielTitel = eingabe.trim() ? ziel(eingabe.trim()).projektTitel : '';
-  });
+  const aufloesung = $derived(ziel(eingabe.trim()));
+  const zielTitel = $derived(eingabe.trim() ? (aufloesung.projekt?.titel ?? 'Postkorb') : '');
 
   async function speichern() {
-    const text = eingabe.trim();
-    if (!text || wirdGespeichert) return;
-    const { projektId, text: notizText } = ziel(text);
+    const roh = eingabe.trim();
+    if (!roh || wirdGespeichert) return;
     wirdGespeichert = true;
+    fehler = null;
     try {
-      await provider.addNote(projektId, { quelle: 'mensch', art: 'log', text: notizText });
+      const { projekt, text } = ziel(roh);
+      // Ohne Zuordnung: Auffangprojekt, das der Kern bei Bedarf selbst anlegt.
+      const zielProjekt = projekt ?? (await provider.postkorb());
+      await provider.addNote(zielProjekt.id, { quelle: 'mensch', art: erfassung.art, text });
       datenVersion.bump();
-      schliessen();
+      eingabe = '';
+      erfassung.schliessen();
+    } catch (e) {
+      fehler = e instanceof Error ? e.message : String(e);
     } finally {
       wirdGespeichert = false;
     }
@@ -84,9 +89,10 @@
 
 <svelte:window onkeydown={aufTastenkuerzel} />
 
-{#if offen}
+{#if erfassung.offen}
   <div class="ueberlagerung">
-    <button type="button" class="rueckwand" aria-label="Schnellerfassung schließen" onclick={schliessen}></button>
+    <button type="button" class="rueckwand" aria-label="Schnellerfassung schließen" onclick={() => erfassung.schliessen()}
+    ></button>
     <div class="dialog" role="dialog" aria-modal="true" aria-label="Schnellerfassung">
       <input
         bind:this={inputEl}
@@ -96,9 +102,19 @@
         placeholder="Was gibt's? @projekt für Zuordnung, sonst Postkorb …"
         aria-label="Schnellerfassung"
       />
+      <div class="arten" role="group" aria-label="Art des Eintrags">
+        {#each ARTEN as art (art)}
+          <button type="button" class:gewaehlt={erfassung.art === art} onclick={() => (erfassung.art = art)}>
+            {ART_LABEL[art]}
+          </button>
+        {/each}
+      </div>
+      {#if fehler}
+        <p class="fehler">{fehler}</p>
+      {/if}
       <div class="fusszeile">
         <span class="ziel-hinweis">{zielTitel ? `→ ${zielTitel}` : ''}</span>
-        <span class="hinweis">Enter zum Speichern · Esc zum Schließen</span>
+        <span class="hinweis">{wirdGespeichert ? 'Speichere …' : 'Enter zum Speichern · Esc zum Schließen'}</span>
       </div>
     </div>
   </div>
@@ -148,6 +164,24 @@
     outline: none;
     border-bottom-color: var(--akzent);
   }
+  .arten {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+  }
+  .arten button {
+    border: 1px solid var(--rahmen);
+    background: transparent;
+    color: var(--text-gedaempft);
+    border-radius: 999px;
+    padding: 0.15rem 0.7rem;
+    font-size: 0.8rem;
+  }
+  .arten button.gewaehlt {
+    border-color: var(--akzent);
+    color: var(--akzent);
+    font-weight: 600;
+  }
   .fusszeile {
     display: flex;
     justify-content: space-between;
@@ -161,5 +195,10 @@
   }
   .hinweis {
     color: var(--text-gedaempft);
+  }
+  .fehler {
+    color: var(--farbe-ueberfaellig);
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0;
   }
 </style>

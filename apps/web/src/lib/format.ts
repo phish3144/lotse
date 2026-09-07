@@ -1,5 +1,14 @@
 import type { Auffaelligkeit } from './brief';
-import type { NotizQuelle, Pruefstatus, ProjektStatus } from './data/types';
+import type {
+  NotizArt,
+  NotizQuelle,
+  Pruefstatus,
+  ProjektStatus,
+  ReferenzRolle,
+  ReferenzTyp,
+  TresorStufe,
+  VorlagenId,
+} from './data/types';
 
 const TAG_MS = 24 * 60 * 60 * 1000;
 
@@ -51,4 +60,59 @@ export const AUFFAELLIGKEIT_LABEL: Record<Auffaelligkeit, string> = {
   ruhig: 'ruhig',
   auffaellig: 'auffällig',
   ueberfaellig: 'überfällig',
+};
+
+export const ART_LABEL: Record<NotizArt, string> = {
+  log: 'Notiz',
+  offen: 'Offener Faden',
+  entscheidung: 'Entscheidung',
+  status: 'Statuswechsel',
+  uebergabe: 'Übergabe',
+};
+
+export const VORLAGEN_LABEL: Record<VorlagenId, string> = {
+  software: 'Software',
+  hardware_maker: 'Hardware & Maker',
+  haus_garten: 'Haus & Garten',
+  kreativ: 'Kreativ',
+  finanzen_verwaltung: 'Finanzen & Verwaltung',
+  lernen_forschung: 'Lernen & Forschung',
+  reise_veranstaltung: 'Reise & Veranstaltung',
+  generisch: 'Generisch',
+};
+
+export const REFERENZ_TYP_LABEL: Record<ReferenzTyp, string> = {
+  ordner: 'Ordner',
+  git_repo: 'Git-Repo',
+  url: 'URL',
+  datei: 'Datei',
+  physisch: 'Physisch',
+  geraet: 'Gerät',
+  passwortmanager: 'Passwortmanager',
+  anhang: 'Anhang',
+};
+
+/**
+ * Typen, die sich in der Oberfläche anlegen lassen. `anhang` fehlt bewusst: dafür
+ * braucht es einen Datei-Upload, den es noch nicht gibt.
+ */
+export const ANLEGBARE_REFERENZ_TYPEN: ReferenzTyp[] = [
+  'ordner',
+  'git_repo',
+  'url',
+  'datei',
+  'physisch',
+  'geraet',
+  'passwortmanager',
+];
+
+export const REFERENZ_ROLLE_LABEL: Record<ReferenzRolle, string> = {
+  material: 'Material',
+  ergebnis: 'Ergebnis',
+  doku: 'Doku',
+};
+
+export const STUFE_LABEL: Record<TresorStufe, string> = {
+  ueberall: 'überall',
+  nur_desktop: 'nur Desktop',
 };

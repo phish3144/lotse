@@ -14,12 +14,32 @@
     datenVersion.wert;
     return laden();
   });
+
+  let fehlerText: string | null = $state(null);
+  let laeuft: string | null = $state(null);
+
+  async function erledigen(notizId: string) {
+    laeuft = notizId;
+    fehlerText = null;
+    try {
+      await provider.completeThread(notizId);
+      datenVersion.bump();
+    } catch (e) {
+      fehlerText = e instanceof Error ? e.message : String(e);
+    } finally {
+      laeuft = null;
+    }
+  }
 </script>
 
 <svelte:head><title>Offene Punkte · Lotse</title></svelte:head>
 
 <h1>Offene Punkte</h1>
 <p class="hinweis">Alle offenen Fäden, projektübergreifend – die einzige Aufgabenliste, die Lotse braucht.</p>
+
+{#if fehlerText}
+  <p class="hinweis fehler">{fehlerText}</p>
+{/if}
 
 {#await datenPromise}
   <p class="hinweis">Lade offene Punkte…</p>
@@ -34,7 +54,19 @@
             <a class="projekt-link" href={`#/projekt/${faden.projekt_id}`}>{projektTitel}</a>
             <span class="alter">{alterInTagenText(faden.ts)}</span>
           </div>
-          <NoteText text={faden.text} />
+          <div class="faden-koerper">
+            <button
+              type="button"
+              class="haken"
+              title="Faden abhaken"
+              aria-label="Faden abhaken"
+              onclick={() => erledigen(faden.id)}
+              disabled={laeuft === faden.id}
+            >
+              ✓
+            </button>
+            <NoteText text={faden.text} />
+          </div>
         </li>
       {/each}
     </ul>
@@ -83,5 +115,25 @@
     font-size: 0.8rem;
     color: var(--text-gedaempft);
     white-space: nowrap;
+  }
+  .faden-koerper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+  .haken {
+    flex: none;
+    border: 1px solid var(--rahmen);
+    background: transparent;
+    color: var(--farbe-ruhig);
+    border-radius: 0.35rem;
+    padding: 0 0.45rem;
+    line-height: 1.5;
+  }
+  .haken:hover:not(:disabled) {
+    border-color: var(--farbe-ruhig);
+  }
+  .haken:disabled {
+    opacity: 0.5;
   }
 </style>

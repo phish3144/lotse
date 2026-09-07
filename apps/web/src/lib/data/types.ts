@@ -75,7 +75,8 @@ export type ReferenzTyp =
   | 'datei'
   | 'physisch'
   | 'geraet'
-  | 'passwortmanager';
+  | 'passwortmanager'
+  | 'anhang';
 
 export type ReferenzRolle = 'material' | 'ergebnis' | 'doku';
 

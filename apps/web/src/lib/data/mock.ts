@@ -4,6 +4,7 @@ import type {
   Kandidat,
   Notiz,
   Projekt,
+  Pruefstatus,
   Referenz,
   TresorEintrag,
   VorlagenId,
@@ -27,9 +28,20 @@ function datumOffset(tagen: number): string {
 }
 
 let seq = 0;
+/**
+ * Bereits belegte Kennungen. Wird unten mit den fest verdrahteten Beispiel-IDs gefüllt,
+ * damit neu angelegte Datensätze nicht mit ihnen kollidieren – sonst trifft etwa
+ * `completeThread` die falsche Notiz.
+ */
+const vergebeneIds = new Set<Id>();
 function nextId(prefix: string): Id {
-  seq += 1;
-  return `${prefix}_${seq.toString(36).padStart(4, '0')}`;
+  let kandidat: Id;
+  do {
+    seq += 1;
+    kandidat = `${prefix}_${seq.toString(36).padStart(4, '0')}`;
+  } while (vergebeneIds.has(kandidat));
+  vergebeneIds.add(kandidat);
+  return kandidat;
 }
 
 /** Default-Erwartungsintervall je Vorlage, siehe CONCEPT.md Abschnitt 3. */
@@ -42,17 +54,6 @@ export const VORLAGEN_INTERVALL: Record<VorlagenId, number> = {
   lernen_forschung: 30,
   reise_veranstaltung: 120,
   generisch: 30,
-};
-
-export const VORLAGEN_LABEL: Record<VorlagenId, string> = {
-  software: 'Software',
-  hardware_maker: 'Hardware & Maker',
-  haus_garten: 'Haus & Garten',
-  kreativ: 'Kreativ',
-  finanzen_verwaltung: 'Finanzen & Verwaltung',
-  lernen_forschung: 'Lernen & Forschung',
-  reise_veranstaltung: 'Reise & Veranstaltung',
-  generisch: 'Generisch',
 };
 
 // ---------------------------------------------------------------------------
@@ -338,9 +339,24 @@ let candidates: Kandidat[] = [
 // Provider-Implementierung
 // ---------------------------------------------------------------------------
 
+for (const eintrag of [...projects, ...notes, ...references, ...vaultEntries, ...candidates]) {
+  vergebeneIds.add(eintrag.id);
+}
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
+
+/**
+ * Beispielwerte für die Tresor-Vorschau im Browser. In der Tauri-Hülle kommen die Werte
+ * entschlüsselt aus dem Kern; hier gibt es nur Attrappen, damit die Bedienung zu sehen ist.
+ */
+const mockTresorWerte = new Map<string, string>([
+  ['v_001|Benutzername', 'admin@getraenkekasse.example'],
+  ['v_001|Passwort', 'beispiel-passwort-nicht-echt'],
+  ['v_002|API-Key', 'kl_beispiel_9f2a41c7e8'],
+  ['v_003|PIN', '123456'],
+]);
 
 export function createMockProvider(): DataProvider {
   return {
@@ -350,6 +366,51 @@ export function createMockProvider(): DataProvider {
 
     async getProject(id) {
       return clone(projects.find((p) => p.id === id));
+    },
+
+    async createProject(titel, vorlage, kurs) {
+      const jetzt = new Date().toISOString();
+      const project: Projekt = {
+        id: nextId('p'),
+        titel: titel.trim(),
+        kurs: kurs?.trim() ?? '',
+        status: 'idee',
+        erwartungsintervall_tage: VORLAGEN_INTERVALL[vorlage],
+        tags: [],
+        vorlage,
+        angelegt: jetzt,
+        zuletzt_beruehrt: jetzt,
+      };
+      projects.push(project);
+      return clone(project);
+    },
+
+    async saveProject(projekt) {
+      const index = projects.findIndex((p) => p.id === projekt.id);
+      if (index < 0) {
+        throw new Error(`Unbekanntes Projekt: ${projekt.id}`);
+      }
+      projects[index] = clone(projekt);
+      return clone(projects[index]);
+    },
+
+    async postkorb() {
+      const vorhanden = projects.find((p) => p.id === POSTKORB_PROJEKT_ID);
+      if (vorhanden) return clone(vorhanden);
+      const jetzt = new Date().toISOString();
+      const project: Projekt = {
+        id: POSTKORB_PROJEKT_ID,
+        titel: 'Postkorb',
+        kurs: 'Gedanken ohne Zuordnung. Von hier aus einsortieren.',
+        status: 'aktiv',
+        erwartungsintervall_tage: 3650,
+        tags: ['postkorb'],
+        vorlage: 'generisch',
+        angelegt: jetzt,
+        zuletzt_beruehrt: jetzt,
+      };
+      projects.push(project);
+      return clone(project);
     },
 
     async listNotes(projectId) {
@@ -373,6 +434,14 @@ export function createMockProvider(): DataProvider {
       notes.push(created);
       project.zuletzt_beruehrt = created.ts;
       return clone(created);
+    },
+
+    async completeThread(noteId) {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note) {
+        throw new Error(`Unbekannte Notiz: ${noteId}`);
+      }
+      note.erledigt_am = new Date().toISOString();
     },
 
     async setStatus(projectId, status, uebergabeText) {
@@ -418,8 +487,71 @@ export function createMockProvider(): DataProvider {
       return clone(references.filter((r) => r.projekt_id === projectId));
     },
 
+    async addReference(projectId, typ, ziel, rolle) {
+      const referenz: Referenz = {
+        id: nextId('r'),
+        projekt_id: projectId,
+        typ,
+        ziel: ziel.trim(),
+        rolle,
+        pruefstatus: typ === 'physisch' || typ === 'passwortmanager' ? 'nicht_pruefbar' : 'ok',
+      };
+      references.push(referenz);
+      return clone(referenz);
+    },
+
+    async checkReference(id) {
+      const referenz = references.find((r) => r.id === id);
+      if (!referenz) {
+        throw new Error(`Unbekannte Referenz: ${id}`);
+      }
+      // Im Browser lässt sich nichts wirklich prüfen – das ist ein ehrlicher Zustand.
+      const status: Pruefstatus = referenz.typ === 'url' ? 'ok' : 'nicht_pruefbar';
+      referenz.pruefstatus = status;
+      referenz.zuletzt_geprueft = new Date().toISOString();
+      return status;
+    },
+
     async listVaultEntries(projectId) {
       return clone(vaultEntries.filter((v) => v.projekt_ids.includes(projectId)));
+    },
+
+    async listAllVaultEntries() {
+      return clone(vaultEntries);
+    },
+
+    async addVaultEntry(titel, projektIds, stufe, felder) {
+      const eintrag: TresorEintrag = {
+        id: nextId('v'),
+        titel: titel.trim(),
+        projekt_ids: projektIds,
+        stufe,
+        felder: felder.map((f) => ({ name: f.name, wert_verschluesselt: '••••••••' })),
+      };
+      vaultEntries.push(eintrag);
+      for (const f of felder) {
+        mockTresorWerte.set(`${eintrag.id}|${f.name}`, f.wert);
+      }
+      return clone(eintrag);
+    },
+
+    async readVaultField(id, feld) {
+      const wert = mockTresorWerte.get(`${id}|${feld}`);
+      if (wert === undefined) {
+        throw new Error('Für diesen Beispieleintrag ist kein Wert hinterlegt.');
+      }
+      return wert;
+    },
+
+    async deleteVaultEntry(id) {
+      const index = vaultEntries.findIndex((v) => v.id === id);
+      if (index < 0) {
+        throw new Error(`Unbekannter Tresor-Eintrag: ${id}`);
+      }
+      for (const feld of vaultEntries[index].felder) {
+        mockTresorWerte.delete(`${id}|${feld.name}`);
+      }
+      vaultEntries.splice(index, 1);
     },
 
     async search(query) {
@@ -467,6 +599,15 @@ export function createMockProvider(): DataProvider {
         text: `Aus Hafeneinfahrt bestätigt (Erkennungsmarke: ${candidate.erkennungsmarke}, Pfad: ${candidate.pfad}).`,
       });
       return clone(project);
+    },
+
+    async rejectCandidate(candidateId) {
+      candidates = candidates.filter((c) => c.id !== candidateId);
+    },
+
+    async scan() {
+      // Im Browser gibt es kein Dateisystem; die Beispielkandidaten bleiben, wie sie sind.
+      return clone(candidates);
     },
   };
 }
