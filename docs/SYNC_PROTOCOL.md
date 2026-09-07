@@ -67,6 +67,7 @@ Basis-URL: `https://api.<domain>/v1`. Alle Bodies JSON. Fehler als
 | POST | `/auth/logout` | – | `204` |
 | POST | `/auth/password` | `{ old_auth_key, new_auth_key, new_salt, new_kdf, wrapped_account_key, recovery_auth_key, wrapped_account_key_recovery }` | `204`; widerruft alle anderen Sitzungen |
 | POST | `/auth/recover` | `{ email, recovery_auth_key }` | `{ wrapped_account_key_recovery, salt, kdf }` |
+| POST | `/auth/recover/complete` | `{ email, recovery_auth_key, new_auth_key, new_salt, new_kdf, wrapped_account_key, new_recovery_auth_key, wrapped_account_key_recovery }` | `204`; widerruft **alle** Sitzungen |
 | GET | `/devices` | – | `[{ id, name, platform, created_at, last_seen_at }]` |
 | DELETE | `/devices/:id` | – | `204`; widerruft dessen Sitzungen |
 

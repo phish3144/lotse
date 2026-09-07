@@ -25,6 +25,20 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Remote-Git (GitHub: offene PRs, Issue-Zahl, Prüflauf) | läuft im Kern und in der App; GitLab folgt |
 | WebAssembly-Client für den Browser | offen |
 
+## Bekannte Grenzen
+
+- **Der Ordner-Beobachter hält beim Schreiben kurz die Sitzung.** Er teilt sich den
+  Speicher mit der Oberfläche, und sein Schreibdurchlauf ruft `git log` je Repo auf.
+  Bei vielen Repos stockt die Oberfläche dabei spürbar. Sauber lösen ließe sich das mit
+  einer eigenen Datenbankverbindung für den Beobachter – das berührt aber die
+  HLC-Vergabe und damit den Abgleich, deshalb steht es aus und wird nicht nebenbei
+  gemacht.
+- **Anhalten wartet nicht auf das Ende des Threads.** Nach „Anhalten" oder „Sperren"
+  läuft der Beobachter-Thread bis zu 20 Sekunden weiter, bis sein Warteintervall
+  abläuft. Er schreibt in dieser Zeit nichts mehr: der Stop-Schalter wird vor jedem
+  Schreiben geprüft. Es bleibt ein untätiger Thread, keine Änderung an den Daten.
+- **GitLab** ist nicht angebunden, nur GitHub.
+
 ## Ausprobieren (CLI)
 
 ```

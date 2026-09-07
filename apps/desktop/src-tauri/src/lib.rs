@@ -196,6 +196,15 @@ fn konto_wiederherstellen(state: State<AppState>, code: String, neues_passwort: 
     let k = konto::lesen(&h).map_err(fehler)?;
     let code = RecoveryCode::parse(&code)
         .map_err(|_| "Das ist kein gültiger Wiederherstellungscode".to_string())?;
+
+    // Geräte, die per Anmeldung dazukamen, tragen das Recovery-Wrapping nicht lokal.
+    // Dort scheitert jeder Code – das ist kein falscher Code, und die Meldung darf das
+    // nicht behaupten.
+    if k.header.wrapped_account_key_recovery.is_none() {
+        return Err("Dieses Gerät kam per Anmeldung dazu und trägt den              Wiederherstellungscode nicht lokal. Stelle das Konto auf dem Gerät wieder              her, auf dem du Lotse eingerichtet hast; danach meldest du dieses hier mit              dem neuen Passwort neu an."
+            .into());
+    }
+
     let ak = lotse_core::crypto::konto_wiederherstellen(&k.header, &code)
         .map_err(|_| "Dieser Code passt nicht zu diesem Konto".to_string())?;
 
@@ -208,14 +217,45 @@ fn konto_wiederherstellen(state: State<AppState>, code: String, neues_passwort: 
     )
     .map_err(fehler)?;
 
+    // Die lokale Datenbank hängt am Account-Schlüssel, nicht am Passwort – sie öffnet
+    // also weiterhin. Von dort kommt die Adresse des Dienstes.
+    let store = lotse_core::store::Store::open(&h.join(konto::DB_DATEI), &ak, k.geraet_id)
+        .map_err(fehler)?;
+
+    // Liegt das Konto beim Dienst, muss er den Wechsel erfahren. Sonst hätte dieses
+    // Gerät ein neues Passwort und der Dienst weiter das alte; auffallen würde das erst
+    // beim nächsten Login auf einem zweiten Gerät – also wieder im schlechtesten
+    // Moment. Erst danach wird lokal geschrieben: lehnt der Dienst ab, bleibt hier alles,
+    // wie es war.
+    if let (Ok(client), Ok(Some(email))) = (
+        sync_client::client_aus_store(&store),
+        store.meta_get(sync_client::meta::EMAIL),
+    ) {
+        let salt: [u8; lotse_core::crypto::SALT_LEN] = k
+            .header
+            .salt
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Salt hat die falsche Länge".to_string())?;
+        let alter_recovery_key = code.derive_key(&salt, &k.header.kdf).map_err(fehler)?;
+        let alter_recovery_auth = lotse_core::crypto::recovery_auth_key(&alter_recovery_key);
+        client
+            .wiederherstellung_abschliessen(
+                &email,
+                &alter_recovery_auth,
+                &w.auth_key,
+                &w.recovery_auth_key,
+                &w.header,
+            )
+            .map_err(fehler)?;
+    }
+
     let neues_konto = konto::Konto {
         header: w.header,
         geraet_id: k.geraet_id,
         geraet_name: k.geraet_name.clone(),
     };
     konto::schreiben(&h, &neues_konto).map_err(fehler)?;
-    let store = lotse_core::store::Store::open(&h.join(konto::DB_DATEI), &ak, k.geraet_id)
-        .map_err(fehler)?;
     let vault = match konto::desktop_key_laden(k.geraet_id).map_err(fehler)? {
         Some(dk) => VaultKeys::with_desktop_key(&ak, &dk),
         None => VaultKeys::from_account_key(&ak),
@@ -283,9 +323,20 @@ fn passwort_aendern(
             andere => fehler(andere),
         })?;
 
-    // Wenn das Konto beim Dienst liegt, muss er den Wechsel mitbekommen – sonst passt
-    // der dort gespeicherte Wiederherstellungscode nicht mehr zum Konto.
-    {
+    // Reihenfolge mit Bedacht: erst lokal schreiben, dann den Dienst. Scheitert der
+    // Dienst, wird die alte Datei zurückgeschrieben – am Ende gilt überall dasselbe
+    // Passwort. Andersherum genügte ein fehlgeschlagener Dateizugriff, um Gerät und
+    // Dienst dauerhaft zu trennen: ein zweiter Versuch bräuchte den alten
+    // Auth-Schlüssel, den der Dienst dann schon nicht mehr kennt.
+    let neues_konto = konto::Konto {
+        header: w.header.clone(),
+        geraet_id: k.geraet_id,
+        geraet_name: k.geraet_name.clone(),
+    };
+    konto::schreiben(&h, &neues_konto).map_err(fehler)?;
+
+    // Ohne eingerichteten Abgleich gibt es nichts zu melden; das ist kein Fehler.
+    let dienst = {
         let mut guard = state
             .sitzung
             .lock()
@@ -293,24 +344,36 @@ fn passwort_aendern(
         let s = guard
             .as_mut()
             .ok_or_else(|| "Nicht entsperrt".to_string())?;
-        // Ohne eingerichteten Abgleich gibt es nichts zu melden; das ist kein Fehler.
-        if let Ok(client) = sync_client::client_aus_store(&s.store) {
-            client
-                .passwort_wechseln(&alter_auth, &w.auth_key, &w.recovery_auth_key, &w.header)
-                .map_err(fehler)?;
+        sync_client::client_aus_store(&s.store).ok()
+    };
+    if let Some(client) = dienst {
+        if let Err(e) =
+            client.passwort_wechseln(&alter_auth, &w.auth_key, &w.recovery_auth_key, &w.header)
+        {
+            return Err(match konto::schreiben(&h, &k) {
+                Ok(()) => format!(
+                    "Der Dienst hat den Wechsel abgelehnt ({e}). Es bleibt beim bisherigen Passwort."
+                ),
+                Err(_) => format!(
+                    "Der Dienst hat den Wechsel abgelehnt ({e}), und die alte Kontodatei ließ \
+                     sich nicht zurückschreiben. Dieses Gerät kennt jetzt das neue Passwort, \
+                     der Dienst das alte. Mit dem Wiederherstellungscode lässt sich beides \
+                     wieder zusammenbringen."
+                ),
+            });
         }
-        s.auth_key = w.auth_key;
     }
 
-    konto::schreiben(
-        &h,
-        &konto::Konto {
-            header: w.header,
-            geraet_id: k.geraet_id,
-            geraet_name: k.geraet_name,
-        },
-    )
-    .map_err(fehler)?;
+    // Erst wenn beides steht, gilt der neue Schlüssel auch für die laufende Sitzung.
+    {
+        let mut guard = state
+            .sitzung
+            .lock()
+            .map_err(|_| "Zustand gesperrt".to_string())?;
+        if let Some(s) = guard.as_mut() {
+            s.auth_key = w.auth_key;
+        }
+    }
 
     Ok(w.neuer_code.map(|c| c.display().to_string()))
 }
@@ -618,15 +681,24 @@ fn export_bundle(state: State<AppState>, ziel: String, passphrase: String) -> R<
     if passphrase.len() < 8 {
         return Err("Die Passphrase braucht mindestens 8 Zeichen".into());
     }
-    let mut guard = state
-        .sitzung
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())?;
-    let s = guard
-        .as_mut()
-        .ok_or_else(|| "Nicht entsperrt".to_string())?;
-    let b = lotse_core::export::bundle::schreiben(&s.store, Some(&s.vault), &passphrase, &pfad)
-        .map_err(fehler)?;
+    // Nur das Zusammentragen braucht Speicher und Schlüssel. Verschlüsseln und Schreiben
+    // laufen ohne Sperre – sonst hinge die ganze Oberfläche am Export, „Sperren“
+    // eingeschlossen.
+    let b = {
+        let mut guard = state
+            .sitzung
+            .lock()
+            .map_err(|_| "Zustand gesperrt".to_string())?;
+        let s = guard
+            .as_mut()
+            .ok_or_else(|| "Nicht entsperrt".to_string())?;
+        lotse_core::export::bundle::bauen(&s.store, Some(&s.vault)).map_err(fehler)?
+    };
+    let json = serde_json::to_vec_pretty(&b).map_err(|e| e.to_string())?;
+    let verschluesselt =
+        lotse_core::export::bundle::age_verschluesseln(&json, &passphrase).map_err(fehler)?;
+    lotse_core::export::atomar_schreiben(&pfad, &verschluesselt).map_err(fehler)?;
+
     Ok(BundleBilanz {
         projekte: b.projekte.len(),
         notizen: b.notizen.len(),
@@ -710,10 +782,20 @@ fn beobachter_starten(
         }
     }
 
-    beobachter_stoppen(state.clone())?;
     mit(&state, |s| {
         lotse_core::watcher::wurzeln_speichern(&s.store, &pfade)
     })?;
+
+    // Anhalten und Ablegen unter einer einzigen Sperre. Sonst könnten zwei fast
+    // gleichzeitige Starts – ein Doppelklick genügt – einen Beobachter zurücklassen,
+    // dessen Stop-Schalter niemand mehr hält.
+    let mut handle = state
+        .beobachter
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())?;
+    if let Some(vorheriger) = handle.take() {
+        vorheriger.stop.store(true, Ordering::SeqCst);
+    }
 
     let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let stop_thread = stop.clone();
@@ -793,10 +875,8 @@ fn beobachter_starten(
         }
     });
 
-    *state
-        .beobachter
-        .lock()
-        .map_err(|_| "Zustand gesperrt".to_string())? = Some(BeobachterHandle { stop });
+    *handle = Some(BeobachterHandle { stop });
+    drop(handle);
 
     Ok(BeobachterStatus {
         laeuft: true,

@@ -201,6 +201,83 @@ describe("auth", () => {
     expect(res.status).toBe(400);
   });
 
+  it("completes a recovery and leaves the new password usable", async () => {
+    // Ohne /auth/recover/complete haette das Geraet nach der Wiederherstellung ein
+    // neues Passwort und der Dienst weiter das alte. Gemerkt haette man es erst beim
+    // Login auf einem zweiten Geraet -- also im schlechtesten Moment.
+    const { requestBody } = await registerAccount();
+
+    const neuerAuthKey = "bmV1ZXItYXV0aC1rZXktbmFjaC1yZWNvdmVyeQ==";
+    const neuerRecoveryAuthKey = "bmV1ZXItcmVjb3ZlcnktYXV0aC1uYWNoLXJlY292ZXJ5";
+    const neuerSalt = "bmV1ZXItc2FsdC1uYWNoLXJlY292ZXJ5";
+    const neuesWrapping = "bmV1ZXMtcmVjb3Zlcnktd3JhcHBpbmctbmFjaA==";
+
+    const res = await api("/v1/auth/recover/complete", {
+      method: "POST",
+      body: JSON.stringify({
+        email: requestBody.email,
+        recovery_auth_key: requestBody.recovery_auth_key,
+        new_auth_key: neuerAuthKey,
+        new_salt: neuerSalt,
+        new_kdf: { m: 65536, t: 3, p: 1 },
+        wrapped_account_key: requestBody.wrapped_account_key,
+        new_recovery_auth_key: neuerRecoveryAuthKey,
+        wrapped_account_key_recovery: neuesWrapping,
+      }),
+    });
+    expect(res.status).toBe(204);
+
+    // Das neue Passwort gilt jetzt auch beim Dienst.
+    const login = await api("/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: requestBody.email,
+        auth_key: neuerAuthKey,
+        device: { ...(requestBody.device as object), id: crypto.randomUUID() },
+      }),
+    });
+    expect(login.status).toBe(200);
+
+    // Das alte nicht mehr.
+    const alt = await api("/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: requestBody.email,
+        auth_key: requestBody.auth_key,
+        device: { ...(requestBody.device as object), id: crypto.randomUUID() },
+      }),
+    });
+    expect(alt.status).toBe(401);
+
+    // Und der Wiederherstellungscode ist am neuen Salt verankert.
+    const wieder = await api("/v1/auth/recover", {
+      method: "POST",
+      body: JSON.stringify({ email: requestBody.email, recovery_auth_key: neuerRecoveryAuthKey }),
+    });
+    expect(wieder.status).toBe(200);
+    const body = (await wieder.json()) as Record<string, unknown>;
+    expect(body.salt).toBe(neuerSalt);
+    expect(body.wrapped_account_key_recovery).toBe(neuesWrapping);
+  });
+
+  it("rejects a recovery completion with the wrong recovery_auth_key", async () => {
+    const { requestBody } = await registerAccount();
+    const res = await api("/v1/auth/recover/complete", {
+      method: "POST",
+      body: JSON.stringify({
+        email: requestBody.email,
+        recovery_auth_key: "ZmFsc2NoZXIta2V5",
+        new_auth_key: "bmV1",
+        new_salt: "c2FsdA==",
+        new_kdf: { m: 65536, t: 3, p: 1 },
+        wrapped_account_key: requestBody.wrapped_account_key,
+        new_recovery_auth_key: "bmV1",
+        wrapped_account_key_recovery: "bmV1",
+      }),
+    });
+    expect(res.status).toBe(401);
+  });
+
   it("recover returns the wrapped recovery key for a valid recovery_auth_key", async () => {
     const { requestBody } = await registerAccount();
     const res = await api("/v1/auth/recover", {

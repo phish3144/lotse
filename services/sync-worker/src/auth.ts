@@ -8,6 +8,7 @@
  * stop abusive requests before they burn CPU on PBKDF2.
  */
 import {
+  deleteAllSessions,
   deleteDevice,
   deleteOtherSessions,
   deleteSessionByTokenHash,
@@ -297,6 +298,51 @@ export async function recover({ request, env }: RequestContext): Promise<Respons
     salt: account.salt,
     kdf: { m: account.kdf_m, t: account.kdf_t, p: account.kdf_p },
   });
+}
+
+/**
+ * Schliesst eine Wiederherstellung ab: neue Zugangsdaten, beglaubigt mit dem
+ * recovery_auth_key statt mit dem alten Passwort.
+ *
+ * Ohne diesen Weg gaebe es keinen: /auth/password verlangt den old_auth_key, und den
+ * hat nicht, wer sein Passwort vergessen hat. Das Geraet haette danach ein neues
+ * Passwort, der Dienst weiter das alte -- die Aussperrung faellt erst beim naechsten
+ * Login auf einem zweiten Geraet auf.
+ */
+export async function recoverComplete({ request, env }: RequestContext): Promise<Response> {
+  const body = await parseJson(request);
+  const email = normalizeEmail(requireString(body, "email"));
+  const recoveryAuthKey = requireString(body, "recovery_auth_key");
+  const newAuthKey = requireString(body, "new_auth_key");
+  const newSalt = requireString(body, "new_salt");
+  const newKdf = requireKdf(body, "new_kdf");
+  const wrappedAccountKey = requireString(body, "wrapped_account_key");
+  const newRecoveryAuthKey = requireString(body, "new_recovery_auth_key");
+  const wrappedAccountKeyRecovery = requireString(body, "wrapped_account_key_recovery");
+
+  const account = await getAccountByEmail(env.DB, email);
+  if (!account) {
+    throw unauthorized("invalid email or recovery_auth_key", "invalid_recovery");
+  }
+  const valid = await verifySecret(account.recovery_auth_hash, recoveryAuthKey);
+  if (!valid) {
+    throw unauthorized("invalid email or recovery_auth_key", "invalid_recovery");
+  }
+
+  await updateAccountPassword(env.DB, {
+    id: account.id,
+    authHash: await hashSecret(newAuthKey),
+    salt: newSalt,
+    kdfM: newKdf.m,
+    kdfT: newKdf.t,
+    kdfP: newKdf.p,
+    wrappedAccountKey,
+    recoveryAuthHash: await hashSecret(newRecoveryAuthKey),
+    wrappedAccountKeyRecovery,
+  });
+  // Wer das Passwort vergessen hat, weiss nicht, wer sonst noch angemeldet ist.
+  await deleteAllSessions(env.DB, account.id);
+  return noContent();
 }
 
 export async function listDevicesHandler({ env, auth }: RequestContext): Promise<Response> {

@@ -13,6 +13,7 @@ import {
   logout,
   prelogin,
   recover,
+  recoverComplete,
   register,
 } from "./auth";
 import { deleteBlob, getBlob, putBlob } from "./blobs";
@@ -29,6 +30,7 @@ router.post("/v1/auth/login", login);
 router.post("/v1/auth/logout", logout, { auth: true });
 router.post("/v1/auth/password", changePassword, { auth: true });
 router.post("/v1/auth/recover", recover);
+router.post("/v1/auth/recover/complete", recoverComplete);
 router.get("/v1/devices", listDevicesHandler, { auth: true });
 router.delete("/v1/devices/:id", deleteDeviceHandler, { auth: true });
 

@@ -114,6 +114,11 @@ export async function deleteOtherSessions(db: D1Database, accountId: string, kee
     .run();
 }
 
+/** Nach einer Wiederherstellung gilt keine bestehende Sitzung mehr. */
+export async function deleteAllSessions(db: D1Database, accountId: string): Promise<void> {
+  await db.prepare("DELETE FROM sessions WHERE account_id = ?").bind(accountId).run();
+}
+
 export async function deleteSessionsForDevice(db: D1Database, accountId: string, deviceId: string): Promise<void> {
   await db
     .prepare("DELETE FROM sessions WHERE account_id = ? AND device_id = ?")
