@@ -103,6 +103,15 @@ export const konto = {
   sperren: () => invoke<void>('sperren'),
   syncLogin: (url: string, email: string, passwort: string, geraet: string) =>
     invoke<void>('sync_login', { url, email, passwort, geraet }),
+  /** Vergessenes Passwort: mit dem Wiederherstellungscode öffnen und neu setzen. */
+  wiederherstellen: (code: string, neuesPasswort: string) =>
+    invoke<void>('konto_wiederherstellen', { code, neuesPasswort }),
+  /**
+   * Master-Passwort wechseln. Ohne `code` entsteht ein neuer Wiederherstellungscode,
+   * der zurückgegeben wird und einmal angezeigt werden muss.
+   */
+  passwortAendern: (altesPasswort: string, neuesPasswort: string, code?: string) =>
+    invoke<string | null>('passwort_aendern', { altesPasswort, neuesPasswort, code: code ?? null }),
 };
 
 /** Tresor-Werte werden nie im Provider gehalten; genau ein Feld auf Klick. */
@@ -128,10 +137,51 @@ export interface SyncErgebnis {
  * Abgleich zwischen Geräten. Belang der Hülle, nicht der Datenschicht – deshalb neben
  * `konto` und nicht im `DataProvider`.
  */
+export interface GeraetInfo {
+  id: string;
+  name: string;
+  platform: string;
+  created_at: number;
+  last_seen_at: number;
+}
+
 export const sync = {
   status: () => invoke<SyncStatus>('sync_status'),
   jetzt: () => invoke<SyncErgebnis>('sync_jetzt'),
   registrieren: (url: string, email: string, code: string) => invoke<void>('sync_register', { url, email, code }),
+  geraete: () => invoke<GeraetInfo[]>('sync_geraete'),
+  geraetWiderrufen: (id: string) => invoke<void>('sync_geraet_widerrufen', { id }),
+};
+
+export interface BundleBilanz {
+  projekte: number;
+  notizen: number;
+  tresor: number;
+  tresor_nicht_lesbar: number;
+}
+
+/** Der Fluchtweg: Klartext-Spiegel und verschlüsseltes Bundle. */
+export const exportieren = {
+  spiegel: (ziel: string) => invoke<number>('export_spiegel', { ziel }),
+  bundle: (ziel: string, passphrase: string) => invoke<BundleBilanz>('export_bundle', { ziel, passphrase }),
+};
+
+export interface BeobachterStatus {
+  laeuft: boolean;
+  wurzeln: string[];
+}
+
+export interface BeobachterBilanz {
+  datei_notizen: number;
+  git_notizen: number;
+  kandidaten: number;
+}
+
+/** Ordner-Beobachter: sammelt Metadaten im Hintergrund, ohne dass man etwas tut. */
+export const beobachter = {
+  status: () => invoke<BeobachterStatus>('beobachter_status'),
+  starten: (wurzeln: string[]) => invoke<BeobachterStatus>('beobachter_starten', { wurzeln }),
+  stoppen: () => invoke<void>('beobachter_stoppen'),
 };
 
 /** Ist auf diesem Gerät die Tresor-Stufe »nur Desktop« lesbar? */
@@ -144,6 +194,8 @@ export const kannNurDesktop = () => invoke<boolean>('kann_nur_desktop');
 export const system = {
   /** Systemdialog zur Ordnerwahl. `null`, wenn abgebrochen. */
   ordnerWaehlen: () => invoke<string | null>('ordner_waehlen'),
+  /** Systemdialog für einen Speicherort. `null`, wenn abgebrochen. */
+  dateiWaehlen: (name: string) => invoke<string | null>('datei_waehlen', { name }),
   /** Öffnet Ordner, Datei oder URL im System – nur auf ausdrücklichen Klick. */
   oeffnen: (ziel: string) => invoke<void>('oeffnen', { ziel }),
 };

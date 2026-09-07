@@ -4,7 +4,7 @@
   let { fertig }: { fertig: () => void } = $props();
 
   let status = $state<KontoStatus | null>(null);
-  let modus = $state<'laden' | 'einrichten' | 'geheimnisse' | 'bestaetigen' | 'entsperren' | 'login'>('laden');
+  let modus = $state<'laden' | 'einrichten' | 'geheimnisse' | 'bestaetigen' | 'entsperren' | 'login' | 'wiederherstellen'>('laden');
   let fehler = $state('');
   let beschaeftigt = $state(false);
 
@@ -18,6 +18,26 @@
 
   let syncUrl = $state('');
   let email = $state('');
+
+  // Vergessenes Passwort: mit dem Wiederherstellungscode öffnen und dabei ein neues
+  // Passwort setzen. Ohne diesen Weg wäre die App hier eine Sackgasse.
+  async function wiederherstellen(ev: SubmitEvent) {
+    ev.preventDefault();
+    fehler = '';
+    if (passwort.length < 12) return (fehler = 'Das neue Passwort braucht mindestens 12 Zeichen.');
+    if (passwort !== passwort2) return (fehler = 'Die Passwörter stimmen nicht überein.');
+    beschaeftigt = true;
+    try {
+      await konto.wiederherstellen(codeEingabe.trim(), passwort);
+      codeEingabe = '';
+      fertig();
+    } catch (e) {
+      fehler = String(e);
+    } finally {
+      beschaeftigt = false;
+      passwort = passwort2 = '';
+    }
+  }
 
   $effect(() => {
     konto
@@ -143,6 +163,22 @@
       </details>
       <button type="submit" disabled={beschaeftigt}>{beschaeftigt ? 'Entsperre …' : 'Entsperren'}</button>
     </form>
+    <button class="leise" type="button" onclick={() => { modus = 'wiederherstellen'; fehler = ''; }}>
+      Passwort vergessen?
+    </button>
+  {:else if modus === 'wiederherstellen'}
+    <h1>Konto wiederherstellen</h1>
+    <p class="gedaempft">
+      Gib den Wiederherstellungscode ein, den Lotse bei der Einrichtung einmal angezeigt hat, und setze ein neues
+      Master-Passwort. Der Code bleibt danach derselbe.
+    </p>
+    <form onsubmit={wiederherstellen}>
+      <label>Wiederherstellungscode <input type="text" bind:value={codeEingabe} autocomplete="off" spellcheck="false" placeholder="5YD6-AR19-…" required /></label>
+      <label>Neues Master-Passwort <input type="password" bind:value={passwort} autocomplete="new-password" required /></label>
+      <label>Noch einmal <input type="password" bind:value={passwort2} autocomplete="new-password" required /></label>
+      <button type="submit" disabled={beschaeftigt}>{beschaeftigt ? 'Stelle wieder her …' : 'Wiederherstellen'}</button>
+    </form>
+    <button class="leise" type="button" onclick={() => { modus = 'entsperren'; fehler = ''; }}>Zurück</button>
   {:else if modus === 'login'}
     <h1>Diesen Rechner anmelden</h1>
     <p class="gedaempft">Der Sync-Dienst liefert deinen Konto-Header, das Master-Passwort entsperrt ihn hier. Der Dienst sieht das Passwort nie.</p>

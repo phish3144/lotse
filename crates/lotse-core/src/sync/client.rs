@@ -253,6 +253,37 @@ impl Client {
         Ok(())
     }
 
+    /// Meldet einen Passwortwechsel beim Dienst. Das Recovery-Wrapping muss mitgehen:
+    /// es hängt am Salt, und der wechselt hier. Der Dienst widerruft alle anderen
+    /// Sitzungen, diese bleibt bestehen.
+    pub fn passwort_wechseln(
+        &self,
+        alter_auth_key: &Key32,
+        neuer_auth_key: &Key32,
+        neuer_recovery_auth_key: &Key32,
+        header: &KontoHeader,
+    ) -> Result<()> {
+        let recovery = header
+            .wrapped_account_key_recovery
+            .as_ref()
+            .ok_or_else(|| {
+                Error::Invalid("Passwortwechsel braucht das Wiederherstellungs-Wrapping".into())
+            })?;
+        let body = serde_json::json!({
+            "old_auth_key": B64.encode(alter_auth_key.as_bytes()),
+            "new_auth_key": B64.encode(neuer_auth_key.as_bytes()),
+            "new_salt": B64.encode(&header.salt),
+            "new_kdf": KdfWire::from(header.kdf),
+            "wrapped_account_key": header.wrapped_account_key.to_compact(),
+            "recovery_auth_key": B64.encode(neuer_recovery_auth_key.as_bytes()),
+            "wrapped_account_key_recovery": recovery.to_compact(),
+        });
+        self.request("POST", "/auth/password")
+            .send_json(body)
+            .map_err(Self::fehler)?;
+        Ok(())
+    }
+
     pub fn geraete(&self) -> Result<Vec<GeraetInfo>> {
         let resp = self
             .request("GET", "/devices")

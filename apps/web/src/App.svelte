@@ -4,7 +4,10 @@
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
   import Sprung from './lib/components/Sprung.svelte';
   import { echteDaten } from './lib/data/store';
+  import type { BeobachterBilanz } from './lib/data/tauri';
+  import { datenVersion } from './lib/data/version.svelte';
   import { erfassung } from './lib/erfassung.svelte';
+  import { meldungen } from './lib/meldung.svelte';
   import { router, zurueck } from './lib/router.svelte';
   import { sprung } from './lib/sprung.svelte';
   import Einstellungen from './routes/Einstellungen.svelte';
@@ -17,6 +20,33 @@
   // In der Tauri-Hülle steht vor allem der Entsperr-Bildschirm; im Browser mit
   // Beispieldaten entfällt er.
   let entsperrt = $state(!echteDaten);
+
+  // Der Ordner-Beobachter schreibt im Hintergrund. Damit das sichtbar wird, ohne dass
+  // man die Seite neu lädt, hört die App auf seine Meldungen.
+  $effect(() => {
+    if (!echteDaten || !entsperrt) return;
+    let abmelden: (() => void) | undefined;
+    let entsorgt = false;
+    void import('@tauri-apps/api/event').then(({ listen }) =>
+      listen<BeobachterBilanz>('beobachter-bilanz', (e) => {
+        datenVersion.bump();
+        const b = e.payload;
+        const teile = [
+          b.datei_notizen ? `${b.datei_notizen} aus Dateien` : '',
+          b.git_notizen ? `${b.git_notizen} aus Git` : '',
+          b.kandidaten ? `${b.kandidaten} neue Kandidaten` : '',
+        ].filter(Boolean);
+        if (teile.length > 0) meldungen.zeigen(`Beobachter: ${teile.join(', ')}.`);
+      }).then((un) => {
+        if (entsorgt) un();
+        else abmelden = un;
+      }),
+    );
+    return () => {
+      entsorgt = true;
+      abmelden?.();
+    };
+  });
 
   function aufTaste(e: KeyboardEvent) {
     // Strg/Cmd+P springt zum Projekt. Das Drucken-Kürzel hat in dieser App keinen Sinn.

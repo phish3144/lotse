@@ -31,10 +31,17 @@ struct Sitzung {
     geraet_name: String,
 }
 
+/// Laufender Ordner-Beobachter. Der Thread hält den `Beobachter` selbst; hier steht nur
+/// der Schalter, mit dem er sich beenden lässt.
+struct BeobachterHandle {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
 #[derive(Default)]
 pub struct AppState {
     home: Mutex<Option<PathBuf>>,
     sitzung: Mutex<Option<Sitzung>>,
+    beobachter: Mutex<Option<BeobachterHandle>>,
 }
 
 type R<T> = Result<T, String>;
@@ -176,8 +183,131 @@ fn entsperren(
     Ok(())
 }
 
+/// Konto mit dem Wiederherstellungscode öffnen und dabei ein neues Passwort setzen.
+/// Der Weg für ein vergessenes Master-Passwort; ohne ihn wäre die App an der Stelle
+/// eine Sackgasse.
+#[tauri::command]
+fn konto_wiederherstellen(state: State<AppState>, code: String, neues_passwort: String) -> R<()> {
+    let h = home(&state)?;
+    let neues_passwort = Zeroizing::new(neues_passwort);
+    if neues_passwort.len() < 12 {
+        return Err("Das neue Master-Passwort braucht mindestens 12 Zeichen".into());
+    }
+    let k = konto::lesen(&h).map_err(fehler)?;
+    let code = RecoveryCode::parse(&code)
+        .map_err(|_| "Das ist kein gültiger Wiederherstellungscode".to_string())?;
+    let ak = lotse_core::crypto::konto_wiederherstellen(&k.header, &code)
+        .map_err(|_| "Dieser Code passt nicht zu diesem Konto".to_string())?;
+
+    // Der Code bleibt derselbe; er wird nur am neuen Salt neu verankert.
+    let w = lotse_core::crypto::passwort_wechseln(
+        &k.header,
+        &ak,
+        neues_passwort.as_bytes(),
+        lotse_core::crypto::RecoveryWechsel::Behalten(&code),
+    )
+    .map_err(fehler)?;
+
+    let neues_konto = konto::Konto {
+        header: w.header,
+        geraet_id: k.geraet_id,
+        geraet_name: k.geraet_name.clone(),
+    };
+    konto::schreiben(&h, &neues_konto).map_err(fehler)?;
+    let store = lotse_core::store::Store::open(&h.join(konto::DB_DATEI), &ak, k.geraet_id)
+        .map_err(fehler)?;
+    let vault = match konto::desktop_key_laden(k.geraet_id).map_err(fehler)? {
+        Some(dk) => VaultKeys::with_desktop_key(&ak, &dk),
+        None => VaultKeys::from_account_key(&ak),
+    };
+    *state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = Some(Sitzung {
+        store,
+        account_key: ak,
+        auth_key: w.auth_key,
+        vault,
+        geraet_id: k.geraet_id,
+        geraet_name: k.geraet_name,
+    });
+    Ok(())
+}
+
+/// Master-Passwort wechseln. Der Wiederherstellungscode muss dabei neu verankert werden
+/// (er hängt am Salt): entweder wird der bisherige angegeben, oder es entsteht ein neuer,
+/// der einmal angezeigt wird.
+#[tauri::command]
+fn passwort_aendern(
+    state: State<AppState>,
+    altes_passwort: String,
+    neues_passwort: String,
+    code: Option<String>,
+) -> R<Option<String>> {
+    let h = home(&state)?;
+    let altes_passwort = Zeroizing::new(altes_passwort);
+    let neues_passwort = Zeroizing::new(neues_passwort);
+    if neues_passwort.len() < 12 {
+        return Err("Das neue Master-Passwort braucht mindestens 12 Zeichen".into());
+    }
+    let k = konto::lesen(&h).map_err(fehler)?;
+    let (ak, alter_auth) =
+        lotse_core::crypto::konto_entsperren(&k.header, altes_passwort.as_bytes())
+            .map_err(|_| "Das bisherige Passwort stimmt nicht".to_string())?;
+
+    let geparst = match code.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) => Some(
+            RecoveryCode::parse(s)
+                .map_err(|_| "Das ist kein gültiger Wiederherstellungscode".to_string())?,
+        ),
+        None => None,
+    };
+    let wahl = match &geparst {
+        Some(c) => lotse_core::crypto::RecoveryWechsel::Behalten(c),
+        None => lotse_core::crypto::RecoveryWechsel::Neu,
+    };
+    let w = lotse_core::crypto::passwort_wechseln(&k.header, &ak, neues_passwort.as_bytes(), wahl)
+        .map_err(|e| match e {
+            Error::Decrypt => "Dieser Wiederherstellungscode passt nicht zu diesem Konto".into(),
+            andere => fehler(andere),
+        })?;
+
+    // Wenn das Konto beim Dienst liegt, muss er den Wechsel mitbekommen – sonst passt
+    // der dort gespeicherte Wiederherstellungscode nicht mehr zum Konto.
+    {
+        let mut guard = state
+            .sitzung
+            .lock()
+            .map_err(|_| "Zustand gesperrt".to_string())?;
+        let s = guard
+            .as_mut()
+            .ok_or_else(|| "Nicht entsperrt".to_string())?;
+        // Ohne eingerichteten Abgleich gibt es nichts zu melden; das ist kein Fehler.
+        if let Ok(client) = sync_client::client_aus_store(&s.store) {
+            client
+                .passwort_wechseln(&alter_auth, &w.auth_key, &w.recovery_auth_key, &w.header)
+                .map_err(fehler)?;
+        }
+        s.auth_key = w.auth_key;
+    }
+
+    konto::schreiben(
+        &h,
+        &konto::Konto {
+            header: w.header,
+            geraet_id: k.geraet_id,
+            geraet_name: k.geraet_name,
+        },
+    )
+    .map_err(fehler)?;
+
+    Ok(w.neuer_code.map(|c| c.display().to_string()))
+}
+
 #[tauri::command]
 fn sperren(state: State<AppState>) -> R<()> {
+    // Erst den Beobachter anhalten: er greift sonst weiter auf die Sitzung zu.
+    beobachter_stoppen(state.clone())?;
     *state
         .sitzung
         .lock()
@@ -444,6 +574,262 @@ fn oeffnen(app: tauri::AppHandle, ziel: String) -> R<()> {
     }
 }
 
+// ------------------------------------------------------------------ Export
+
+/// Was im Bundle gelandet ist. `tresor_nicht_lesbar` zählt Einträge der Stufe
+/// »nur Desktop«, für die auf diesem Gerät der Schlüssel fehlt – ehrlicher als
+/// sie stillschweigend wegzulassen.
+#[derive(Serialize)]
+struct BundleBilanz {
+    projekte: usize,
+    notizen: usize,
+    tresor: usize,
+    tresor_nicht_lesbar: usize,
+}
+
+/// Klartext-Spiegel: ein Ordner mit Markdown, den grep und Obsidian lesen.
+/// Ohne Tresor-Werte – der Spiegel ist unverschlüsselt.
+#[tauri::command]
+fn export_spiegel(state: State<AppState>, ziel: String) -> R<usize> {
+    let pfad = PathBuf::from(ziel);
+    mit(&state, |s| {
+        lotse_core::export::spiegel::schreiben(&s.store, &pfad)
+    })
+}
+
+/// Der Fluchtweg: alles als JSON, mit `age` und Passphrase verschlüsselt. Lässt sich
+/// ohne Lotse öffnen (`age -d -o bundle.json backup.json.age`). Enthält den Tresor,
+/// soweit er auf diesem Gerät lesbar ist.
+#[tauri::command]
+fn export_bundle(state: State<AppState>, ziel: String, passphrase: String) -> R<BundleBilanz> {
+    let pfad = PathBuf::from(ziel);
+    let passphrase = Zeroizing::new(passphrase);
+    if passphrase.len() < 8 {
+        return Err("Die Passphrase braucht mindestens 8 Zeichen".into());
+    }
+    let mut guard = state
+        .sitzung
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())?;
+    let s = guard
+        .as_mut()
+        .ok_or_else(|| "Nicht entsperrt".to_string())?;
+    let b = lotse_core::export::bundle::schreiben(&s.store, Some(&s.vault), &passphrase, &pfad)
+        .map_err(fehler)?;
+    Ok(BundleBilanz {
+        projekte: b.projekte.len(),
+        notizen: b.notizen.len(),
+        tresor: b.tresor.len(),
+        tresor_nicht_lesbar: b.tresor_nicht_lesbar.len(),
+    })
+}
+
+/// Systemdialog für einen Speicherort. `None`, wenn abgebrochen.
+#[tauri::command]
+async fn datei_waehlen(app: tauri::AppHandle, name: String) -> R<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .set_file_name(&name)
+        .save_file(move |pfad| {
+            let _ = tx.send(pfad);
+        });
+    let gewaehlt = rx.recv().map_err(|_| "Auswahl abgebrochen".to_string())?;
+    Ok(gewaehlt
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string()))
+}
+
+// ------------------------------------------------------- Ordner-Beobachter
+
+#[derive(Serialize, Clone)]
+struct BeobachterStatus {
+    laeuft: bool,
+    wurzeln: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct BeobachterBilanz {
+    datei_notizen: usize,
+    git_notizen: usize,
+    kandidaten: usize,
+}
+
+#[tauri::command]
+fn beobachter_status(state: State<AppState>) -> R<BeobachterStatus> {
+    let laeuft = state
+        .beobachter
+        .lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false);
+    let wurzeln = mit(&state, |s| lotse_core::watcher::wurzeln_laden(&s.store))?;
+    Ok(BeobachterStatus {
+        laeuft,
+        wurzeln: wurzeln
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
+    })
+}
+
+/// Startet die Beobachtung im Hintergrund. Der Thread verarbeitet Ereignisse ohne die
+/// Sitzung zu sperren und greift nur zum Schreiben kurz zu. Wird das Konto gesperrt,
+/// beendet er sich von selbst.
+#[tauri::command]
+fn beobachter_starten(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    wurzeln: Vec<String>,
+) -> R<BeobachterStatus> {
+    use std::sync::atomic::Ordering;
+    use tauri::Emitter;
+
+    let pfade: Vec<PathBuf> = wurzeln
+        .iter()
+        .map(|w| PathBuf::from(w.trim()))
+        .filter(|p| !p.as_os_str().is_empty())
+        .collect();
+    if pfade.is_empty() {
+        return Err("Kein Wurzelordner angegeben".into());
+    }
+    for p in &pfade {
+        if !p.is_dir() {
+            return Err(format!("Kein Ordner: {}", p.display()));
+        }
+    }
+
+    beobachter_stoppen(state.clone())?;
+    mit(&state, |s| {
+        lotse_core::watcher::wurzeln_speichern(&s.store, &pfade)
+    })?;
+
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop_thread = stop.clone();
+    let pfade_thread = pfade.clone();
+
+    std::thread::spawn(move || {
+        let zustand = app.state::<AppState>();
+
+        // Start braucht den Speicher nur lesend und nur kurz.
+        let mut b = {
+            let Ok(mut guard) = zustand.sitzung.lock() else {
+                return;
+            };
+            let Some(s) = guard.as_mut() else { return };
+            match lotse_core::watcher::Beobachter::starten(&s.store, pfade_thread) {
+                Ok(b) => b,
+                Err(e) => {
+                    let _ = app.emit("beobachter-fehler", e.to_string());
+                    return;
+                }
+            }
+        };
+
+        // Erster Durchlauf setzt den Git-Stand und findet Kandidaten.
+        let schreiben = |b: &mut lotse_core::watcher::Beobachter| -> bool {
+            let Ok(mut guard) = zustand.sitzung.lock() else {
+                return false;
+            };
+            // Gesperrtes Konto beendet die Beobachtung.
+            let Some(s) = guard.as_mut() else {
+                return false;
+            };
+            if b.zuordnung_laden(&s.store).is_err() {
+                return false;
+            }
+            match b.schreiben(&mut s.store) {
+                Ok(bilanz) => {
+                    if bilanz.datei_notizen > 0 || bilanz.git_notizen > 0 || bilanz.kandidaten > 0 {
+                        let _ = app.emit(
+                            "beobachter-bilanz",
+                            BeobachterBilanz {
+                                datei_notizen: bilanz.datei_notizen,
+                                git_notizen: bilanz.git_notizen,
+                                kandidaten: bilanz.kandidaten,
+                            },
+                        );
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        };
+
+        if !schreiben(&mut b) {
+            return;
+        }
+        while !stop_thread.load(Ordering::SeqCst) {
+            // Ohne Sperre warten, sonst stünde die Oberfläche die ganze Zeit an.
+            b.verarbeiten(std::time::Duration::from_secs(20));
+            if stop_thread.load(Ordering::SeqCst) || !schreiben(&mut b) {
+                break;
+            }
+        }
+        // Eigenen Eintrag räumen, damit der Status nicht „läuft“ behauptet.
+        {
+            let ergebnis = zustand.beobachter.lock();
+            if let Ok(mut g) = ergebnis {
+                *g = None;
+            }
+        }
+    });
+
+    *state
+        .beobachter
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())? = Some(BeobachterHandle { stop });
+
+    Ok(BeobachterStatus {
+        laeuft: true,
+        wurzeln: pfade
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
+    })
+}
+
+#[tauri::command]
+fn beobachter_stoppen(state: State<AppState>) -> R<()> {
+    use std::sync::atomic::Ordering;
+    if let Some(h) = state
+        .beobachter
+        .lock()
+        .map_err(|_| "Zustand gesperrt".to_string())?
+        .take()
+    {
+        h.stop.store(true, Ordering::SeqCst);
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------------ Geräte
+
+#[tauri::command]
+fn sync_geraete(state: State<AppState>) -> R<Vec<sync_client::GeraetInfo>> {
+    mit(&state, |s| {
+        match sync_client::client_aus_store(&s.store) {
+            Ok(client) => client.geraete(),
+            // Ohne Abgleich gibt es keine weiteren Geräte, nur dieses hier.
+            Err(_) => Ok(Vec::new()),
+        }
+    })
+}
+
+/// Entzieht einem Gerät den Zugang. Das eigene lässt sich nicht widerrufen –
+/// dafür gibt es Sperren.
+#[tauri::command]
+fn sync_geraet_widerrufen(state: State<AppState>, id: String) -> R<()> {
+    mit(&state, |s| {
+        if id == s.geraet_id.to_string() {
+            return Err(Error::Invalid(
+                "Das eigene Gerät lässt sich nicht widerrufen".into(),
+            ));
+        }
+        sync_client::client_aus_store(&s.store)?.geraet_widerrufen(&id)
+    })
+}
+
 // ----------------------------------------------------------------- Tresor
 
 #[tauri::command]
@@ -651,6 +1037,8 @@ pub fn run() {
             wiederherstellungscode_pruefen,
             entsperren,
             sperren,
+            konto_wiederherstellen,
+            passwort_aendern,
             kann_nur_desktop,
             hafen,
             projekte,
@@ -676,12 +1064,20 @@ pub fn run() {
             kandidat_verwerfen,
             scan,
             ordner_waehlen,
+            datei_waehlen,
+            export_spiegel,
+            export_bundle,
+            beobachter_status,
+            beobachter_starten,
+            beobachter_stoppen,
             oeffnen,
             tresor_liste,
             tresor_anlegen,
             tresor_feld_lesen,
             tresor_loeschen,
             sync_status,
+            sync_geraete,
+            sync_geraet_widerrufen,
             sync_jetzt,
             sync_register,
             sync_login
