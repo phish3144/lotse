@@ -3,16 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lotse</title>
-<meta name="description" content="Lotse ist das Logbuch für alle deine Vorhaben. Wiedereinstieg in alte Projekte, Faden halten, Rad nicht neu erfinden, Geheimnisse Ende-zu-Ende verschlüsselt am Projekt.">
+<title>Lotse – Nach Wochen wieder rein, in dreißig Sekunden</title>
+<meta name="description" content="Lotse ist das Logbuch für alle deine Vorhaben. Wiedereinstieg nach langen Pausen, alle Projekte auf einen Blick, automatisches Logbuch aus Ordnern und Git, Tresor am Projekt. Ende-zu-Ende verschlüsselt, kostenlos, für Windows, macOS und Linux.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0b1b2b">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1b2b'/%3E%3Cpath d='M20 14h8v28h16v8H20z' fill='%23f2b544'/%3E%3Ccircle cx='46' cy='18' r='5' fill='%23e8e1d1'/%3E%3C/svg%3E">
 <style>
 /* ------------------------------------------------------------------
-   Seekarte bei Nacht (Standard) und bei Tag (helles System-Theme).
-   Alle Farben laufen über Tokens; Komponenten greifen nie direkt zu.
+   Zwei Paletten: Tag (helles Papier) und Nacht (Seekarte). Abschnitte
+   mit der Klasse .night tragen die Nacht-Palette in beiden Themes, damit
+   die Seite Rhythmus hat statt einer durchgehenden Fläche.
    ------------------------------------------------------------------ */
 :root {
   --ground: #0b1b2b;
@@ -26,12 +27,14 @@
   --muted: #8393a4;
   --accent: #f2b544;
   --accent-ink: #1a1405;
+  --accent-soft: rgba(242, 181, 68, 0.14);
   --beam: rgba(242, 181, 68, 0.16);
   --ok: #4fbf9a;
+  --warn: #f08a7a;
   --busy: #7fb3d5;
-  --plan: #7c8a99;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-  --radius: 10px;
+  --chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='110' viewBox='0 0 220 110'%3E%3Cg fill='none' stroke='%232e5f7a' stroke-opacity='.45'%3E%3Cpath d='M0 22c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 58c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 94c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3C/g%3E%3C/svg%3E");
+  --radius: 12px;
   --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, "Times New Roman", serif;
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
@@ -40,39 +43,54 @@
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --ground: #f3eee2;
-    --ground-2: #ece6d8;
-    --surface: #fbf8f1;
-    --surface-2: #f2ecdf;
-    --line: #d9d0bd;
+    --ground: #f7f5f0;
+    --ground-2: #eeebe3;
+    --surface: #ffffff;
+    --surface-2: #f3f0e8;
+    --line: #dcd7cb;
     --contour: #a9c3d1;
     --ink: #14232f;
     --ink-2: #3a4a58;
     --muted: #66757f;
     --accent: #b7791f;
     --accent-ink: #fff8e6;
+    --accent-soft: rgba(183, 121, 31, 0.12);
     --beam: rgba(183, 121, 31, 0.10);
     --ok: #1f8a63;
+    --warn: #c8503c;
     --busy: #2f6f95;
-    --plan: #7a8791;
-    --shadow: 0 18px 40px rgba(40, 30, 10, 0.14);
+    --shadow: 0 18px 40px rgba(40, 30, 10, 0.12);
+    --chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='110' viewBox='0 0 220 110'%3E%3Cg fill='none' stroke='%23a9c3d1' stroke-opacity='.55'%3E%3Cpath d='M0 22c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 58c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 94c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3C/g%3E%3C/svg%3E");
     color-scheme: light;
   }
 }
 :root[data-theme="dark"] {
   --ground: #0b1b2b; --ground-2: #0e2236; --surface: #12283d; --surface-2: #17324b;
   --line: #22415c; --contour: #2e5f7a; --ink: #e8e1d1; --ink-2: #b9c3cc; --muted: #8393a4;
-  --accent: #f2b544; --accent-ink: #1a1405; --beam: rgba(242, 181, 68, 0.16);
-  --ok: #4fbf9a; --busy: #7fb3d5; --plan: #7c8a99; --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --accent: #f2b544; --accent-ink: #1a1405; --accent-soft: rgba(242, 181, 68, 0.14); --beam: rgba(242, 181, 68, 0.16);
+  --ok: #4fbf9a; --warn: #f08a7a; --busy: #7fb3d5; --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='110' viewBox='0 0 220 110'%3E%3Cg fill='none' stroke='%232e5f7a' stroke-opacity='.45'%3E%3Cpath d='M0 22c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 58c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 94c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3C/g%3E%3C/svg%3E");
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --ground: #f3eee2; --ground-2: #ece6d8; --surface: #fbf8f1; --surface-2: #f2ecdf;
-  --line: #d9d0bd; --contour: #a9c3d1; --ink: #14232f; --ink-2: #3a4a58; --muted: #66757f;
-  --accent: #b7791f; --accent-ink: #fff8e6; --beam: rgba(183, 121, 31, 0.10);
-  --ok: #1f8a63; --busy: #2f6f95; --plan: #7a8791; --shadow: 0 18px 40px rgba(40, 30, 10, 0.14);
+  --ground: #f7f5f0; --ground-2: #eeebe3; --surface: #ffffff; --surface-2: #f3f0e8;
+  --line: #dcd7cb; --contour: #a9c3d1; --ink: #14232f; --ink-2: #3a4a58; --muted: #66757f;
+  --accent: #b7791f; --accent-ink: #fff8e6; --accent-soft: rgba(183, 121, 31, 0.12); --beam: rgba(183, 121, 31, 0.10);
+  --ok: #1f8a63; --warn: #c8503c; --busy: #2f6f95; --shadow: 0 18px 40px rgba(40, 30, 10, 0.12);
+  --chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='110' viewBox='0 0 220 110'%3E%3Cg fill='none' stroke='%23a9c3d1' stroke-opacity='.55'%3E%3Cpath d='M0 22c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 58c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 94c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3C/g%3E%3C/svg%3E");
   color-scheme: light;
 }
+/* Nacht-Abschnitte: Seekarte in beiden Themes, im dunklen Theme eine Spur tiefer. */
+.night {
+  --ground: #081627; --ground-2: #0e2236; --surface: #12283d; --surface-2: #17324b;
+  --line: #22415c; --contour: #2e5f7a; --ink: #e8e1d1; --ink-2: #b9c3cc; --muted: #8fa0b1;
+  --accent: #f2b544; --accent-ink: #1a1405; --accent-soft: rgba(242, 181, 68, 0.14);
+  --ok: #4fbf9a; --warn: #f08a7a; --busy: #7fb3d5; --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='110' viewBox='0 0 220 110'%3E%3Cg fill='none' stroke='%232e5f7a' stroke-opacity='.45'%3E%3Cpath d='M0 22c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 58c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3Cpath d='M0 94c28-14 55-14 83 0s55 14 83 0 40-10 54 0'/%3E%3C/g%3E%3C/svg%3E");
+  background: var(--ground); color: var(--ink); color-scheme: dark;
+}
+.tint { background: var(--ground-2); }
+.chartbg { background-image: var(--chart); background-size: 220px 110px; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -96,29 +114,39 @@ p { margin: 0; max-width: var(--measure); }
 code, pre, .mono { font-family: var(--font-mono); font-size: 0.92em; }
 code { background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 5px; }
 pre { margin: 0; overflow-x: auto; }
-.eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); font-weight: 600; }
+.eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent); font-weight: 600; }
 .lede { font-size: 1.2rem; color: var(--ink-2); }
 .wrap { width: min(1120px, 100% - 3rem); margin-inline: auto; }
-section { padding-block: clamp(4rem, 9vw, 7.5rem); border-top: 1px solid var(--line); }
+section { padding-block: clamp(4rem, 9vw, 7.5rem); }
 section > .wrap > .eyebrow { margin-bottom: 0.9rem; }
 section > .wrap > h2 { margin-bottom: 1.2rem; }
 section > .wrap > .lede { margin-bottom: 2.6rem; }
 .stack { display: grid; gap: 1rem; }
+.glyph { width: 42px; height: 42px; border-radius: 11px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.glyph svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tag { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+.tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.tag.busy { color: var(--busy); border-color: color-mix(in srgb, var(--busy) 45%, transparent); }
+.tag.acc { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 
 /* Kopfzeile ---------------------------------------------------------- */
 header.top {
   position: sticky; top: 0; z-index: 10;
-  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  background: color-mix(in srgb, var(--ground) 84%, transparent);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding-block: 0.8rem; }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding-block: 0.7rem; }
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-display); font-size: 1.35rem; color: var(--ink); text-decoration: none; }
 .brand svg { width: 28px; height: 28px; }
 nav.main { display: flex; gap: 1.4rem; flex-wrap: wrap; }
 nav.main a { color: var(--ink-2); text-decoration: none; font-size: 0.95rem; }
 nav.main a:hover { color: var(--ink); }
-@media (max-width: 720px) { nav.main { display: none; } }
+header.top .actions { display: flex; align-items: center; gap: 0.6rem; }
+header.top .gh { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); }
+header.top .gh:hover { color: var(--ink); border-color: var(--accent); }
+header.top .gh svg { width: 18px; height: 18px; }
+@media (max-width: 860px) { nav.main { display: none; } }
 
 .btn {
   display: inline-flex; align-items: center; gap: 0.55rem;
@@ -129,10 +157,11 @@ nav.main a:hover { color: var(--ink); }
 .btn:hover { transform: translateY(-1px); border-color: var(--accent); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover { filter: brightness(1.05); }
+.btn.small { padding: 0.55rem 1rem; font-size: 0.9rem; }
 .btn svg { width: 18px; height: 18px; }
 
 /* Hero: die Seekarte ------------------------------------------------- */
-.hero { position: relative; overflow: hidden; border-top: 0; padding-block: clamp(4rem, 9vw, 7rem) clamp(4rem, 8vw, 6rem); }
+.hero { position: relative; overflow: hidden; padding-block: clamp(4rem, 9vw, 7rem) clamp(4rem, 8vw, 6rem); }
 .hero canvas.chart { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.9; }
 .hero .beam {
   position: absolute; width: 180vmax; height: 180vmax; left: 50%; top: -40vmax; transform: translateX(-50%);
@@ -159,12 +188,8 @@ nav.main a:hover { color: var(--ink); }
 @keyframes rise { from { transform: translateY(16px); opacity: 0.2; } to { transform: none; opacity: 1; } }
 .brief .head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 0.7rem; }
 .brief .head .name { font-family: var(--font-display); font-size: 1.3rem; }
-.brief .chip { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
 .brief .kurs { color: var(--ink-2); font-style: italic; margin-bottom: 1rem; }
-.brief .note {
-  border-left: 3px solid var(--accent); padding: 0.7rem 0.9rem; background: var(--ground-2); border-radius: 6px;
-  display: grid; gap: 0.35rem;
-}
+.brief .note { border-left: 3px solid var(--accent); padding: 0.7rem 0.9rem; background: var(--ground-2); border-radius: 6px; display: grid; gap: 0.35rem; }
 .brief .note .t { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .brief ul { margin: 0.9rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; }
 .brief .since { margin-top: 0.9rem; font-size: 0.86rem; color: var(--muted); display: flex; gap: 0.9rem; flex-wrap: wrap; }
@@ -177,128 +202,173 @@ nav.main a:hover { color: var(--ink); }
 
 /* Enthüllung beim Scrollen: sichtbarer Ruhezustand, nur leichte Bewegung */
 .reveal { transition: opacity 600ms ease, transform 600ms cubic-bezier(.2,.7,.2,1); }
-html.js .reveal:not(.in) { opacity: 0.6; transform: translateY(14px); }
+html.js .reveal:not(.in) { opacity: 0.55; transform: translateY(12px); }
 .reveal:nth-child(2) { transition-delay: 70ms; }
 .reveal:nth-child(3) { transition-delay: 140ms; }
 .reveal:nth-child(4) { transition-delay: 210ms; }
 
-/* Vier Probleme ------------------------------------------------------ */
-.four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-@media (max-width: 980px) { .four { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .four { grid-template-columns: 1fr; } }
-.problem { padding: 1.4rem 1.3rem 1.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: grid; gap: 0.7rem; align-content: start; transition: border-color 160ms ease, transform 160ms ease; }
-.problem:hover { border-color: var(--contour); transform: translateY(-2px); }
-.problem .q { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.2; }
-.problem .a { color: var(--ink-2); font-size: 0.97rem; }
-.problem .mech { font-size: 0.86rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 0.7rem; margin-top: 0.3rem; }
+/* Kennst du das? ------------------------------------------------------ */
+.stories { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+@media (max-width: 900px) { .stories { grid-template-columns: 1fr; } }
+.story { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem 1.4rem 1.5rem; display: grid; gap: 0.9rem; align-content: start; box-shadow: var(--shadow); }
+.story .q { font-family: var(--font-display); font-size: 1.45rem; line-height: 1.2; }
+.story .was { color: var(--ink-2); font-size: 0.97rem; }
+.story .lotse { border-top: 1px dashed var(--line); padding-top: 0.9rem; font-size: 0.97rem; }
+.story .lotse b { color: var(--accent); font-weight: 600; }
 
-/* Logbuch-Abschnitt: Terminal + Regeln --------------------------------- */
-.twocol { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start; }
-@media (max-width: 900px) { .twocol { grid-template-columns: 1fr; } }
+/* So geht es: Schritte und Oberfläche ---------------------------------- */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; margin-bottom: 2.6rem; }
+@media (max-width: 900px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .steps { grid-template-columns: 1fr; } }
+.step { display: grid; gap: 0.35rem; align-content: start; border-top: 2px solid var(--line); padding-top: 0.9rem; }
+.step .n { font-family: var(--font-display); font-size: 1.9rem; color: var(--accent); line-height: 1; }
+.step h3 { font-family: var(--font-body); font-size: 1.05rem; font-weight: 600; }
+.step p { font-size: 0.92rem; color: var(--ink-2); }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.app .titlebar { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); background: var(--ground-2); font-size: 0.8rem; color: var(--muted); }
+.app .titlebar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: inline-block; }
+.app .titlebar span { margin-left: 0.5rem; }
+.app .body { padding: 1.2rem 1.3rem 1.3rem; display: grid; gap: 1.1rem; }
+.hafen { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+@media (max-width: 720px) { .hafen { grid-template-columns: 1fr; } }
+.hafen h4 { margin: 0 0 0.6rem; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; }
+.karte { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.8rem; padding: 0.65rem 0.85rem 0.7rem 0.95rem; border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; background: var(--ground-2); margin-bottom: 0.55rem; font-size: 0.9rem; }
+.karte .n { font-weight: 600; }
+.karte .age { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.karte .l { grid-column: 1 / -1; color: var(--ink-2); font-size: 0.86rem; }
+.karte.auffaellig { border-left-color: var(--accent); }
+.karte.auffaellig .age { color: var(--accent); }
+.karte.ueberfaellig { border-left-color: var(--warn); }
+.karte.ueberfaellig .age { color: var(--warn); }
+.karte.ruhig { border-left-color: var(--contour); }
+.einfahrt { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.75rem 0.95rem; border: 1px dashed color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 8px; font-size: 0.88rem; color: var(--ink-2); }
+.einfahrt .t { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.einfahrt .b { margin-left: auto; display: flex; gap: 0.4rem; }
+.einfahrt .b span { padding: 0.22rem 0.65rem; border-radius: 999px; border: 1px solid var(--line); font-size: 0.8rem; color: var(--ink); }
+.einfahrt .b span.p { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.mockrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.6rem; }
+@media (max-width: 900px) { .mockrow { grid-template-columns: 1fr; } }
+.mock { display: grid; gap: 0.7rem; align-content: start; }
+.mock h3 { font-family: var(--font-body); font-size: 1.05rem; font-weight: 600; margin-top: 0.3rem; }
+.mock p { font-size: 0.92rem; color: var(--ink-2); }
+.mini { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.86rem; display: grid; gap: 0.5rem; min-height: 11.5rem; align-content: start; }
+.mini .h { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.entry { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; align-items: start; }
+.src { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 5px; margin-top: 0.15rem; white-space: nowrap; }
+.src.du { background: var(--accent-soft); color: var(--accent); }
+.src.datei, .src.git { background: color-mix(in srgb, var(--busy) 18%, transparent); color: var(--busy); }
+.src.ki { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.src.offen { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.entry .x { color: var(--ink-2); }
+.entry .x small { color: var(--muted); display: block; font-size: 0.76rem; }
+.input { border: 1px solid var(--accent); border-radius: 8px; padding: 0.6rem 0.75rem; font-family: var(--font-mono); font-size: 0.86rem; background: var(--ground-2); display: flex; align-items: center; gap: 0.1rem; }
+.input .at { color: var(--accent); }
+.caret { display: inline-block; width: 0.55em; height: 1.05em; background: var(--ink); vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.hint { color: var(--muted); font-size: 0.8rem; }
+.dialog .f { display: grid; gap: 0.2rem; }
+.dialog .f .k { font-size: 0.72rem; color: var(--muted); }
+.dialog .f .v { border: 1px solid var(--line); border-radius: 6px; padding: 0.45rem 0.6rem; background: var(--ground-2); color: var(--ink-2); }
+.dialog .btns { display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.2rem; }
+.dialog .btns span { padding: 0.28rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); font-size: 0.8rem; }
+.dialog .btns span.p { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+
+/* Nutzen --------------------------------------------------------------- */
+.benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+@media (max-width: 980px) { .benefits { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .benefits { grid-template-columns: 1fr; } }
+.benefit { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem 1.3rem 1.5rem; display: grid; gap: 0.7rem; align-content: start; transition: border-color 160ms ease, transform 160ms ease; }
+.benefit:hover { border-color: var(--contour); transform: translateY(-2px); }
+.benefit h3 { font-family: var(--font-body); font-size: 1.1rem; font-weight: 600; }
+.benefit p { font-size: 0.95rem; color: var(--ink-2); }
+.benefit .how { font-size: 0.84rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 0.7rem; margin-top: 0.2rem; }
+
+/* Projektarten ---------------------------------------------------------- */
+.kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.9rem; }
+@media (max-width: 980px) { .kinds { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .kinds { grid-template-columns: 1fr; } }
+.kind { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.1rem 1.2rem; display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.9rem; align-items: start; }
+.kind .glyph { grid-row: span 3; width: 38px; height: 38px; }
+.kind .t { font-weight: 600; }
+.kind .ex { font-size: 0.88rem; color: var(--ink-2); }
+.kind .det { font-size: 0.76rem; color: var(--muted); font-family: var(--font-mono); margin-top: 0.3rem; }
+
+/* Sicherheit ---------------------------------------------------------- */
+.promises { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2.4rem; }
+@media (max-width: 900px) { .promises { grid-template-columns: 1fr; } }
+.promise { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.4rem 1.3rem 1.5rem; display: grid; gap: 0.7rem; align-content: start; }
+.promise h3 { font-size: 1.3rem; }
+.promise p { font-size: 0.95rem; color: var(--ink-2); }
+.keys { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.2rem 1rem 1rem; overflow-x: auto; }
+.keys svg { width: 100%; min-width: 760px; height: auto; display: block; }
+.keys text { font-family: var(--font-body); font-size: 13px; fill: var(--ink); }
+.keys text.small { font-size: 10.5px; fill: var(--muted); font-family: var(--font-mono); }
+.keys text.lab { font-size: 11px; fill: var(--muted); font-style: italic; }
+.keys rect.node { fill: var(--ground-2); stroke: var(--line); stroke-width: 1; rx: 7; }
+.keys rect.secret { stroke: var(--accent); stroke-width: 1.5; }
+.keys rect.hub { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.keys path.edge { fill: none; stroke: var(--contour); stroke-width: 1.6; stroke-dasharray: 700; }
+.keys.prep path.edge { stroke-dashoffset: 700; }
+.keys.in path.edge { animation: draw 1400ms ease forwards; }
+.keys.in path.edge:nth-of-type(n+3) { animation-delay: 500ms; }
+.keys.in path.edge:nth-of-type(n+7) { animation-delay: 900ms; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.keys .legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem; }
+.keys .legend i { display: inline-block; width: 14px; height: 10px; border: 1.5px solid var(--line); border-radius: 3px; vertical-align: -1px; margin-right: 0.4rem; }
+.keys .legend i.s { border-color: var(--accent); }
+.keys .legend i.h { border-color: var(--accent); background: var(--accent-soft); }
+.keys-caption { margin: 1.1rem 0 0; font-size: 0.95rem; color: var(--ink-2); }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.2rem; }
+@media (max-width: 800px) { .compare { grid-template-columns: 1fr; } }
+.compare .box { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.compare .box .t { padding: 0.6rem 1rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--ground-2); }
+.compare pre { padding: 1rem; font-size: 0.8rem; line-height: 1.5; }
+.compare .box.server .t { color: var(--busy); }
+.compare .k { color: var(--busy); }
+.compare .s { color: var(--accent); }
+.techline { margin-top: 1.6rem; font-size: 0.9rem; color: var(--muted); }
+
+/* Überall dabei --------------------------------------------------------- */
+.places { display: grid; grid-template-columns: 1fr 3.2rem 1fr 3.2rem 1fr; align-items: center; }
+@media (max-width: 900px) { .places { grid-template-columns: 1fr; } }
+.place { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.3rem 1.3rem 1.4rem; display: grid; gap: 0.5rem; align-content: start; min-height: 13rem; }
+.place .h { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; }
+.place h3 { font-size: 1.3rem; }
+.place p { font-size: 0.93rem; color: var(--ink-2); }
+.place .m { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }
+.place.server { border-color: color-mix(in srgb, var(--busy) 60%, transparent); }
+.place.server h3 { color: var(--busy); }
+.link { position: relative; height: 2px; background: repeating-linear-gradient(90deg, var(--contour) 0 8px, transparent 8px 14px); }
+.link .env { position: absolute; top: 50%; left: 0; width: 22px; height: 16px; margin-top: -8px; border-radius: 4px; background: var(--accent); display: grid; place-items: center; animation: shuttle 3.2s ease-in-out infinite; }
+.link .env::after { content: ""; width: 8px; height: 6px; border: 2px solid var(--accent-ink); border-bottom-width: 3px; border-radius: 3px 3px 1px 1px; }
+.link.back .env { animation-name: shuttleBack; animation-delay: 1.6s; }
+@keyframes shuttle { 0% { transform: translateX(-6px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(2.2rem); opacity: 0; } }
+@keyframes shuttleBack { 0% { transform: translateX(2.2rem); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(-6px); opacity: 0; } }
+@media (max-width: 900px) {
+  .link { height: 2.4rem; width: 2px; margin-inline: auto; background: repeating-linear-gradient(180deg, var(--contour) 0 8px, transparent 8px 14px); }
+  .link .env { display: none; }
+}
 .term {
   background: #0a141e; color: #d9e2ea; border-radius: var(--radius); border: 1px solid #1f3446; box-shadow: var(--shadow);
-  font-family: var(--font-mono); font-size: 0.86rem; line-height: 1.55; overflow: hidden;
+  font-family: var(--font-mono); font-size: 0.86rem; line-height: 1.6; overflow: hidden; margin-top: 2rem;
 }
 .term .bar { display: flex; gap: 0.4rem; padding: 0.6rem 0.9rem; background: #0f1d2a; border-bottom: 1px solid #1f3446; }
 .term .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2c4a60; display: inline-block; }
 .term .bar span { margin-left: auto; color: #7d93a6; font-size: 0.78rem; }
-.term pre { padding: 1rem 1.1rem 1.2rem; white-space: pre-wrap; min-height: 19em; }
+.term pre { padding: 1rem 1.1rem 1.1rem; white-space: pre-wrap; }
 .term .p { color: #7d93a6; }
 .term .c { color: #f2b544; }
 .term .o { color: #9fd1b6; }
-.term .e { color: #f08a7a; }
-.term .caret { display: inline-block; width: 0.55em; height: 1.05em; background: #d9e2ea; vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.rules { display: grid; gap: 1.1rem; }
-.rule { display: grid; grid-template-columns: auto 1fr; gap: 0.9rem; align-items: start; }
-.rule .k { font-family: var(--font-display); font-size: 1.1rem; color: var(--accent); white-space: nowrap; padding-top: 0.05rem; min-width: 7.5rem; }
-.rule .v { color: var(--ink-2); font-size: 0.97rem; }
-table.vorlagen { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin-top: 1.4rem; }
-table.vorlagen th, table.vorlagen td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
-table.vorlagen th { font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
-table.vorlagen td:last-child, table.vorlagen th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-
-/* Sicherheit ---------------------------------------------------------- */
-.keys { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; overflow-x: auto; }
-.keys svg { width: 100%; min-width: 720px; height: auto; display: block; }
-.keys text { font-family: var(--font-body); font-size: 12.5px; fill: var(--ink); }
-.keys text.small { font-size: 10.5px; fill: var(--muted); font-family: var(--font-mono); }
-.keys rect.node { fill: var(--ground-2); stroke: var(--line); stroke-width: 1; rx: 6; }
-.keys rect.secret { stroke: var(--accent); }
-.keys rect.server { stroke: var(--busy); stroke-dasharray: 4 3; }
-.keys path.edge { fill: none; stroke: var(--contour); stroke-width: 1.4; stroke-dasharray: 600; }
-.keys.prep path.edge { stroke-dashoffset: 600; }
-.keys.in path.edge { animation: draw 1400ms ease forwards; }
-.keys.in path.edge:nth-of-type(n+5) { animation-delay: 300ms; }
-.keys.in path.edge:nth-of-type(n+9) { animation-delay: 600ms; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-.keys .legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); margin-top: 0.6rem; }
-.keys .legend i { display: inline-block; width: 14px; height: 10px; border: 1.5px solid var(--line); border-radius: 3px; vertical-align: -1px; margin-right: 0.4rem; }
-.keys .legend i.s { border-color: var(--accent); }
-.keys .legend i.v { border-color: var(--busy); border-style: dashed; }
-.secgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
-@media (max-width: 900px) { .secgrid { grid-template-columns: 1fr; } }
-.fact { padding: 1.2rem 1.2rem 1.3rem; border: 1px solid var(--line); border-radius: var(--radius); display: grid; gap: 0.5rem; align-content: start; }
-.fact h3 { font-size: 1.15rem; }
-.fact p { font-size: 0.95rem; color: var(--ink-2); }
-.fact .mono { font-size: 0.8rem; color: var(--muted); }
-.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
-@media (max-width: 800px) { .compare { grid-template-columns: 1fr; } }
-.compare .box { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.compare .box .t { padding: 0.6rem 1rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface); }
-.compare pre { padding: 1rem; font-size: 0.8rem; line-height: 1.5; }
-.compare .box.server .t { color: var(--busy); }
-
-/* Architektur --------------------------------------------------------- */
-.arch { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem 1rem 1rem; overflow-x: auto; }
-.arch .lanes { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3rem; min-width: 780px; }
-.node { background: var(--ground-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; display: grid; gap: 0.35rem; position: relative; z-index: 1; }
-.node .t { font-family: var(--font-display); font-size: 1.2rem; }
-.node .s { font-size: 0.86rem; color: var(--ink-2); }
-.node .m { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); }
-.node.server { border-color: var(--busy); }
-.node.server .t { color: var(--busy); }
-.wire { position: absolute; top: 50%; height: 2px; background: repeating-linear-gradient(90deg, var(--contour) 0 8px, transparent 8px 14px); z-index: 0; }
-.wire.l { left: calc(33.33% - 1.4rem); width: 3rem; }
-.wire.r { right: calc(33.33% - 1.4rem); width: 3rem; }
-.env { position: absolute; top: 50%; width: 26px; height: 18px; margin-top: -9px; border-radius: 4px; background: var(--accent); z-index: 2; display: grid; place-items: center; }
-.env::after { content: ""; width: 8px; height: 6px; border: 2px solid var(--accent-ink); border-bottom-width: 3px; border-radius: 3px 3px 1px 1px; }
-.env.a { left: calc(33.33% - 1.4rem); animation: goRight 3.2s ease-in-out infinite; }
-.env.b { right: calc(33.33% - 1.4rem); animation: goLeft 3.2s ease-in-out infinite 1.6s; }
-@keyframes goRight { 0% { transform: translateX(-10px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(3rem); opacity: 0; } }
-@keyframes goLeft { 0% { transform: translateX(10px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(-3rem); opacity: 0; } }
-.stack-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.4rem; }
-.chip { font-size: 0.84rem; padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); background: var(--surface); }
-.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
-@media (max-width: 900px) { .facts { grid-template-columns: 1fr; } }
-
-/* Funktionen mit Stand ------------------------------------------------ */
-.legend-status { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.86rem; color: var(--muted); margin-bottom: 1.4rem; }
-.badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.badge.ok { color: var(--ok); }
-.badge.busy { color: var(--busy); }
-.badge.plan { color: var(--plan); }
-.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; }
-@media (max-width: 980px) { .features { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
-.feature { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.1rem 1.2rem; display: grid; gap: 0.45rem; align-content: start; background: var(--surface); transition: border-color 160ms ease; }
-.feature:hover { border-color: var(--contour); }
-.feature .h { display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem; }
-.feature h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
-.feature p { font-size: 0.92rem; color: var(--ink-2); }
-
-/* Daten --------------------------------------------------------------- */
-.data { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 4vw, 3rem); align-items: start; }
-@media (max-width: 860px) { .data { grid-template-columns: 1fr; } }
-.file { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.file .t { padding: 0.55rem 1rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); border-bottom: 1px solid var(--line); }
-.file pre { padding: 1rem; font-size: 0.82rem; line-height: 1.5; }
-.file .y { color: var(--busy); }
-.file .h { color: var(--accent); }
+.termgrid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: clamp(1.5rem, 4vw, 3rem); align-items: center; margin-top: 2.5rem; }
+@media (max-width: 900px) { .termgrid { grid-template-columns: 1fr; } }
+.termgrid .term { margin-top: 0; }
+.termgrid h3 { font-size: 1.5rem; margin-bottom: 0.6rem; }
+.termgrid p { font-size: 0.97rem; color: var(--ink-2); margin-bottom: 0.7rem; }
 
 /* Download ------------------------------------------------------------ */
-.dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.9rem; margin-bottom: 1.5rem; }
+.dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.9rem; margin-bottom: 1.4rem; }
 @media (max-width: 980px) { .dl { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .dl { grid-template-columns: 1fr; } }
 .os { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.1rem 1.2rem; background: var(--surface); display: grid; gap: 0.6rem; align-content: start; }
@@ -308,26 +378,32 @@ table.vorlagen td:last-child, table.vorlagen th:last-child { text-align: right; 
 .os .sub { font-size: 0.84rem; color: var(--muted); }
 .os .links { display: grid; gap: 0.4rem; }
 .os .links a { font-size: 0.92rem; }
+.os .links .none { color: var(--muted); font-size: 0.86rem; }
 .os .mine-tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
-.dlstate { border: 1px dashed var(--line); border-radius: var(--radius); padding: 1.1rem 1.2rem; color: var(--ink-2); font-size: 0.95rem; display: grid; gap: 0.6rem; }
+.dlstate { border: 1px dashed var(--line); border-radius: var(--radius); padding: 1rem 1.2rem; color: var(--ink-2); font-size: 0.93rem; display: grid; gap: 0.5rem; background: var(--surface); }
 .dlstate strong { color: var(--ink); }
-.codebox { position: relative; background: #0a141e; color: #d9e2ea; border-radius: var(--radius); border: 1px solid #1f3446; }
+.notes { margin-top: 1.4rem; display: grid; gap: 0.5rem; font-size: 0.9rem; color: var(--muted); }
+details.srcbox { margin-top: 1.6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+details.srcbox summary { cursor: pointer; padding: 0.9rem 1.1rem; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.srcbox summary::-webkit-details-marker { display: none; }
+details.srcbox summary::after { content: "+"; font-family: var(--font-mono); color: var(--muted); }
+details.srcbox[open] summary::after { content: "–"; }
+details.srcbox .in { padding: 0 1.1rem 1.1rem; display: grid; gap: 0.8rem; }
+details.srcbox .in p { font-size: 0.92rem; color: var(--ink-2); }
+.codebox { position: relative; min-width: 0; background: #0a141e; color: #d9e2ea; border-radius: 10px; border: 1px solid #1f3446; }
 .codebox pre { padding: 1rem 3.6rem 1rem 1.1rem; font-size: 0.84rem; }
 .codebox button { position: absolute; top: 0.6rem; right: 0.6rem; font: inherit; font-size: 0.78rem; padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid #2c4a60; background: #0f1d2a; color: #d9e2ea; cursor: pointer; }
 .codebox button:hover { border-color: var(--accent); }
-.notes { margin-top: 1.4rem; display: grid; gap: 0.5rem; font-size: 0.9rem; color: var(--muted); }
 
-/* Roadmap ------------------------------------------------------------- */
-.timeline { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.8rem; position: relative; }
-@media (max-width: 980px) { .timeline { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 600px) { .timeline { grid-template-columns: 1fr; } }
-.phase { border-top: 3px solid var(--line); padding-top: 0.9rem; display: grid; gap: 0.4rem; align-content: start; }
-.phase.done { border-top-color: var(--ok); }
-.phase.now { border-top-color: var(--accent); }
-.phase .n { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }
-.phase h3 { font-size: 1.05rem; }
-.phase p { font-size: 0.88rem; color: var(--ink-2); }
-.phase .trig { font-size: 0.8rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 0.5rem; margin-top: 0.2rem; }
+/* Fragen --------------------------------------------------------------- */
+.faq { max-width: 780px; }
+details.q { border-top: 1px solid var(--line); padding: 0.2rem 0; }
+details.q:last-child { border-bottom: 1px solid var(--line); }
+details.q summary { cursor: pointer; padding: 0.9rem 0; font-weight: 600; font-size: 1.05rem; list-style: none; display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+details.q summary::-webkit-details-marker { display: none; }
+details.q summary::after { content: "+"; font-family: var(--font-mono); color: var(--accent); font-weight: 400; }
+details.q[open] summary::after { content: "–"; }
+details.q p { padding-bottom: 1rem; color: var(--ink-2); font-size: 0.97rem; }
 
 /* Fuß ----------------------------------------------------------------- */
 footer { border-top: 1px solid var(--line); padding-block: 2.5rem 3rem; color: var(--muted); font-size: 0.9rem; }
@@ -338,13 +414,13 @@ footer a { color: var(--ink-2); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .hero .beam, .env.a, .env.b, .term .caret { animation: none; }
+  .hero .beam, .link .env, .caret { animation: none; }
   .brief, .brief .row { animation: none; }
   html.js .reveal:not(.in) { opacity: 1; transform: none; }
   .reveal { transition: none; }
   .keys.prep path.edge { stroke-dashoffset: 0; }
   .keys path.edge { animation: none; }
-  .btn, .problem, .feature { transition: none; }
+  .btn, .benefit { transition: none; }
 }
 </style>
 </head>
@@ -357,17 +433,18 @@ footer a { color: var(--ink-2); }
       Lotse
     </a>
     <nav class="main" aria-label="Abschnitte">
-      <a href="#probleme">Wozu</a>
-      <a href="#logbuch">Logbuch</a>
+      <a href="#kennst-du-das">Wozu</a>
+      <a href="#so-geht-es">So geht es</a>
+      <a href="#nutzen">Was Lotse kann</a>
       <a href="#sicherheit">Sicherheit</a>
-      <a href="#architektur">Architektur</a>
-      <a href="#funktionen">Funktionen</a>
-      <a href="#download">Download</a>
+      <a href="#faq">Fragen</a>
     </nav>
-    <a class="btn" href="https://github.com/phish3144/lotse" rel="noopener">
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
-      GitHub
-    </a>
+    <div class="actions">
+      <a class="gh" href="https://github.com/phish3144/lotse" rel="noopener" aria-label="Quellcode auf GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
+      </a>
+      <a class="btn primary small" href="#download">Herunterladen</a>
+    </div>
   </div>
 </header>
 
@@ -379,20 +456,20 @@ footer a { color: var(--ink-2); }
   <div class="beam" aria-hidden="true"></div>
   <div class="wrap">
     <div>
-      <div class="eyebrow">Ein Logbuch für alle deine Vorhaben</div>
-      <h1 id="hero-h">Lotse bringt dich zurück <em>ins Projekt.</em></h1>
-      <p class="lede">Software, Werkstatt, Haus, Musik, Steuer, Reise. Für jedes Vorhaben an derselben Stelle: worum geht es, wo stehe ich, was war zuletzt, was ist der nächste Schritt, wo liegt das Material, wie komme ich rein.</p>
+      <div class="eyebrow">Das Logbuch für alle deine Vorhaben</div>
+      <h1 id="hero-h">Nach Wochen wieder rein, <em>in dreißig Sekunden.</em></h1>
+      <p class="lede">Lotse merkt sich für jedes Projekt, wo du stehst, was zuletzt passiert ist und was als Nächstes dran ist. Software, Werkstatt, Haus, Musik, Steuer, Reise: alles an einem Ort, verschlüsselt, auf deinem Rechner.</p>
       <div class="cta">
         <a class="btn primary" href="#download">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-          Herunterladen
+          Kostenlos herunterladen
         </a>
-        <a class="btn" href="https://github.com/phish3144/lotse/blob/HEAD/docs/CONCEPT.md" rel="noopener">Konzept lesen</a>
+        <a class="btn" href="#so-geht-es">So funktioniert es</a>
       </div>
-      <p class="fine">Ende-zu-Ende verschlüsselt. Läuft lokal auf Windows, macOS und Linux, dazu im Browser. Keine Telemetrie, keine Fremdskripte, auch nicht auf dieser Seite.</p>
+      <p class="fine">Windows, macOS und Linux. Quellcode öffentlich auf GitHub. Kein Konto nötig, keine Telemetrie, keine Fremdskripte, auch nicht auf dieser Seite.</p>
     </div>
     <aside class="brief" aria-label="Beispiel: der Wo-war-ich-Brief eines Projekts">
-      <div class="row head"><span class="name">Gartenhaus Fundament</span><span class="chip">vor Anker</span></div>
+      <div class="row head"><span class="name">Gartenhaus</span><span class="tag">vor Anker</span></div>
       <div class="row kurs">Fundament gießen und Bausatz aufstellen, bis Ende Oktober nutzbar.</div>
       <div class="row note">
         <span class="t">Wo war ich? · zuletzt vor 47 Tagen</span>
@@ -402,294 +479,344 @@ footer a { color: var(--ink-2); }
         <li>Braucht die Bodenplatte Bewehrung? Nachbarn fragen.</li>
         <li>Statik-PDF mit dem Bausatz abgleichen.</li>
       </ul>
-      <div class="row since"><span>Seitdem: <b>6 Commits</b></span><span><b>14 Dateien</b> geändert</span><span>Wiedervorlage <b>1. Okt.</b></span></div>
+      <div class="row since"><span>Seitdem: <b>14 Dateien</b> geändert</span><span><b>2 neue</b> Fotos</span><span>Wiedervorlage <b>1. Okt.</b></span></div>
     </aside>
   </div>
 </section>
 
-<!-- Vier Probleme ---------------------------------------------------- -->
-<section id="probleme" aria-labelledby="probleme-h">
+<!-- Kennst du das? --------------------------------------------------- -->
+<section id="kennst-du-das" class="chartbg" aria-labelledby="kennst-h">
   <div class="wrap">
-    <div class="eyebrow">Wozu</div>
-    <h2 id="probleme-h">Vier Probleme, die jedes Projekt irgendwann hat.</h2>
-    <p class="lede">Jedes Feature in Lotse muss eines davon lösen und darf keine laufende Pflegearbeit verlangen. Sonst kommt es nicht ins Produkt.</p>
-    <div class="four">
-      <article class="problem reveal">
-        <div class="q">Wie komme ich nach drei Monaten wieder rein?</div>
-        <div class="a">Beim Öffnen steht oben der Brief: letzte Übergabenotiz im Wortlaut, offene Fäden, was seitdem im Ordner und im Repo passiert ist.</div>
-        <div class="mech">Der einzige Pflichtmoment ist der Statuswechsel auf »vor Anker«. Kein Ritual bei jedem Schließen.</div>
+    <div class="eyebrow">Kennst du das?</div>
+    <h2 id="kennst-h">Drei Monate Pause, und das eigene Projekt ist ein Fremder.</h2>
+    <p class="lede">Der Ordner ist noch da. Die Idee auch. Nur der Faden nicht. Lotse hebt ihn für dich auf, ohne dass du dafür etwas pflegen musst.</p>
+    <div class="stories">
+      <article class="story reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.6 1 1.4 1 2.5h6c0-1.1.3-1.9 1-2.5A6 6 0 0 0 12 3z"/></svg></div>
+        <div class="q">Die Lampe im Regal</div>
+        <div class="was">Der Mikrocontroller blinkt noch, die Firmware liegt irgendwo, und welcher Pin war noch mal der Taster? Du fängst fast von vorn an.</div>
+        <div class="lotse"><b>Mit Lotse:</b> Beim Öffnen steht oben der Brief. Dein letzter Stand in deinen Worten, die offene Frage, und welche Dateien sich seitdem geändert haben.</div>
       </article>
-      <article class="problem reveal">
-        <div class="q">Wie verliere ich zwischen zwölf Projekten nicht den Faden?</div>
-        <div class="a">Der Hafen zeigt alle Vorhaben mit letztem Logbuch-Satz und dessen Alter. Rot wird nur, wer sein eigenes Erwartungsintervall reißt.</div>
-        <div class="mech">Pausierte Projekte sind ruhig, nicht überfällig. Ein Garten darf 90 Tage schweigen, Software 14.</div>
+      <article class="story reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <div class="q">Zwölf Projekte, ein Kopf</div>
+        <div class="was">Steuer, Website, Gartenhaus, Bandprobe, das Buch. Irgendetwas hängt immer, und du weißt erst zu spät, was.</div>
+        <div class="lotse"><b>Mit Lotse:</b> Der Hafen zeigt alle Vorhaben auf einen Blick. Auffällig wird nur, was länger schweigt, als es für diese Art Projekt normal ist.</div>
       </article>
-      <article class="problem reveal">
-        <div class="q">Wie hab ich das damals gemacht?</div>
-        <div class="a">Volltextsuche über alle Logbücher, neues Projekt aus einem alten, beim Abschluss die eine Frage: »Eine Sache fürs nächste Mal?«</div>
-        <div class="mech">Eine Bausteine-Bibliothek kommt erst, wenn derselbe Inhalt zum dritten Mal von Hand kopiert wurde.</div>
-      </article>
-      <article class="problem reveal">
-        <div class="q">Wo liegt das Router-Passwort für dieses Projekt?</div>
-        <div class="a">Im Tresor am Projekt, Ende-zu-Ende verschlüsselt, mit zwei Stufen: »überall« und »nur Desktop«.</div>
-        <div class="mech">Proton Pass bleibt für Web-Logins zuständig. Lotse hält, was projektgebunden ist und sonst in einer Textdatei landen würde.</div>
+      <article class="story reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M15 7l3 3M18 4l2 2"/></svg></div>
+        <div class="q">Das Router-Passwort vom letzten Mal</div>
+        <div class="was">Steht in einer Textdatei. Oder in einer Mail an dich selbst. Oder auf dem Zettel, der beim Umzug verloren ging.</div>
+        <div class="lotse"><b>Mit Lotse:</b> Zugangsdaten liegen im Tresor direkt am Projekt, verschlüsselt, auf allen deinen Geräten. Was besonders heikel ist, bleibt nur auf dem Desktop lesbar.</div>
       </article>
     </div>
   </div>
 </section>
 
-<!-- Logbuch ---------------------------------------------------------- -->
-<section id="logbuch" aria-labelledby="logbuch-h">
+<!-- So geht es ------------------------------------------------------- -->
+<section id="so-geht-es" class="night" aria-labelledby="sogehts-h">
   <div class="wrap">
-    <div class="eyebrow">Logbuch</div>
-    <h2 id="logbuch-h">Erfassen ist billiger als Vergessen.</h2>
-    <p class="lede">Ein Feld, Enter. Aus dem Terminal, aus der App, später aus dem Browser. Lotse erkennt das Projekt am Arbeitsverzeichnis oder am <code>@Namen</code>. Ohne Treffer landet der Gedanke im Postkorb, nie in einem Dialog.</p>
-    <div class="twocol">
-      <div class="term" role="img" aria-label="Beispielsitzung in der Kommandozeile: Notizen anlegen, Statuswechsel mit Übergabenotiz, Hafen anzeigen">
-        <div class="bar"><i></i><i></i><i></i><span>lotse</span></div>
-        <pre id="term"></pre>
+    <div class="eyebrow">So geht es</div>
+    <h2 id="sogehts-h">Ein Blick, und du weißt, wo du stehst.</h2>
+    <p class="lede">Du arbeitest wie immer. Lotse schaut deinen Ordnern und Repos zu, führt das Logbuch mit und fragt dich nur an einer einzigen Stelle nach einem Satz: wenn du ein Projekt bewusst liegen lässt.</p>
+
+    <div class="steps">
+      <div class="step reveal"><div class="n">1</div><h3>Ordner zeigen</h3><p>Lotse durchsucht deine Projektordner und schlägt in der Hafeneinfahrt vor, was es gefunden hat. Du übernimmst mit einem Klick.</p></div>
+      <div class="step reveal"><div class="n">2</div><h3>Arbeiten wie immer</h3><p>Geänderte Dateien und Commits landen als verdichtete Zeile im Logbuch. Eigene Gedanken erfasst du in einem Feld, mit Enter.</p></div>
+      <div class="step reveal"><div class="n">3</div><h3>Vor Anker gehen</h3><p>Wenn du ein Projekt pausierst, fragt Lotse nach einer Übergabenotiz. Vorbefüllt aus den offenen Fäden, ein Klick genügt.</p></div>
+      <div class="step reveal"><div class="n">4</div><h3>Wiederkommen</h3><p>Monate später öffnest du das Projekt und liest den Brief: wo du warst, was seitdem passiert ist, was jetzt dran ist.</p></div>
+    </div>
+
+    <div class="app reveal" role="img" aria-label="Die Hafen-Ansicht von Lotse: aktive Projekte unter »Auf See«, pausierte unter »Vor Anker«, darunter die Hafeneinfahrt mit neu gefundenen Ordnern">
+      <div class="titlebar"><i></i><i></i><i></i><span>Lotse · Hafen</span></div>
+      <div class="body">
+        <div class="hafen">
+          <div>
+            <h4>Auf See</h4>
+            <div class="karte auffaellig"><span class="n">Website Bäckerei Krause</span><span class="age">vor 19 Tagen</span><span class="l">Entwurf an Frau Krause geschickt, warte auf Rückmeldung.</span></div>
+            <div class="karte ruhig"><span class="n">Lampe ESP32</span><span class="age">heute</span><span class="l">2 Commits: Taster entprellt, Firmware flasht wieder.</span></div>
+            <div class="karte ruhig"><span class="n">Steuer 2025</span><span class="age">vor 8 Tagen</span><span class="l">3 neue Belege im Ordner.</span></div>
+            <div class="karte ueberfaellig"><span class="n">Buchmanuskript</span><span class="age">vor 41 Tagen</span><span class="l">Kapitel 7 umgestellt, Ende noch offen.</span></div>
+          </div>
+          <div>
+            <h4>Vor Anker</h4>
+            <div class="karte ruhig"><span class="n">Gartenhaus</span><span class="age">Wiedervorlage 1. Okt.</span><span class="l">Warte auf Beton. Nächster Schritt: Schalung prüfen.</span></div>
+            <div class="karte ruhig"><span class="n">Bandprobe-Set</span><span class="age">Wiedervorlage 15. Nov.</span><span class="l">Drei Songs stehen, Setlist nach der Tour neu sortieren.</span></div>
+            <div class="karte ruhig"><span class="n">Sommer-Roadtrip</span><span class="age">abgeschlossen</span><span class="l">Eine Sache fürs nächste Mal: Unterkünfte früher buchen.</span></div>
+          </div>
+        </div>
+        <div class="einfahrt"><span class="t">Hafeneinfahrt</span><span>2 neue Ordner gefunden: <b>~/Projekte/wetterstation</b> (Hardware) und <b>~/Dokumente/Hausbau-2027</b> (Haus &amp; Garten)</span><span class="b"><span class="p">Übernehmen</span><span>Später</span></span></div>
       </div>
-      <div class="rules">
-        <div class="rule reveal"><div class="k">Eine Entität</div><div class="v">Faden, Logbuch-Eintrag, Entscheidung, Statuswechsel und Übergabenotiz sind eine Notiz mit einem Art-Feld. Eine Eingabezeile, keine Typ-Frage. Notizen werden nie überschrieben.</div></div>
-        <div class="rule reveal"><div class="k">Ein Pflichtmoment</div><div class="v">Der Wechsel auf »pausiert« oder »wartet« verlangt eine Übergabenotiz. Vorbefüllt aus offenen Fäden und Commits, mit Ein-Klick-Default. Selten, bewusst, deshalb überlebt es die dritte Woche.</div></div>
-        <div class="rule reveal"><div class="k">Kein Vorwurf</div><div class="v">Idee, aktiv, pausiert, wartet, abgeschlossen, eingemottet. »Eingemottet« heißt bewusst beendet, nicht gescheitert. Ruhende Projekte tauchen in keiner Rückstandszählung auf.</div></div>
-        <div class="rule reveal"><div class="k">Automatisch</div><div class="v">Der Ordner-Beobachter sammelt Metadaten, keine Inhalte: geänderte Dateien, neue Dateien, Commits, pro Tag zu einer Zeile verdichtet. Dateien wie <code>.env</code> oder Schlüssel werden nie gelesen.</div></div>
-        <table class="vorlagen" aria-label="Erwartungsintervall je Start-Vorlage">
-          <thead><tr><th>Vorlage</th><th>Erkennungsmarken</th><th>ruhig bis</th></tr></thead>
-          <tbody>
-            <tr><td>Software</td><td class="mono">.git, Cargo.toml, package.json, go.mod</td><td>14 Tage</td></tr>
-            <tr><td>Hardware &amp; Maker</td><td class="mono">platformio.ini, .kicad_pro, .scad, .stl</td><td>30 Tage</td></tr>
-            <tr><td>Haus &amp; Garten</td><td class="mono">Fotos + PDFs</td><td>60 Tage</td></tr>
-            <tr><td>Kreativ</td><td class="mono">.als, .logicx, .scriv, RAW-Fotos</td><td>30 Tage</td></tr>
-            <tr><td>Finanzen &amp; Verwaltung</td><td class="mono">PDFs mit Jahreszahl</td><td>90 Tage</td></tr>
-            <tr><td>Lernen &amp; Forschung</td><td class="mono">.ipynb, .bib, .tex</td><td>30 Tage</td></tr>
-            <tr><td>Reise &amp; Veranstaltung</td><td class="mono">–</td><td>120 Tage</td></tr>
-            <tr><td>Generisch</td><td class="mono">README</td><td>30 Tage</td></tr>
-          </tbody>
-        </table>
+    </div>
+
+    <div class="mockrow">
+      <div class="mock reveal">
+        <div class="mini" role="img" aria-label="Logbuch mit Einträgen aus verschiedenen Quellen">
+          <div class="h">Logbuch · Lampe ESP32</div>
+          <div class="entry"><span class="src git">Git</span><span class="x">2 Commits: Taster entprellt, Firmware flasht wieder<small>heute, 21:14</small></span></div>
+          <div class="entry"><span class="src datei">Datei</span><span class="x">3 Dateien geändert: main.cpp, platformio.ini, schaltplan.pdf<small>heute</small></span></div>
+          <div class="entry"><span class="src du">Du</span><span class="x">Taster hängt jetzt an GPIO 4, Pull-up intern.<small>gestern</small></span></div>
+          <div class="entry"><span class="src offen">Offen</span><span class="x">Gehäuse: 3D-Druck oder Holz?<small>vor 3 Tagen</small></span></div>
+          <div class="entry"><span class="src ki">KI</span><span class="x">Tests für den Parser ergänzt (Claude Code)<small>vor 5 Tagen</small></span></div>
+        </div>
+        <h3>Das Logbuch schreibt sich mit</h3>
+        <p>Jede Änderung im Ordner, jeder Commit, jede Notiz von dir oder deinem KI-Assistenten steht in einer Zeitleiste. Nichts wird überschrieben, nichts geht verloren.</p>
       </div>
+      <div class="mock reveal">
+        <div class="mini" role="img" aria-label="Schnellerfassung: ein Eingabefeld mit Projektkürzel">
+          <div class="h">Schnellerfassung</div>
+          <div class="input"><span class="at">@Gartenhaus</span>&nbsp;Beton bestellt, Liefertermin offen<span class="caret"></span></div>
+          <div class="hint">Enter. Fertig. Lotse erkennt das Projekt am @Namen oder am Ordner, in dem du gerade arbeitest.</div>
+          <div class="hint">Ohne Treffer landet der Gedanke im Postkorb, nie in einem Dialog.</div>
+        </div>
+        <h3>Ein Feld, ein Satz, Enter</h3>
+        <p>Keine Formulare, keine Kategorien, keine Pflichtfelder. Ein Gedanke ist in drei Sekunden festgehalten, deshalb hältst du ihn auch fest.</p>
+      </div>
+      <div class="mock reveal">
+        <div class="mini dialog" role="img" aria-label="Dialog beim Pausieren: Übergabenotiz und Wiedervorlage">
+          <div class="h">Gartenhaus · vor Anker gehen</div>
+          <div class="f"><span class="k">Wo stehst du? Was ist der nächste Schritt?</span><span class="v">Warte auf Beton. Nächster Schritt: Schalung prüfen, sobald er da ist.</span></div>
+          <div class="f"><span class="k">Wiedervorlage</span><span class="v">1. Oktober 2026</span></div>
+          <div class="btns"><span>Abbrechen</span><span class="p">Vor Anker</span></div>
+        </div>
+        <h3>Die eine Frage, die sich lohnt</h3>
+        <p>Nur wenn du ein Projekt bewusst liegen lässt, bittet Lotse um einen Satz für dein späteres Ich. Der wird zum Anfang des Briefs, den du beim Wiederkommen liest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Nutzen ----------------------------------------------------------- -->
+<section id="nutzen" aria-labelledby="nutzen-h">
+  <div class="wrap">
+    <div class="eyebrow">Was Lotse kann</div>
+    <h2 id="nutzen-h">Weniger merken. Mehr machen.</h2>
+    <p class="lede">Alles, was Lotse tut, spart dir Kopfplatz: das Nachdenken, wo du warst, das Suchen, wie du es damals gelöst hast, das Kramen nach dem Passwort.</p>
+    <div class="benefits">
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+        <h3>Der Brief beim Öffnen</h3>
+        <p>Wie lange warst du weg, was war dein letzter Stand, welche Fäden sind offen, was hat sich seitdem im Ordner getan. Alles auf einer Seite, bevor du irgendetwas anfasst.</p>
+        <div class="how">Entsteht aus deiner Übergabenotiz, den offenen Fäden und der Aktivität seit dem letzten Besuch.</div>
+      </article>
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 13a7 7 0 0 0 14 0M8 11H5M19 11h-3"/></svg></div>
+        <h3>Der Hafen für alle Vorhaben</h3>
+        <p>Jedes Projekt mit seinem letzten Logbuch-Satz und dessen Alter. Rot wird nur, was wirklich hängt. Pausierte Projekte sind ruhig, nicht überfällig.</p>
+        <div class="how">Ein Garten darf 60 Tage schweigen, Software 14. Jede Projektart hat ihr eigenes Maß, du kannst es ändern.</div>
+      </article>
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <h3>Das Logbuch führt sich selbst</h3>
+        <p>Lotse beobachtet deine Projektordner und Git-Repos und schreibt pro Tag eine verdichtete Zeile: was sich geändert hat, welche Commits dazukamen.</p>
+        <div class="how">Nur Namen, Zeiten und Commit-Texte. Dateiinhalte liest Lotse nicht, Schlüssel und Konfigurationsdateien nie.</div>
+      </article>
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h3>Der Tresor am Projekt</h3>
+        <p>Router-Passwort, API-Schlüssel, Kundenzugang, Bank-PIN fürs Bauprojekt: dort, wo du sie brauchst, verschlüsselt mit deinem Master-Passwort.</p>
+        <div class="how">Zwei Stufen: »überall« für alle Geräte, »nur Desktop« für Dinge, die ein fremder Rechner nie sehen soll.</div>
+      </article>
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></div>
+        <h3>Wie hab ich das damals gemacht?</h3>
+        <p>Volltextsuche über alle Logbücher, Notizen und Referenzen aller Projekte. Der Trick von vor zwei Jahren ist drei Wörter entfernt.</p>
+        <div class="how">Beim Abschließen fragt Lotse nach einer Sache fürs nächste Mal. Die findest du dann auch.</div>
+      </article>
+      <article class="benefit reveal">
+        <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></div>
+        <h3>KI, die dein Projekt kennt</h3>
+        <p>Claude Code und andere Assistenten lesen über den eingebauten MCP-Server den Projektkontext und tragen ins Logbuch ein, was sie erledigt haben.</p>
+        <div class="how">Der Tresor ist über diese Schnittstelle nicht erreichbar, nicht einmal die Titel der Einträge.</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- Projektarten ----------------------------------------------------- -->
+<section id="arten" class="tint" aria-labelledby="arten-h">
+  <div class="wrap">
+    <div class="eyebrow">Für alles</div>
+    <h2 id="arten-h">Ein Projekt ist alles, was einen Anfang hat und irgendwann fertig sein soll.</h2>
+    <p class="lede">Lotse fragt nicht nach Sprints, Tickets oder Boards. Es erkennt an deinen Dateien, um welche Art Vorhaben es sich handelt, und passt Erwartung und Vorschläge daran an.</p>
+    <div class="kinds">
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/></svg></div><span class="t">Software</span><span class="ex">Apps, Skripte, Websites, Bibliotheken</span><span class="det">erkennt .git, Cargo.toml, package.json</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></div><span class="t">Hardware &amp; Maker</span><span class="ex">Mikrocontroller, Platinen, 3D-Druck</span><span class="det">erkennt platformio.ini, .kicad_pro, .stl</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg></div><span class="t">Haus &amp; Garten</span><span class="ex">Umbau, Gartenhaus, Werkstatt</span><span class="det">erkennt Fotos und PDFs</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><span class="t">Kreativ</span><span class="ex">Musik, Foto, Film, Schreiben</span><span class="det">erkennt .als, .logicx, .scriv, RAW</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 6a7 7 0 1 0 0 12M3 10h11M3 14h11"/></svg></div><span class="t">Finanzen &amp; Verwaltung</span><span class="ex">Steuer, Versicherung, Anträge</span><span class="det">erkennt PDFs mit Jahreszahl</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4zM20 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z"/></svg></div><span class="t">Lernen &amp; Forschung</span><span class="ex">Kurse, Abschlussarbeit, Experimente</span><span class="det">erkennt .ipynb, .bib, .tex</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div><span class="t">Reise &amp; Veranstaltung</span><span class="ex">Roadtrip, Hochzeit, Vereinsfest</span><span class="det">ruhig bis 120 Tage</span></div>
+      <div class="kind reveal"><div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg></div><span class="t">Alles andere</span><span class="ex">Auch ohne einen einzigen Ordner</span><span class="det">Logbuch und Tresor reichen</span></div>
     </div>
   </div>
 </section>
 
 <!-- Sicherheit ------------------------------------------------------- -->
-<section id="sicherheit" aria-labelledby="sicherheit-h">
+<section id="sicherheit" class="night" aria-labelledby="sicherheit-h">
   <div class="wrap">
     <div class="eyebrow">Sicherheit</div>
-    <h2 id="sicherheit-h">Der Sync-Dienst sieht nur Ciphertext. Ein fremder Rechner sieht nicht alles.</h2>
-    <p class="lede">Keine eigenen Krypto-Primitive. Argon2id, HKDF-SHA256 und XChaCha20-Poly1305 aus RustCrypto, zusammengesetzt wie bei Bitwarden oder 1Password, mit einem Zusatz: dem Desktop-Schlüssel.</p>
+    <h2 id="sicherheit-h">Deine Daten gehören dir. Wörtlich.</h2>
+    <p class="lede">Alles wird auf deinem Gerät verschlüsselt, bevor es irgendwohin geht. Der Sync-Dienst bekommt nur Umschläge, und den Schlüssel dazu erzeugt allein dein Master-Passwort.</p>
+
+    <div class="promises">
+      <article class="promise reveal">
+        <h3>Nur du kannst lesen</h3>
+        <p>Projekte, Logbücher und Tresor sind Ende-zu-Ende verschlüsselt. Der Sync-Dienst sieht Kennungen und Zeitstempel, aber nie einen Titel, einen Satz oder ein Passwort.</p>
+      </article>
+      <article class="promise reveal">
+        <h3>Fremder Rechner, halbes Risiko</h3>
+        <p>Tresor-Einträge der Stufe »nur Desktop« brauchen zusätzlich einen Schlüssel, der nur im Schlüsselbund deines eigenen Rechners liegt. Ein Keylogger im Büro bekommt damit keine Bank-PIN, selbst mit deinem Passwort.</p>
+      </article>
+      <article class="promise reveal">
+        <h3>Ein vergessenes Passwort ist nicht das Ende</h3>
+        <p>Beim Einrichten bekommst du einen Wiederherstellungscode. Er gehört in deinen Passwortmanager und öffnet dein Konto, wenn das Passwort weg ist. Wer beides nicht hat, hat nichts.</p>
+      </article>
+    </div>
 
     <div class="keys reveal" id="keys">
-      <svg viewBox="0 0 900 330" role="img" aria-labelledby="keys-t">
-        <title id="keys-t">Schlüsselhierarchie: Master-Passwort und Wiederherstellungscode wrappen den zufälligen Account-Schlüssel; daraus leiten sich Datensatz-, Datenbank-, Tresor- und Anhang-Schlüssel ab; der Desktop-Schlüssel wird für die Tresor-Stufe »nur Desktop« zusätzlich gebraucht.</title>
-        <!-- Kanten -->
-        <path class="edge" d="M110 62 V 110"/>
-        <path class="edge" d="M110 150 V 190 H 300"/>
-        <path class="edge" d="M110 150 V 260 H 300"/>
-        <path class="edge" d="M780 62 V 110 H 660"/>
-        <path class="edge" d="M430 210 H 560 V 190 H 610"/>
-        <path class="edge" d="M430 210 H 560 V 230 H 610"/>
-        <path class="edge" d="M430 210 H 560 V 270 H 610"/>
-        <path class="edge" d="M430 210 H 560 V 310 H 610"/>
-        <path class="edge" d="M430 130 H 560 V 150 H 610"/>
-        <path class="edge" d="M330 92 V 120"/>
-        <!-- Knoten -->
-        <rect class="node secret" x="30" y="30" width="160" height="32"/><text x="110" y="51" text-anchor="middle">Master-Passwort</text>
-        <rect class="node" x="30" y="110" width="160" height="40"/><text x="110" y="126" text-anchor="middle">Argon2id · HKDF</text><text class="small" x="110" y="142" text-anchor="middle">m=64 MiB t=3 p=1</text>
-        <rect class="node server" x="300" y="176" width="130" height="28"/><text x="365" y="195" text-anchor="middle">Auth-Schlüssel</text>
-        <rect class="node" x="300" y="246" width="130" height="28"/><text x="365" y="265" text-anchor="middle">Wrap-Schlüssel</text>
-        <rect class="node secret" x="700" y="30" width="160" height="32"/><text x="780" y="51" text-anchor="middle">Wiederherstellungscode</text>
-        <rect class="node" x="540" y="96" width="120" height="28"/><text x="600" y="115" text-anchor="middle">Recovery Key</text>
-        <rect class="node secret" x="250" y="60" width="160" height="32"/><text x="330" y="81" text-anchor="middle">Desktop-Schlüssel</text>
-        <rect class="node secret" x="300" y="120" width="130" height="60"/><text x="365" y="143" text-anchor="middle">Account-Schlüssel</text><text class="small" x="365" y="160" text-anchor="middle">32 B zufällig</text><text class="small" x="365" y="173" text-anchor="middle">wrap(WK) · wrap(RK)</text>
-        <rect class="node" x="610" y="136" width="240" height="28"/><text x="730" y="155" text-anchor="middle">Tresor »nur Desktop« = HKDF(AK ‖ DK)</text>
-        <rect class="node" x="610" y="176" width="240" height="28"/><text x="730" y="195" text-anchor="middle">Datensatz-Schlüssel · Sync-Umschläge</text>
-        <rect class="node" x="610" y="216" width="240" height="28"/><text x="730" y="235" text-anchor="middle">SQLCipher-Schlüssel · lokale Datenbank</text>
-        <rect class="node" x="610" y="256" width="240" height="28"/><text x="730" y="275" text-anchor="middle">Tresor »überall« · DEK pro Eintrag</text>
-        <rect class="node" x="610" y="296" width="240" height="28"/><text x="730" y="315" text-anchor="middle">Anhang-Schlüssel · Blobs in R2</text>
+      <svg viewBox="0 0 900 320" role="img" aria-labelledby="keys-t">
+        <title id="keys-t">Schlüsselhierarchie: Master-Passwort und Wiederherstellungscode entsperren jeweils den Konto-Schlüssel. Aus dem Konto-Schlüssel entstehen die Schlüssel für Projekte und Logbücher, die lokale Datenbank und den Tresor »überall«. Der Tresor »nur Desktop« braucht zusätzlich den Desktop-Schlüssel.</title>
+        <!-- Kanten: erst die beiden Wege zum Konto-Schlüssel, dann vier Ableitungen, zuletzt der Desktop-Schlüssel -->
+        <path class="edge" d="M230 70 H300 V130 H350"/>
+        <path class="edge" d="M230 150 H350"/>
+        <path class="edge" d="M550 140 H600 V57 H650"/>
+        <path class="edge" d="M550 140 H600 V117 H650"/>
+        <path class="edge" d="M550 140 H600 V177 H650"/>
+        <path class="edge" d="M550 140 H600 V257 H650"/>
+        <path class="edge" d="M230 250 H600 V257 H650"/>
+        <!-- Eingaben, die nur du kennst -->
+        <rect class="node secret" x="40" y="52" width="190" height="36"/><text x="135" y="75" text-anchor="middle">Master-Passwort</text>
+        <rect class="node secret" x="40" y="132" width="190" height="36"/><text x="135" y="155" text-anchor="middle">Wiederherstellungscode</text>
+        <rect class="node secret" x="40" y="232" width="190" height="36"/><text x="135" y="255" text-anchor="middle">Desktop-Schlüssel</text>
+        <text class="small" x="135" y="284" text-anchor="middle">nur im Schlüsselbund dieses Rechners</text>
+        <!-- Beschriftungen an den Kanten -->
+        <text class="lab" x="265" y="62" text-anchor="middle">Argon2id</text>
+        <text class="lab" x="295" y="144" text-anchor="middle">Notfall</text>
+        <text class="lab" x="420" y="243" text-anchor="middle">beides nötig</text>
+        <!-- Der eine Schlüssel, aus dem alles entsteht -->
+        <rect class="node hub" x="350" y="112" width="200" height="56"/><text x="450" y="136" text-anchor="middle">Konto-Schlüssel</text><text class="small" x="450" y="154" text-anchor="middle">zufällig, nie übertragen</text>
+        <!-- Abgeleitete Schlüssel -->
+        <rect class="node" x="650" y="40" width="220" height="34"/><text x="760" y="62" text-anchor="middle">Projekte &amp; Logbücher</text>
+        <rect class="node" x="650" y="100" width="220" height="34"/><text x="760" y="122" text-anchor="middle">Lokale Datenbank</text>
+        <rect class="node" x="650" y="160" width="220" height="34"/><text x="760" y="182" text-anchor="middle">Tresor »überall«</text>
+        <rect class="node" x="650" y="240" width="220" height="34"/><text x="760" y="262" text-anchor="middle">Tresor »nur Desktop«</text>
+        <text class="small" x="760" y="296" text-anchor="middle">jeder Bereich mit eigenem Schlüssel</text>
       </svg>
-      <div class="legend"><span><i class="s"></i>geheim, nur beim Nutzer</span><span><i></i>abgeleitet oder gewrappt</span><span><i class="v"></i>geht zum Dienst, dort nochmals gehasht</span></div>
+      <div class="legend"><span><i class="s"></i>kennst nur du</span><span><i class="h"></i>entsteht auf deinem Gerät, wird nie übertragen</span><span><i></i>daraus abgeleitet</span></div>
     </div>
-
-    <div class="secgrid">
-      <div class="fact reveal"><h3>Zwei Tresor-Stufen</h3><p>»Überall« braucht das Master-Passwort. »Nur Desktop« braucht zusätzlich den Desktop-Schlüssel, der nur im OS-Schlüsselbund liegt. Ein Keylogger auf einem fremden Rechner bekommt damit selbst mit Passwort keine Bank-PIN.</p><div class="mono">wrapped_dek = AEAD(HKDF(AK ‖ DK), DEK)</div></div>
-      <div class="fact reveal"><h3>Löschen ist Crypto-Shredding</h3><p>Jeder Tresor-Eintrag hat einen eigenen Schlüssel. Löschen vernichtet ihn, damit auch alte Sync-Kopien und Backups unlesbar werden.</p><div class="mono">wrapped_dek = null → Werte bleiben Ballast</div></div>
-      <div class="fact reveal"><h3>Vertauschen fällt auf</h3><p>Jeder Umschlag ist mit Formatversion, Art und ID als Additional Authenticated Data gebunden. Ein Dienst, der Datensätze vertauscht oder verändert, scheitert beim Entschlüsseln.</p><div class="mono">aad = format_version ‖ kind ‖ id</div></div>
-      <div class="fact reveal"><h3>Gestohlener Laptop</h3><p>Die lokale Datenbank ist SQLCipher, der Schlüssel liegt im OS-Schlüsselbund oder kommt aus dem Passwort. Ohne Entsperren ist die Datei Rauschen.</p><div class="mono">PRAGMA key = x'HKDF(AK, "lotse/local-db")'</div></div>
-      <div class="fact reveal"><h3>Vergessenes Passwort</h3><p>Der Wiederherstellungscode wird beim Einrichten einmal angezeigt und muss kalt wiedereingegeben werden, bevor das Konto steht. Er gehört in den Passwortmanager.</p><div class="mono">5YD6-AR19-N3N0-M61R-2Q4Z-JRA8-WC</div></div>
-      <div class="fact reveal"><h3>Was nicht verteidigt wird</h3><p>Malware auf dem eigenen entsperrten Gerät. Keylogger auf fremden Rechnern für die Stufe »überall«. Beides steht im Bedrohungsmodell, statt verschwiegen zu werden.</p><div class="mono"><a href="https://github.com/phish3144/lotse/blob/HEAD/docs/THREAT_MODEL.md" rel="noopener">docs/THREAT_MODEL.md</a></div></div>
-    </div>
+    <p class="keys-caption">Aus einem Passwort, das nur du kennst, entstehen alle Schlüssel. Löschst du einen Tresor-Eintrag, wird sein Schlüssel vernichtet; damit sind auch alte Sync-Kopien und Backups des Eintrags unlesbar.</p>
 
     <div class="compare">
-      <div class="box reveal"><div class="t">Was dein Gerät kennt</div><pre>{
-  "id": "01M1VYYC0K2DMA5TTHF6YH17EJ",
-  "projekt_id": "01M1VYYBT52VD84AESZEV8DX69",
-  "ts": 1757182545000,
-  "quelle": "cli",
-  "art": "offen",
-  "text": "Bewehrung nötig? Nachbarn fragen"
-}</pre></div>
-      <div class="box server reveal"><div class="t">Was der Sync-Dienst speichert</div><pre>{
-  "id": "01M1VYYC0K2DMA5TTHF6YH17EJ",
-  "kind": "note",
-  "hlc": "1757182545000-0001-01M1VYX…",
-  "device_id": "01M1VYXKRKQ2R2M0E59YHHMH45",
-  "deleted": false,
-  "format_version": 1,
-  "nonce": "xQ7…24 Byte…",
-  "ciphertext": "9GkR2…"
-}</pre></div>
+      <div class="box reveal"><div class="t">Was du siehst</div><pre>Projekt   <span class="s">Gartenhaus</span>
+Art       offener Faden
+Text      <span class="s">Bewehrung nötig? Nachbarn fragen.</span>
+Zeit      6. September 2026, 21:14</pre></div>
+      <div class="box server reveal"><div class="t">Was der Sync-Dienst speichert</div><pre><span class="k">id</span>          01M1VYYC0K2DMA5TTHF6YH17EJ
+<span class="k">kind</span>        note
+<span class="k">hlc</span>         1757182545000-0001-01M1VYX…
+<span class="k">ciphertext</span>  9GkR2vQ7…  (Rauschen ohne deinen Schlüssel)</pre></div>
     </div>
+    <p class="techline">Keine eigenen Krypto-Erfindungen: Argon2id, HKDF-SHA256 und XChaCha20-Poly1305 aus RustCrypto, zusammengesetzt wie bei bekannten Passwortmanagern. Das vollständige <a href="https://github.com/phish3144/lotse/blob/HEAD/docs/THREAT_MODEL.md" rel="noopener">Bedrohungsmodell</a> ist öffentlich, samt dem, was Lotse bewusst nicht verteidigt.</p>
   </div>
 </section>
 
-<!-- Architektur ------------------------------------------------------ -->
-<section id="architektur" aria-labelledby="arch-h">
+<!-- Überall dabei ---------------------------------------------------- -->
+<section id="ueberall" aria-labelledby="ueberall-h">
   <div class="wrap">
-    <div class="eyebrow">Architektur</div>
-    <h2 id="arch-h">Ein Rust-Kern, zwei Hüllen, ein dummer Dienst.</h2>
-    <p class="lede">Die Desktop-App ist das mächtige Werkzeug. Der Browser ist ein vollwertiger Zweitclient mit demselben Kern als WebAssembly. Dazwischen ein Sync-Dienst, der nichts versteht, was er speichert.</p>
+    <div class="eyebrow">Überall dabei</div>
+    <h2 id="ueberall-h">Auf dem Laptop. Am Rechner in der Werkstatt. Im Terminal.</h2>
+    <p class="lede">Die Desktop-App ist das Zuhause deiner Projekte. Weitere Geräte holen sich den Stand über einen kleinen Sync-Dienst, der nichts versteht, was er speichert. Und wer lieber tippt, nutzt die Kommandozeile.</p>
 
-    <div class="arch reveal">
-      <div class="lanes">
-        <div class="node">
-          <div class="t">Desktop</div>
-          <div class="s">Tauri 2 · Rust-Kern · SQLCipher · Ordner-Beobachter · Tresor beide Stufen · CLI · MCP</div>
-          <div class="m">Windows · macOS · Linux</div>
-        </div>
-        <div class="node server">
-          <div class="t">Sync-Dienst</div>
-          <div class="s">Cloudflare Worker · D1 · R2. Speichert Umschläge, vergibt Sequenznummern, liefert Änderungen seit X.</div>
-          <div class="m">sieht: id · kind · hlc · device_id · ciphertext</div>
-        </div>
-        <div class="node">
-          <div class="t">Browser</div>
-          <div class="s">Dieselbe Oberfläche, Rust-Kern als WebAssembly. Modus »fremder Rechner« ohne Persistenz. Tresor-Stufe »überall«.</div>
-          <div class="m">Cloudflare Pages + Access</div>
-        </div>
-        <div class="wire l" aria-hidden="true"></div>
-        <div class="wire r" aria-hidden="true"></div>
-        <div class="env a" aria-hidden="true"></div>
-        <div class="env b" aria-hidden="true"></div>
+    <div class="places">
+      <div class="place reveal">
+        <div class="h"><h3>Desktop-App</h3><span class="tag acc">Vorschau 0.1</span></div>
+        <p>Hafen, Brief, Logbuch, Tresor mit beiden Stufen, Ordner-Beobachter, Suche. Windows, macOS und Linux.</p>
+        <div class="m">läuft komplett lokal · Daten in einer verschlüsselten Datei</div>
+      </div>
+      <div class="link" aria-hidden="true"><div class="env"></div></div>
+      <div class="place server reveal">
+        <div class="h"><h3>Sync-Dienst</h3><span class="tag ok">läuft</span></div>
+        <p>Optional. Speichert verschlüsselte Umschläge und liefert Änderungen an deine anderen Geräte. Kostenlos selbst betreibbar auf Cloudflare.</p>
+        <div class="m">sieht: id · kind · hlc · ciphertext</div>
+      </div>
+      <div class="link back" aria-hidden="true"><div class="env"></div></div>
+      <div class="place reveal">
+        <div class="h"><h3>Zweites Gerät</h3><span class="tag busy">Browser folgt</span></div>
+        <p>Jeder weitere Rechner meldet sich mit E-Mail und Master-Passwort an und hat danach denselben Stand. Der Zugriff aus dem Browser ist in Arbeit.</p>
+        <div class="m">Geräte einzeln widerrufbar</div>
       </div>
     </div>
 
-    <div class="facts">
-      <div class="fact reveal"><h3>Änderungsprotokoll statt Textmerge</h3><p>Jeder Datensatz trägt eine Hybrid Logical Clock. Der lexikografisch größte Zeitstempel gewinnt. Notizen sind append-only und kollidieren nie; ein verlorener Projektkopf landet als Konfliktnotiz im Logbuch statt stumm zu verschwinden.</p><div class="mono">1757182545000-0001-01M1VYXKRKQ2R2M0E59YHHMH45</div></div>
-      <div class="fact reveal"><h3>Offline ohne Limit</h3><p>Die Wahrheit ist die lokale Datenbank. Änderungen sammeln sich im Protokoll und werden gebündelt gepusht: Debounce zwei Sekunden, höchstens 500 Datensätze pro Anfrage.</p><div class="mono">push → pull → Regel anwenden</div></div>
-      <div class="fact reveal"><h3>Kostenlos für eine Person</h3><p>Der Gratisplan erlaubt 100 000 Schreibvorgänge pro Tag, 5 GB Datenbank und 10 GB Anhänge. Ein Einzelnutzer braucht davon Bruchteile. Das Protokoll ist portabel, derselbe Dienst kann als Rust-Binary auf einem eigenen Server laufen.</p><div class="mono"><a href="https://github.com/phish3144/lotse/blob/HEAD/docs/SYNC_PROTOCOL.md" rel="noopener">docs/SYNC_PROTOCOL.md</a></div></div>
-    </div>
-
-    <div class="stack-chips" aria-label="Technik">
-      <span class="chip">Rust</span><span class="chip">Tauri 2</span><span class="chip">Svelte 5</span><span class="chip">SQLite + SQLCipher + FTS5</span><span class="chip">RustCrypto</span><span class="chip">age</span><span class="chip">zeroize</span><span class="chip">WebAssembly</span><span class="chip">Cloudflare Workers · D1 · R2 · Pages</span><span class="chip">notify</span><span class="chip">git log als Subprozess</span>
-    </div>
-  </div>
-</section>
-
-<!-- Funktionen ------------------------------------------------------- -->
-<section id="funktionen" aria-labelledby="funktionen-h">
-  <div class="wrap">
-    <div class="eyebrow">Funktionen</div>
-    <h2 id="funktionen-h">Was läuft, was in Arbeit ist, was geplant ist.</h2>
-    <p class="lede">Ehrlich beschriftet. Der Kern und die Kommandozeile sind getestet und benutzbar, die grafischen Hüllen entstehen gerade.</p>
-    <div class="legend-status"><span class="badge ok">läuft</span><span class="badge busy">in Arbeit</span><span class="badge plan">geplant</span></div>
-    <div class="features">
-      <div class="feature reveal"><div class="h"><h3>Logbuch und offene Fäden</h3><span class="badge ok">läuft</span></div><p>Eine Notiz-Entität für alles, append-only, projektübergreifende Liste offener Punkte.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Wo-war-ich-Brief</h3><span class="badge ok">läuft</span></div><p>Tage seit Kontakt, letzte Übergabe, offene Fäden, Aktivität seit dem letzten Besuch je Quelle.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Übergabe beim Pausieren</h3><span class="badge ok">läuft</span></div><p>Pflicht nur beim Wechsel auf pausiert oder wartet, mit Wiedervorlage-Datum.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Hafen mit Erwartungsintervall</h3><span class="badge ok">läuft</span></div><p>Auffälligkeit relativ zum eigenen Intervall, Wiedervorlage hebt an, ruhende Projekte bleiben ruhig.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Projekterkennung</h3><span class="badge ok">läuft</span></div><p>Scan von Wurzelordnern nach Erkennungsmarken, Vorlage-Vorschlag, Marker-Datei gegen Umbenennen, Massen-Import.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Git-Import</h3><span class="badge ok">läuft</span></div><p>Commits als rückdatierte, pro Tag verdichtete Notizen; README als Kurs-Vorschlag, nie automatisch übernommen.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Tresor mit zwei Stufen</h3><span class="badge ok">läuft</span></div><p>Envelope-Encryption pro Eintrag, Desktop-Schlüssel für »nur Desktop«, Crypto-Shredding beim Löschen.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Verschlüsselte lokale Datenbank</h3><span class="badge ok">läuft</span></div><p>SQLCipher mit abgeleitetem Schlüssel, Volltextsuche über Projekte, Notizen, Referenzen und Tresor-Titel.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Sync-Umschläge und Dienst</h3><span class="badge ok">läuft</span></div><p>Versiegelte Datensätze mit AAD, Konfliktregel, Tombstones; Cloudflare-Worker mit 22 Tests im Worker-Runtime.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Klartext-Spiegel und age-Export</h3><span class="badge ok">läuft</span></div><p>Markdown pro Projekt für grep und Obsidian; kompletter Bestand als age-Bundle, ohne Lotse entschlüsselbar.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Kommandozeile</h3><span class="badge ok">läuft</span></div><p>init, hafen, log, offen, projekt, ref, tresor, scan, uebernehmen, suche, export.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Sync-Client</h3><span class="badge ok">läuft</span></div><p>HTTP-Transport im Kern und in der CLI: Registrierung, Anmeldung weiterer Geräte, Push und Pull in Bündeln, Geräte widerrufen. End-to-End gegen den Dienst getestet.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Desktop-App</h3><span class="badge busy">in Arbeit</span></div><p>Tauri-Hülle mit Einrichtung, Entsperren über OS-Schlüsselbund und allen Kern-Kommandos; Tray, Auto-Lock und signierter Updater folgen.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Web-Oberfläche</h3><span class="badge busy">in Arbeit</span></div><p>Svelte-5-Oberfläche mit Hafen, Projektseite, offenen Punkten, Suche und Schnellerfassung; läuft derzeit mit Beispieldaten.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Ordner-Beobachter</h3><span class="badge ok">läuft</span></div><p>Live-Beobachtung registrierter Wurzelordner, Metadaten statt Inhalte, feste Ausschlussliste, eine verdichtete Notiz pro Projekt und Tag, Commits seit dem letzten Blick.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Browser-Client als WebAssembly</h3><span class="badge plan">geplant</span></div><p>Derselbe Kern im Browser: Krypto, Sync und Tresor-Stufe »überall« auf fremden Rechnern.</p></div>
-      <div class="feature reveal"><div class="h"><h3>MCP-Server</h3><span class="badge ok">läuft</span></div><p>Projektkontext für Claude Code und andere Assistenten, Logbuch-Einträge mit Quelle »mcp«, kein Tresor-Zugriff, nicht einmal Titel.</p></div>
-      <div class="feature reveal"><div class="h"><h3>Bausteine, Facetten, KI-Verdichtung</h3><span class="badge plan">geplant</span></div><p>Jeweils erst bei nachgewiesenem Bedarf in einem echten Projekt, siehe Nicht-Ziele.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- Daten ------------------------------------------------------------ -->
-<section id="daten" aria-labelledby="daten-h">
-  <div class="wrap">
-    <div class="eyebrow">Datenhoheit</div>
-    <h2 id="daten-h">Wenn Lotse morgen tot ist, kommst du in fünf Minuten an alles.</h2>
-    <p class="lede">Der Klartext-Spiegel ist ein Ordner mit Markdown, den grep und Obsidian lesen. Das age-Bundle enthält den ganzen Bestand samt Tresor und öffnet sich mit einem generischen Werkzeug. Keine Telemetrie, nie.</p>
-    <div class="data">
-      <div class="file reveal"><div class="t">~/Lotse-Spiegel/gartenhaus/projekt.md</div><pre><span class="h">---</span>
-<span class="y">lotse_schema:</span> 1
-<span class="y">titel:</span> "Gartenhaus"
-<span class="y">status:</span> pausiert
-<span class="y">vorlage:</span> haus_garten
-<span class="y">wiedervorlage:</span> 2026-10-01
-<span class="y">erwartungsintervall_tage:</span> 60
-<span class="y">tags:</span> ["haus"]
-<span class="y">referenzen:</span>
-  - {typ: physisch, ziel: "Keller, Regal 3, blaue Kiste"}
-<span class="h">---</span>
-
-<span class="h"># Gartenhaus</span>
-
-<span class="h">## Kurs</span>
-
-Fundament bis Oktober.</pre></div>
-      <div class="stack">
-        <div class="fact reveal"><h3>Fluchtweg ohne Lotse</h3><p>Das Bundle ist eine JSON-Datei, verschlüsselt mit age und Passphrase.</p><div class="mono">age -d -o bundle.json backup.json.age</div></div>
-        <div class="fact reveal"><h3>Nicht-Ziele, schriftlich</h3><p>Kein Multi-User, kein Block-Editor, kein Backlink-Graph, keine stille Telemetrie, keine Fremdskripte. Änderungen an der Liste nur beim wöchentlichen Soll-Ist-Check.</p><div class="mono"><a href="https://github.com/phish3144/lotse/blob/HEAD/docs/NON_GOALS.md" rel="noopener">docs/NON_GOALS.md</a></div></div>
-        <div class="fact reveal"><h3>Abbruchkriterium</h3><p>Fünf echte Projekte, eines davon ohne Dateien, vier Wochen freiwillig genutzt. Sonst wird Lotse eingefroren statt erweitert. Lotse ist Projekt Nr. 1 in Lotse.</p></div>
+    <div class="termgrid">
+      <div class="term reveal" role="img" aria-label="Beispiel in der Kommandozeile: Notiz erfassen und Hafen anzeigen">
+        <div class="bar"><i></i><i></i><i></i><span>lotse</span></div>
+        <pre><span class="c">$ lotse log "@Lampe Taster hängt jetzt an GPIO 4"</span>
+<span class="o">→ Lampe ESP32 (log)</span>
+<span class="c">$ lotse hafen</span>
+<span class="p">Auf See</span>
+<span class="o">   Lampe ESP32         heute     1 offen  Taster hängt jetzt an GPIO 4</span>
+<span class="o">   Website Krause      19 T      0 offen  Entwurf geschickt, warte auf Rückmeldung</span>
+<span class="p">Vor Anker</span>
+<span class="o">   Gartenhaus          1. Okt.   2 offen  Warte auf Beton. Nächster Schritt: Schalung</span></pre>
+      </div>
+      <div>
+        <h3>Für Tastatur-Menschen und KI-Assistenten</h3>
+        <p>Die Kommandozeile kann alles, was die App kann: erfassen, suchen, Tresor, Ordner scannen, exportieren. Sie erkennt das Projekt am Ordner, in dem du gerade stehst.</p>
+        <p>Über <code>lotse mcp</code> bekommen Claude Code und andere Assistenten den Kontext deines Projekts und schreiben ihre Arbeit ins Logbuch. Der Tresor bleibt für sie unsichtbar.</p>
+        <p>Und wenn du Lotse irgendwann nicht mehr willst: Ein Befehl legt alle Projekte als Markdown-Ordner ab, ein anderer sichert alles in einer verschlüsselten Datei, die sich ohne Lotse öffnen lässt.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- Download --------------------------------------------------------- -->
-<section id="download" aria-labelledby="download-h">
+<section id="download" class="night chartbg" aria-labelledby="download-h">
   <div class="wrap">
     <div class="eyebrow">Download</div>
-    <h2 id="download-h">Für deinen Rechner.</h2>
-    <p class="lede" id="dl-lede">Die Schaltflächen zeigen die neueste Veröffentlichung auf GitHub. Builds sind derzeit unsigniert; Windows SmartScreen und macOS Gatekeeper warnen deshalb. Prüfsumme vergleichen, dann öffnen.</p>
+    <h2 id="download-h">Kostenlos. Für deinen Rechner.</h2>
+    <p class="lede" id="dl-lede">Lotse ist eine frühe Vorschau: Der Kern ist getestet, die Oberfläche wächst. Die Installer sind noch unsigniert, deshalb warnen Windows und macOS einmal beim ersten Start.</p>
     <div class="dl" id="dl">
-      <div class="os" data-os="windows"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>Windows</div><div class="sub">x64 · .msi Installer</div><div class="links" data-slot></div></div>
-      <div class="os" data-os="mac"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8 2.1-1.2 2.9-2.4c.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.5-1-2.5-3.8zM14 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.4z"/></svg>macOS</div><div class="sub">Apple Silicon und Intel · .dmg</div><div class="links" data-slot></div></div>
-      <div class="os" data-os="linux"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-2.2 0-3.5 1.8-3.5 4.2 0 1.5-.6 2.6-1.6 4.1C5.5 13.3 5 14.6 5 16c0 1.2.5 2 1.5 2.4M12 3c2.2 0 3.5 1.8 3.5 4.2 0 1.5.6 2.6 1.6 4.1 1.4 2 1.9 3.3 1.9 4.7 0 1.2-.5 2-1.5 2.4M9 20.5c1 .4 2 .5 3 .5s2-.1 3-.5M10 8h.01M14 8h.01M11 10.5h2l-1 1z"/></svg>Linux</div><div class="sub">x64 · .AppImage und .deb</div><div class="links" data-slot></div></div>
-      <div class="os" data-os="cli"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg>Kommandozeile</div><div class="sub">lotse für alle drei Systeme · Archiv</div><div class="links" data-slot></div></div>
+      <div class="os" data-os="windows"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>Windows</div><div class="sub">Windows 10 und 11 · 64 Bit</div><div class="links" data-slot><span class="none">wird geladen …</span></div></div>
+      <div class="os" data-os="mac"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8 2.1-1.2 2.9-2.4c.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.5-1-2.5-3.8zM14 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.4z"/></svg>macOS</div><div class="sub">Apple Silicon und Intel</div><div class="links" data-slot><span class="none">wird geladen …</span></div></div>
+      <div class="os" data-os="linux"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-2.2 0-3.5 1.8-3.5 4.2 0 1.5-.6 2.6-1.6 4.1C5.5 13.3 5 14.6 5 16c0 1.2.5 2 1.5 2.4M12 3c2.2 0 3.5 1.8 3.5 4.2 0 1.5.6 2.6 1.6 4.1 1.4 2 1.9 3.3 1.9 4.7 0 1.2-.5 2-1.5 2.4M9 20.5c1 .4 2 .5 3 .5s2-.1 3-.5M10 8h.01M14 8h.01M11 10.5h2l-1 1z"/></svg>Linux</div><div class="sub">AppImage, Debian/Ubuntu, Fedora</div><div class="links" data-slot><span class="none">wird geladen …</span></div></div>
+      <div class="os" data-os="cli"><div class="t"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg>Kommandozeile</div><div class="sub">Nur das Programm <code>lotse</code>, als Archiv</div><div class="links" data-slot><span class="none">wird geladen …</span></div></div>
     </div>
     <div class="dlstate" id="dlstate" hidden></div>
-    <h3 style="margin:2rem 0 0.8rem">Aus dem Quellcode</h3>
-    <p style="margin-bottom:0.8rem;color:var(--ink-2)">Rust-Toolchain und OpenSSL-Header genügen. Die Kommandozeile ist heute schon vollständig nutzbar.</p>
-    <div class="codebox"><button type="button" data-copy="src" aria-label="Befehle kopieren">Kopieren</button><pre id="src">git clone https://github.com/phish3144/lotse.git
+    <div class="notes">
+      <span><b>Windows:</b> SmartScreen meldet »unbekannter Herausgeber«. Über »Weitere Informationen« lässt sich die Installation fortsetzen. <b>macOS:</b> Beim ersten Start Rechtsklick auf die App, dann »Öffnen«.</span>
+      <span>Beim Einrichten zeigt Lotse einmalig den Wiederherstellungscode und den Desktop-Schlüssel. Beides gehört in deinen Passwortmanager.</span>
+      <span>Alle Veröffentlichungen mit Prüfsummen: <a href="https://github.com/phish3144/lotse/releases" rel="noopener">github.com/phish3144/lotse/releases</a></span>
+    </div>
+    <details class="srcbox">
+      <summary>Lieber selbst bauen?</summary>
+      <div class="in">
+        <p>Rust-Toolchain und OpenSSL-Header genügen für die Kommandozeile. Für die Desktop-App zusätzlich Node.js und die Tauri-Abhängigkeiten deines Systems.</p>
+        <div class="codebox"><button type="button" data-copy="src" aria-label="Befehle kopieren">Kopieren</button><pre id="src">git clone https://github.com/phish3144/lotse.git
 cd lotse &amp;&amp; cargo build --release -p lotse-cli
 export LOTSE_HOME=~/.lotse
 ./target/release/lotse init --geraet "Laptop"
 ./target/release/lotse scan ~/Projekte
 ./target/release/lotse hafen</pre></div>
-    <div class="notes">
-      <span>Der Wiederherstellungscode und der Desktop-Schlüssel werden bei <code>init</code> genau einmal angezeigt. Beides gehört in den Passwortmanager.</span>
-      <span>Lizenz noch nicht festgelegt. Alle Rechte vorbehalten, bis die Entscheidung in <a href="https://github.com/phish3144/lotse/blob/HEAD/docs/BUSINESS.md" rel="noopener">docs/BUSINESS.md</a> gefallen ist.</span>
-    </div>
+      </div>
+    </details>
   </div>
 </section>
 
-<!-- Roadmap ---------------------------------------------------------- -->
-<section id="roadmap" aria-labelledby="roadmap-h">
+<!-- Fragen ----------------------------------------------------------- -->
+<section id="faq" aria-labelledby="faq-h">
   <div class="wrap">
-    <div class="eyebrow">Kurs</div>
-    <h2 id="roadmap-h">Phasen mit Auslösern, nicht mit Terminen.</h2>
-    <p class="lede">Jede Phase startet erst, wenn die vorige einen konkreten Mangel in einem echten Projekt nachgewiesen hat. Spekulation baut nichts.</p>
-    <div class="timeline">
-      <div class="phase done reveal"><div class="n">Phase 0</div><h3>Fundament</h3><p>Konzept, Bedrohungsmodell, Nicht-Ziele, Sync-Protokoll, Rust-Kern, CLI, Gerüste, CI.</p><div class="trig">Abgeschlossen. Tresor-Stufe »nur Desktop« ohne Desktop-Schlüssel nachweislich unlesbar.</div></div>
-      <div class="phase now reveal"><div class="n">Phase 1</div><h3>Desktop-MVP</h3><p>Hafen, Projektseite mit Brief, Beobachter, Erkennung, Tresor, Suche, Spiegel, Sync gegen den Dienst.</p><div class="trig">Budget: 4 bis 6 Feierabend-Wochen. Erfolgsmaß: fünf echte Projekte, vier Wochen genutzt.</div></div>
-      <div class="phase reveal"><div class="n">Phase 2</div><h3>Web und MCP</h3><p>Kern als WebAssembly, Web-App hinter Cloudflare Access, Modus »fremder Rechner«, MCP-Server.</p><div class="trig">Auslöser: Erfolgsmaß aus Phase 1.</div></div>
-      <div class="phase reveal"><div class="n">Phase 3</div><h3>Wiederverwendung</h3><p>Bausteine mit Herkunft und Verwendung, Vorlagen aus Projekten, Abschluss-Moment.</p><div class="trig">Auslöser: drittes Handkopieren desselben Inhalts.</div></div>
-      <div class="phase reveal"><div class="n">Phase 4</div><h3>Domänentiefe</h3><p>Facetten als Config, Kalender lesend, Projekt-Kanten, KI-Verdichtung des Briefs, Kanban.</p><div class="trig">Auslöser: konkreter Mangel in einem echten Projekt.</div></div>
-      <div class="phase reveal"><div class="n">Phase 5</div><h3>Mobil</h3><p>Lesend über die Web-App ab Phase 2. Native App nur nach sechs Monaten stabiler Nutzung.</p><div class="trig">Auslöser: der Wunsch besteht nach sechs Monaten noch.</div></div>
+    <div class="eyebrow">Fragen</div>
+    <h2 id="faq-h">Was Leute vor dem Herunterladen wissen wollen.</h2>
+    <div class="faq">
+      <details class="q reveal"><summary>Kostet Lotse etwas?</summary><p>Nein. Desktop-App und Kommandozeile sind kostenlos. Der Sync-Dienst ist offen und läuft auf dem Gratisplan von Cloudflare, den du selbst anlegen kannst; ein gehosteter Dienst kommt später als bezahlte Bequemlichkeit, nie als Bedingung.</p></details>
+      <details class="q reveal"><summary>Wo liegen meine Daten?</summary><p>In einer verschlüsselten Datenbank auf deinem Rechner. Der Abgleich zwischen Geräten ist freiwillig. Du kannst jederzeit alles als Markdown-Ordner oder als verschlüsselte Sicherung exportieren, die sich auch ohne Lotse öffnen lässt.</p></details>
+      <details class="q reveal"><summary>Liest Lotse meine Dateien?</summary><p>Nein. Der Ordner-Beobachter sieht nur, welche Datei sich wann geändert hat und welche Commits dazukamen. Inhalte werden nicht gelesen, und Dateien wie <code>.env</code>, Schlüssel oder Zertifikate stehen auf einer festen Ausschlussliste.</p></details>
+      <details class="q reveal"><summary>Was sieht der Sync-Dienst?</summary><p>Verschlüsselte Umschläge mit einer Kennung, einem Zeitstempel und der Art des Datensatzes. Keine Titel, keine Texte, keine Passwörter. Er kann Datensätze auch nicht unbemerkt vertauschen, weil jeder Umschlag an seine Kennung gebunden ist.</p></details>
+      <details class="q reveal"><summary>Was passiert, wenn ich mein Passwort vergesse?</summary><p>Du nutzt den Wiederherstellungscode, den Lotse beim Einrichten einmal anzeigt. Bewahre ihn im Passwortmanager auf. Ohne Passwort und ohne Code kann niemand die Daten öffnen, auch wir nicht.</p></details>
+      <details class="q reveal"><summary>Ersetzt Lotse meinen Passwortmanager?</summary><p>Nein, und das soll es auch nicht. Web-Logins gehören weiter in Proton Pass, Bitwarden oder 1Password. Lotse hält, was zu einem Projekt gehört und sonst in einer Textdatei landen würde: der Router vom Bauprojekt, der API-Schlüssel der Website, der Kundenzugang.</p></details>
+      <details class="q reveal"><summary>Wie fertig ist das Ganze?</summary><p>Eine frühe Vorschau. Der Kern (Speicher, Verschlüsselung, Tresor, Sync, Erkennung, Beobachter) ist getestet und läuft in der Kommandozeile. Die Desktop-App bindet ihn an und wächst gerade; Systemleiste, automatisches Sperren und Updates folgen. Der Zugriff aus dem Browser ist der nächste große Schritt.</p></details>
+      <details class="q reveal"><summary>Warum sind die Installer unsigniert?</summary><p>Signaturzertifikate kosten Geld und Zeit, die im Moment in die Anwendung gehen. Der Quellcode ist öffentlich, jeder Build entsteht nachvollziehbar aus ihm, und neben jedem Archiv liegt eine Prüfsumme.</p></details>
     </div>
   </div>
 </section>
@@ -700,7 +827,7 @@ export LOTSE_HOME=~/.lotse
   <div class="wrap">
     <div>
       <div style="font-family:var(--font-display);font-size:1.2rem;color:var(--ink);margin-bottom:0.4rem">Lotse</div>
-      <div>Das Logbuch für alle deine Vorhaben. Diese Seite lädt keine Fremdschriften, keine Skripte von Dritten und keine Analytics. Die einzige Verbindung geht zu api.github.com, um die neueste Veröffentlichung anzuzeigen.</div>
+      <div>Das Logbuch für alle deine Vorhaben. Diese Seite lädt keine Fremdschriften, keine Skripte von Dritten und keine Analytics. Die einzige Verbindung geht zu api.github.com, um die neueste Veröffentlichung anzuzeigen. Lizenz noch nicht festgelegt.</div>
     </div>
     <nav aria-label="Dokumente">
       <a href="https://github.com/phish3144/lotse" rel="noopener">Quellcode</a>
@@ -785,58 +912,6 @@ export LOTSE_HOME=~/.lotse
     reveals.forEach(function (el) { el.classList.add('in'); });
   }
 
-  /* Terminal-Sitzung ---------------------------------------------------------- */
-  var term = document.getElementById('term');
-  if (term) {
-    var script = [
-      ['c', '$ lotse log "@Gartenhaus Beton bestellt, Liefertermin offen"'],
-      ['o', '→ Gartenhaus (log)'],
-      ['c', '$ lotse log --projekt Gartenhaus --offen "Bewehrung nötig? Nachbarn fragen"'],
-      ['o', '→ Gartenhaus (offen)'],
-      ['c', '$ lotse projekt status Gartenhaus pausiert'],
-      ['e', 'Fehler: Wechsel auf »pausiert« oder »wartet« braucht eine Übergabenotiz'],
-      ['c', '$ lotse projekt status Gartenhaus pausiert \\\n    --notiz "Warte auf Beton. Nächster Schritt: Schalung prüfen." \\\n    --wiedervorlage 2026-10-01'],
-      ['o', 'Gartenhaus → pausiert'],
-      ['c', '$ lotse hafen'],
-      ['p', 'Auf See'],
-      ['o', '   Lotse                 0 T   0 offen  Konto eingerichtet. Lotse ist Projekt Nr. 1 in Lotse.'],
-      ['p', 'Vor Anker'],
-      ['o', '   Gartenhaus            0 T   1 offen  Warte auf Beton. Nächster Schritt: Schalung prüfen.']
-    ];
-    function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-    function render(lines, partial, cls) {
-      var html = '';
-      lines.forEach(function (l) { html += '<span class="' + l[0] + '">' + esc(l[1]) + '</span>\n'; });
-      if (partial !== undefined) html += '<span class="' + cls + '">' + esc(partial) + '</span><span class="caret"></span>';
-      term.innerHTML = html;
-    }
-    if (reduced) {
-      render(script);
-    } else {
-      var done = [], idx = 0;
-      function step() {
-        if (idx >= script.length) { render(done, '', 'c'); return; }
-        var line = script[idx];
-        if (line[0] === 'c') {
-          var i = 0;
-          (function type() {
-            i++;
-            render(done, line[1].slice(0, i), 'c');
-            if (i < line[1].length) setTimeout(type, 18 + Math.random() * 30);
-            else { done.push(line); idx++; setTimeout(step, 320); }
-          })();
-        } else {
-          done.push(line); idx++; render(done, '', 'c'); setTimeout(step, 240);
-        }
-      }
-      var started = false;
-      var termIO = ('IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
-        if (!started && entries.some(function (e) { return e.isIntersecting; })) { started = true; setTimeout(step, 300); termIO.disconnect(); }
-      }, { threshold: 0.3 }) : null;
-      if (termIO) { render([], '', 'c'); termIO.observe(term); } else { started = true; step(); }
-    }
-  }
-
   /* Schlüsselhierarchie zeichnen, wenn sichtbar ----------------------------- */
   var keys = document.getElementById('keys');
   if (keys && 'IntersectionObserver' in window && !reduced) {
@@ -856,6 +931,7 @@ export LOTSE_HOME=~/.lotse
 
   /* Download: eigenes System erkennen, neueste Veröffentlichung laden --------- */
   var REPO = 'phish3144/lotse';
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
   function detectOS() {
     var p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '').toLowerCase();
     var ua = navigator.userAgent.toLowerCase();
@@ -869,52 +945,56 @@ export LOTSE_HOME=~/.lotse
     var card = document.querySelector('.os[data-os="' + mine + '"]');
     if (card) { card.classList.add('mine'); var tag = document.createElement('div'); tag.className = 'mine-tag'; tag.textContent = 'Dein System'; card.insertBefore(tag, card.firstChild); }
   }
+  // Updater-Pakete, Signaturen und Prüfsummen erscheinen nicht als Download.
   function classify(name) {
     var n = name.toLowerCase();
-    if (/lotse-cli|lotse_cli|^lotse-\d|^lotse-v/.test(n) && /\.(tar\.gz|zip)$/.test(n)) return 'cli';
+    if (/\.(sha256|sig)$/.test(n) || /\.app\.tar\.gz$/.test(n) || /latest\.json$/.test(n)) return null;
+    if (/^lotse-cli/.test(n)) return 'cli';
     if (/\.(msi|exe)$/.test(n)) return 'windows';
-    if (/\.dmg$/.test(n) || /\.app\.tar\.gz$/.test(n)) return 'mac';
+    if (/\.dmg$/.test(n)) return 'mac';
     if (/\.(appimage|deb|rpm)$/.test(n)) return 'linux';
     return null;
   }
   function label(name) {
     var n = name.toLowerCase(), arch = '';
-    if (/aarch64|arm64/.test(n)) arch = 'Apple Silicon';
-    else if (/x86_64|x64|amd64/.test(n)) arch = /\.dmg$/.test(n) ? 'Intel' : 'x64';
+    var apple = /apple|darwin|\.dmg$/.test(n);
+    if (/aarch64|arm64/.test(n)) arch = apple ? 'Apple Silicon' : 'ARM64';
+    else if (/x86_64|x64|amd64/.test(n)) arch = apple ? 'Intel' : '64 Bit';
     var ext = (name.match(/\.(msi|exe|dmg|AppImage|deb|rpm|tar\.gz|zip)$/i) || ['', ''])[1];
-    var os = /windows|pc-windows/.test(n) ? 'Windows' : /apple|darwin|mac/.test(n) ? 'macOS' : /linux/.test(n) ? 'Linux' : '';
-    return [os, arch, ext ? '.' + ext : ''].filter(Boolean).join(' · ') || name;
+    var os = /windows/.test(n) ? 'Windows' : apple ? 'macOS' : /linux/.test(n) ? 'Linux' : '';
+    var kind = /setup\.exe$/.test(n) ? 'Setup' : /\.msi$/.test(n) ? 'Installer' : /\.appimage$/.test(n) ? 'AppImage' : /\.deb$/.test(n) ? 'Debian/Ubuntu' : /\.rpm$/.test(n) ? 'Fedora' : '';
+    return [os, arch, kind, ext && !kind ? '.' + ext : ''].filter(Boolean).join(' · ') || name;
   }
-  function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
+  function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(0) + ' MB' : Math.round(b / 1024) + ' KB'; }
   var state = document.getElementById('dlstate');
   function fallback(msg) {
     state.hidden = false;
-    state.innerHTML = '<strong>Noch keine veröffentlichte Version.</strong><span>' + msg + '</span><span>Sobald die erste Version markiert ist, erscheinen hier Installer für Windows, macOS und Linux sowie die Kommandozeile als Archiv. Bis dahin: aus dem Quellcode bauen, siehe unten.</span>';
-    document.querySelectorAll('.os .links').forEach(function (s) { s.innerHTML = '<span style="color:var(--muted);font-size:0.86rem">bald</span>'; });
+    state.innerHTML = '<strong>Gerade nicht erreichbar.</strong><span>' + esc(msg) + '</span><span>Alle Installer liegen auf <a href="https://github.com/' + REPO + '/releases" rel="noopener">GitHub unter Veröffentlichungen</a>.</span>';
+    document.querySelectorAll('.os .links').forEach(function (s) { s.innerHTML = '<span class="none">siehe GitHub</span>'; });
   }
-  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+  fetch('https://api.github.com/repos/' + REPO + '/releases?per_page=5', { headers: { Accept: 'application/vnd.github+json' } })
     .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-    .then(function (rel) {
-      var slots = { windows: [], mac: [], linux: [], cli: [] }, sums = null;
-      (rel.assets || []).forEach(function (a) {
-        if (/sha256|checksums?/i.test(a.name)) { sums = a; return; }
-        var k = classify(a.name); if (k) slots[k].push(a);
-      });
+    .then(function (list) {
+      var rel = (list || []).filter(function (r) { return !r.draft; })[0];
+      if (!rel) throw new Error('empty');
+      var slots = { windows: [], mac: [], linux: [], cli: [] };
+      (rel.assets || []).forEach(function (a) { var k = classify(a.name); if (k) slots[k].push(a); });
       var any = false;
       Object.keys(slots).forEach(function (k) {
         var slot = document.querySelector('.os[data-os="' + k + '"] .links');
-        if (!slots[k].length) { slot.innerHTML = '<span style="color:var(--muted);font-size:0.86rem">in dieser Version nicht enthalten</span>'; return; }
+        if (!slots[k].length) { slot.innerHTML = '<span class="none">in dieser Version nicht enthalten</span>'; return; }
         any = true;
         slot.innerHTML = slots[k].map(function (a) {
-          return '<a href="' + a.browser_download_url + '" rel="noopener">' + label(a.name) + ' <span style="color:var(--muted)">(' + fmtSize(a.size) + ')</span></a>';
+          return '<a href="' + esc(a.browser_download_url) + '" rel="noopener">' + esc(label(a.name)) + ' <span style="color:var(--muted)">(' + fmtSize(a.size) + ')</span></a>';
         }).join('');
       });
       if (!any) { fallback('Die neueste Veröffentlichung enthält keine Installer.'); return; }
       var lede = document.getElementById('dl-lede');
-      lede.textContent = 'Version ' + (rel.tag_name || '').replace(/^v/, '') + ', veröffentlicht am ' + new Date(rel.published_at).toLocaleDateString('de-DE') + '. Builds sind derzeit unsigniert; Windows SmartScreen und macOS Gatekeeper warnen deshalb. Prüfsumme vergleichen, dann öffnen.';
-      if (sums) { state.hidden = false; state.innerHTML = '<span>Prüfsummen: <a href="' + sums.browser_download_url + '" rel="noopener">' + sums.name + '</a></span>'; }
+      var version = (rel.tag_name || '').replace(/^v/, '');
+      var date = rel.published_at ? new Date(rel.published_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+      lede.textContent = 'Version ' + version + (rel.prerelease ? ' (Vorschau)' : '') + (date ? ', veröffentlicht am ' + date : '') + '. Die Installer sind noch unsigniert, deshalb warnen Windows und macOS einmal beim ersten Start.';
     })
-    .catch(function () { fallback('Das Repository ist noch privat oder es gibt noch kein Release.'); });
+    .catch(function () { fallback('Die Liste der Veröffentlichungen konnte nicht von GitHub geladen werden.'); });
 })();
 </script>
 </body>
