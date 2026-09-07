@@ -14,6 +14,7 @@ pub mod brief;
 pub mod crypto;
 pub mod error;
 pub mod hlc;
+pub mod kalender;
 pub mod model;
 pub mod sync;
 pub mod vault;

@@ -96,6 +96,14 @@ enum Cmd {
     Sync(SyncCmd),
     /// MCP-Server über stdin/stdout für KI-Assistenten (z. B. `claude mcp add lotse -- lotse mcp`)
     Mcp,
+    /// Anstehende Termine aus abonnierten Kalendern (.ics) zeigen
+    Termine {
+        /// Nur dieses Projekt; ohne Angabe alle mit Kalender-Referenz
+        projekt: Option<String>,
+        /// Wie weit nach vorn geschaut wird
+        #[arg(long, default_value_t = 90)]
+        tage: i64,
+    },
     /// Stand auf der Gegenseite holen (GitHub, GitLab) und verdichtet ins Logbuch schreiben
     Gegenseite {
         /// Nur dieses Projekt; ohne Angabe alle mit erkanntem Repo
@@ -358,6 +366,7 @@ fn run() -> Result<()> {
             lotse_core::mcp::bedienen(&mut store, stdin.lock(), stdout.lock())?;
             Ok(())
         }
+        Cmd::Termine { projekt, tage } => termine(&store, projekt.as_deref(), tage),
         Cmd::Gegenseite { projekt, trocken } => gegenseite(
             &mut store,
             &ak,
@@ -371,6 +380,64 @@ fn run() -> Result<()> {
             intervall,
         } => beobachten(&mut store, wurzeln, merken, intervall),
     }
+}
+
+/// Zeigt, was ansteht: Termine aus den Kalender-Referenzen der Projekte. Lotse
+/// schreibt sie nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
+fn termine(store: &Store, projekt: Option<&str>, tage: i64) -> Result<()> {
+    use lotse_core::kalender;
+
+    let nur = projekt.map(|p| finde_projekt(store, p)).transpose()?;
+    let von: String = export::iso(now_ms()).chars().take(10).collect();
+    let bis = kalender::tage_spaeter(&von, tage.max(1));
+
+    let mut etwas = false;
+    for p in store.projekte()? {
+        if nur.as_ref().is_some_and(|n| n.id != p.id) {
+            continue;
+        }
+        let ziele: Vec<String> = store
+            .referenzen(p.id)?
+            .into_iter()
+            .filter(|r| {
+                matches!(r.typ, ReferenzTyp::Url | ReferenzTyp::Datei)
+                    && kalender::ist_kalender(&r.ziel)
+            })
+            .map(|r| r.ziel)
+            .collect();
+        if ziele.is_empty() {
+            continue;
+        }
+        etwas = true;
+
+        let mut alle = Vec::new();
+        for ziel in &ziele {
+            match kalender::holen(ziel) {
+                Ok(ics) => alle.extend(kalender::lesen(&ics)),
+                Err(e) => eprintln!("{ziel}: {e}"),
+            }
+        }
+        println!("{}", p.titel);
+        let kommende = kalender::kommende(&alle, &von, &bis, 20);
+        if kommende.is_empty() {
+            println!("  nichts in den nächsten {tage} Tagen");
+        }
+        for t in kommende {
+            let ort = t
+                .ort
+                .as_deref()
+                .map(|o| format!("  ({o})"))
+                .unwrap_or_default();
+            println!("  {}  {}{ort}", t.anzeige(), t.titel);
+        }
+    }
+    if !etwas {
+        bail!(
+            "Kein Projekt hat eine Kalender-Referenz. Die Abonnement-Adresse des Kalenders \
+             als Referenz vom Typ `url` anlegen (endet auf .ics oder beginnt mit webcal://)."
+        );
+    }
+    Ok(())
 }
 
 /// Zeiger auf den Tresor-Eintrag mit dem Token – dieselben Schlüssel wie in der App,

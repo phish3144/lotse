@@ -24,6 +24,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | MCP-Server (`lotse mcp`) | läuft |
 | Remote-Git (GitHub und GitLab: offene PRs/MRs, Issue-Zahl, Prüflauf) | läuft im Kern, in der App und in der CLI (`lotse gegenseite`) |
 | KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App |
+| Kalender lesend (iCalendar/.ics, auch `webcal://`) | läuft im Kern, in der App und in der CLI (`lotse termine`) |
 | WebAssembly-Client für den Browser | offen |
 
 ## Bekannte Grenzen
@@ -43,6 +44,17 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 - **Selbst betriebene GitLab- und GitHub-Instanzen** werden nicht erkannt, nur `github.com`
   und `gitlab.com`. Der Hostname einer eigenen Instanz lässt sich nicht erraten; dafür
   braucht es eine Einstellung, die es noch nicht gibt.
+- **CalDAV spricht Lotse nicht.** Gelesen wird die iCalendar-Datei, die jeder Dienst als
+  Abonnement-Adresse ausgibt (Google, Nextcloud, iCloud, Outlook). Das deckt den Fall
+  „zeig mir, was ansteht" ab; ein echter CalDAV-Client wäre ein eigenes Stück Arbeit und
+  bringt für reines Lesen nichts dazu.
+- **Zeitzonen werden nicht umgerechnet.** Eine Uhrzeit wird so gezeigt, wie sie im
+  Kalender steht; Zeiten in UTC werden als solche gekennzeichnet. Ohne
+  Zeitzonendatenbank wäre jede Umrechnung geraten.
+- **Komplizierte Wiederholungsregeln werden nicht ausgerechnet.** Täglich, wöchentlich,
+  monatlich, jährlich samt Intervall, Anzahl, Stichtag und Wochentagen: ja. „Zweiter
+  Montag im Monat“ und Verwandtes: dann steht nur der erste Termin da, mit dem Hinweis,
+  dass er sich wiederholt.
 - **Der selbsttätige Abruf hängt am Ordner-Beobachter.** Läuft der nicht, passiert nichts
   von allein. Das ist Absicht: ein zweiter Hintergrundthread, der ohne sichtbaren Grund
   ins Netz geht, wäre schlechter zu durchschauen als einer.
@@ -63,6 +75,7 @@ export LOTSE_HOME=$PWD/.lotse-daten
 ./target/debug/lotse tresor zeige Fritzbox passwort
 ./target/debug/lotse export bundle backup.json.age
 ./target/debug/lotse gegenseite --trocken
+./target/debug/lotse termine --tage 30
 ```
 
 `gegenseite` sucht zu jedem Projekt ein Repo bei GitHub oder GitLab – entweder aus einer
@@ -72,6 +85,10 @@ offener Issues, Zustand des Prüflaufs. Issues werden dabei **nicht** zu offenen
 Ein Token ist nur für private Repos und ein größeres Kontingent nötig: entweder in
 `LOTSE_FORGE_TOKEN` oder als Tresor-Eintrag, den die Desktop-App unter *Einstellungen →
 GitHub und GitLab* hinterlegt.
+
+`termine` liest die Kalender, die als Referenz am Projekt hängen (Typ `url` oder `datei`,
+Adresse auf `.ics` oder `webcal://`), und zeigt, was ansteht. Geschrieben wird dabei
+nichts: Termine bleiben im Kalender.
 
 `init` zeigt einmalig den Wiederherstellungscode und den Desktop-Schlüssel. Beides gehört
 in den Passwortmanager. Einträge der Stufe »nur Desktop« brauchen den Desktop-Schlüssel

@@ -4,7 +4,7 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { forge, ki, system, type ForgeProjekt } from '../lib/data/tauri';
+  import { forge, kalender, ki, system, type ForgeProjekt, type Termin } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -302,6 +302,39 @@
     } finally {
       gegenseiteLaeuft = false;
     }
+  }
+
+  // --- Termine --------------------------------------------------------------
+  // Aus abonnierten Kalendern (.ics). Lotse zeigt sie nur; gepflegt werden sie dort,
+  // wo sie herkommen.
+  let termine: Termin[] = $state([]);
+  let terminFehler: string[] = $state([]);
+  let terminQuellen = $state(0);
+
+  $effect(() => {
+    const projektId = id;
+    termine = [];
+    terminFehler = [];
+    terminQuellen = 0;
+    if (!echteDaten) return;
+    let gilt = true;
+    kalender
+      .termine(projektId)
+      .then((r) => {
+        if (!gilt) return;
+        termine = r.termine;
+        terminFehler = r.fehler;
+        terminQuellen = r.quellen.length;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  function terminZeit(t: Termin): string {
+    if (!t.uhrzeit) return 'ganztägig';
+    return t.utc ? `${t.uhrzeit} UTC` : t.uhrzeit;
   }
 
   // --- KI-Verdichtung -------------------------------------------------------
@@ -606,6 +639,11 @@
           </select>
           <button type="submit" class="primaer" disabled={!rZiel.trim() || wirdGespeichert}>Speichern</button>
         </form>
+        <p class="hinweis klein">
+          Zwei Adressen kann Lotse selbst lesen: die Abonnement-Adresse eines Kalenders (endet auf
+          <code>.ics</code> oder beginnt mit <code>webcal://</code>) erscheint als <em>Was ansteht</em>, und ein Ordner
+          mit Git-Remote zu GitHub oder GitLab bringt den Stand der Gegenseite mit.
+        </p>
       {/if}
 
       {#if gegenseite}
@@ -655,6 +693,34 @@
         </ul>
       {/if}
     </section>
+
+    {#if terminQuellen > 0 || terminFehler.length > 0}
+      <section aria-labelledby="termine-titel">
+        <h2 id="termine-titel">Was ansteht</h2>
+        {#each terminFehler as f (f)}
+          <p class="hinweis">{f}</p>
+        {/each}
+        {#if termine.length === 0 && terminFehler.length === 0}
+          <p class="hinweis">In den nächsten 90 Tagen steht nichts im Kalender.</p>
+        {:else}
+          <ul class="einfache-liste">
+            {#each termine as t (t.datum + t.titel + (t.uhrzeit ?? ''))}
+              <li>
+                <span class="termin-datum">{datumText(t.datum)}</span>
+                <span class="hinweis rolle">{terminZeit(t)}</span>
+                <span class="referenz-ziel">{t.titel}</span>
+                {#if t.ort}<span class="hinweis rolle">{t.ort}</span>{/if}
+                {#if t.ungenau}
+                  <span class="hinweis rolle" title="Die Wiederholungsregel wird nicht ausgerechnet">
+                    wiederholt sich
+                  </span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
 
     <section aria-labelledby="zugaenge-titel">
       <div class="abschnitt-kopf">
@@ -1106,6 +1172,13 @@
   .faden-text {
     flex: 1;
     min-width: 10rem;
+  }
+  .klein {
+    font-size: 0.85rem;
+  }
+  .termin-datum {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .gegenseite {
     display: flex;

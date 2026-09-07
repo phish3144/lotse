@@ -235,6 +235,35 @@ export const forge = {
   abfragen: (projektId?: string) => invoke<ForgeErgebnis>('forge_abfragen', { projektId: projektId ?? null }),
 };
 
+export interface Termin {
+  titel: string;
+  /** JJJJ-MM-TT */
+  datum: string;
+  /** HH:MM, fehlt bei ganztägigen Terminen. */
+  uhrzeit?: string;
+  /** Die Uhrzeit steht im Kalender als UTC und wird nicht umgerechnet. */
+  utc: boolean;
+  ort?: string;
+  wiederholt: boolean;
+  /** Die Wiederholungsregel wird nicht ausgerechnet (z. B. „zweiter Montag im Monat“). */
+  ungenau: boolean;
+}
+
+export interface KalenderErgebnis {
+  quellen: string[];
+  termine: Termin[];
+  fehler: string[];
+}
+
+/**
+ * Kalender lesend: was für ein Projekt ansteht. Lotse schreibt keine Termine und
+ * kopiert sie nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
+ */
+export const kalender = {
+  termine: (projektId: string, tage?: number) =>
+    invoke<KalenderErgebnis>('kalender_termine', { projektId, tage: tage ?? null }),
+};
+
 export interface BeobachterStatus {
   laeuft: boolean;
   wurzeln: string[];

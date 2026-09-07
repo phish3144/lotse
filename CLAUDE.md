@@ -8,7 +8,7 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 
 | Pfad | Inhalt |
 |---|---|
-| `crates/lotse-core` | Rust-Kern: Modell, Krypto, Tresor, Sync-Umschläge, SQLCipher-Speicher, Erkennung, Git-Reader, Export. Feature `native` (Default) für alles mit Dateisystem; ohne Feature WASM-tauglich. |
+| `crates/lotse-core` | Rust-Kern: Modell, Krypto, Tresor, Sync-Umschläge, SQLCipher-Speicher, Erkennung, Git-Reader, Gegenseite (GitHub/GitLab), Kalender, KI-Ziel, Export. Feature `native` (Default) für alles mit Dateisystem; ohne Feature WASM-tauglich. |
 | `crates/lotse-cli` | Binary `lotse`: Schnellerfassung, Projekte, Tresor, Scan, Export. |
 | `apps/web` | Svelte 5 + Vite Oberfläche, läuft in Tauri und im Browser. `src/lib/data/provider.ts` ist die Schnittstelle; `tauri.ts` spricht den Kern, `mock.ts` liefert Beispieldaten im Browser. Zeitstempel werden nur in `tauri.ts` von Millisekunden zu ISO umgerechnet. |
 | `apps/desktop` | Tauri-2-Hülle: Kommandos in `src-tauri/src/lib.rs` spiegeln `apps/web/src/lib/data/provider.ts`. Braucht GTK/WebKit zum Bauen, wird nur in `release.yml` gebaut. |
@@ -28,7 +28,7 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 
 ## Regeln, die aus dem Bedrohungsmodell folgen
 
-- `ai`, `detect`, `export::spiegel`, `forge`, `git` und `watcher` importieren **nie**
+- `ai`, `detect`, `export::spiegel`, `forge`, `git`, `kalender` und `watcher` importieren **nie**
   aus `vault`. Nur `export::bundle`, die Oberfläche und die CLI dürfen Tresor-Werte lesen.
 - Keine eigenen Krypto-Primitive. Nur RustCrypto, `age`, `zeroize`. Änderungen an der
   Komposition erhöhen `FORMAT_VERSION` und werden in `THREAT_MODEL.md` protokolliert.

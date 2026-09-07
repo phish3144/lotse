@@ -539,6 +539,22 @@
   {/if}
 </section>
 
+<section aria-labelledby="kalender-titel">
+  <h2 id="kalender-titel">Kalender</h2>
+  <p class="hinweis">
+    Lotse liest Kalender, es führt keinen. Leg auf einer Projektseite unter <em>Referenzen</em> eine Referenz vom Typ
+    <em>URL</em> mit der Abonnement-Adresse an (endet auf <code>.ics</code> oder beginnt mit <code>webcal://</code>);
+    jeder gängige Dienst gibt so eine Adresse aus. Auf der Projektseite steht dann unter <em>Was ansteht</em>, was in
+    den nächsten 90 Tagen kommt. Termine wandern nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
+  </p>
+  <p class="hinweis klein">
+    Uhrzeiten zeigt Lotse so, wie sie im Kalender stehen; ohne Zeitzonendatenbank wäre jede Umrechnung geraten.
+    Wiederholungen rechnet es aus, solange die Regel einfach ist (täglich, wöchentlich, monatlich, jährlich, auch mit
+    Wochentagen). Bei komplizierteren Regeln – „zweiter Montag im Monat“ – steht nur der erste Termin und der Hinweis,
+    dass er sich wiederholt.
+  </p>
+</section>
+
 <section aria-labelledby="sync-titel">
   <h2 id="sync-titel">Abgleich zwischen Geräten</h2>
   {#if !echteDaten}

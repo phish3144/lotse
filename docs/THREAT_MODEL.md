@@ -127,8 +127,27 @@ innerhalb des Ciphertexts.)
 
 Der Tresor ist ein eigenes Modul in `lotse-core` (`vault`). Folgende Module haben
 **keinen** Import-Pfad dorthin, geprüft per Modulsichtbarkeit und CI-Lint:
-`watcher`, `detect`, `mcp`, `ai`, `export::mirror`, `export::site`.
+`watcher`, `detect`, `mcp`, `ai`, `forge`, `git`, `kalender`, `export::mirror`,
+`export::site`. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
+Module holen sie nie selbst.
 KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor dem Senden an.
+
+## 6a. Verbindungen nach außen
+
+Alle Abrufe (Sync-Dienst, GitHub, GitLab, Kalender, KI-Ziel) laufen über TLS mit dem
+Wurzelspeicher des Betriebssystems (`ureq` mit `native-certs`), nicht über eine im
+Programm mitgelieferte Liste. Das ist die Wahl, die Browser, `git` und `curl` auf
+demselben Rechner ebenfalls treffen: In Netzen mit TLS-Prüfung (Firmen-Proxy) hat der
+Betreiber ohnehin eine eigene CA im System, und eine mitgelieferte Liste würde Lotse dort
+schlicht ausfallen lassen, ohne etwas zu schützen. Wer diese CA kontrolliert, sieht die
+Abrufe bei GitHub, GitLab und dem Kalender samt der dabei gesendeten Token — dieselbe
+Lage wie für `git` selbst. Der Abgleich bleibt davon unberührt: Der Sync-Dienst bekommt
+nur Umschläge, deren Inhalt vor dem Senden verschlüsselt wird, und der Wiederherstellungs-
+und Kontoschlüssel verlässt das Gerät nie.
+
+Kehrseite, ausdrücklich: Auf einem System ohne eingerichteten Wurzelspeicher (manche
+minimalen Container) schlagen alle HTTPS-Abrufe fehl. Auf Desktop-Systemen — dem Ziel
+dieser App — gibt es diesen Fall nicht.
 
 ## 7. Betrieb und Konto-Sicherheit
 

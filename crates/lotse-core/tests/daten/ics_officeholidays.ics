@@ -1,0 +1,83 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Office Holidays Ltd.//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Germany Holidays
+X-WR-CALDESC:Public Holidays in Germany. Provided by http://www.officeholidays.com
+REFRESH-INTERVAL;VALUE=DURATION:PT48H
+X-PUBLISHED-TTL:PT48H
+X-MS-OLK-FORCEINSPECTOROPEN:TRUE
+BEGIN:VEVENT
+CLASS:PUBLIC
+UID:2026-01-01DE415regcountry@www.officeholidays.com
+CREATED:20260907T080000Z
+DESCRIPTION:New Year's Day is a public holiday in all countries that observe the Gregorian calendar, with the exception of Israel\n\n\n\nInformation provided by www.officeholidays.com
+URL:https://www.officeholidays.com/holidays/germany/international-new-years-day
+DTSTART;VALUE=DATE:20260101
+DTEND;VALUE=DATE:20260102
+DTSTAMP:20260101T000000Z
+LOCATION:Germany
+PRIORITY:5
+LAST-MODIFIED:20231112T000000Z
+SEQUENCE:1
+SUMMARY;LANGUAGE=en-us:Germany: New Year's Day
+TRANSP:OPAQUE
+X-MICROSOFT-CDO-BUSYSTATUS:BUSY
+X-MICROSOFT-CDO-IMPORTANCE:1
+X-MICROSOFT-DISALLOW-COUNTER:FALSE
+X-MS-OLK-ALLOWEXTERNCHECK:TRUE
+X-MS-OLK-AUTOFILLLOCATION:FALSE
+X-MICROSOFT-CDO-ALLDAYEVENT:TRUE
+X-MICROSOFT-MSNCALENDAR-ALLDAYEVENT:TRUE
+X-MS-OLK-CONFTYPE:0
+END:VEVENT
+BEGIN:VEVENT
+CLASS:PUBLIC
+UID:2026-01-06DE278regregion@www.officeholidays.com
+CREATED:20260907T080000Z
+DESCRIPTION:A major Christian celebration, Epiphany is celebrated on January 6th and commemorates the presentation of the infant Jesus to the Magi, or three wise men. In some countries, it may be known as Three Kings Day.\n\nBaden-Württemberg, Bavaria, Saxony-Anhalt\n\nInformation provided by www.officeholidays.com
+URL:https://www.officeholidays.com/holidays/germany/epiphany
+DTSTART;VALUE=DATE:20260106
+DTEND;VALUE=DATE:20260107
+DTSTAMP:20260106T000000Z
+LOCATION:Germany: Baden-Württemberg, Bavaria, Saxony-Anhalt
+PRIORITY:5
+LAST-MODIFIED:20230724T000000Z
+SEQUENCE:1
+SUMMARY;LANGUAGE=en-us:Germany: Three King's Day (Regional Holiday)
+TRANSP:OPAQUE
+X-MICROSOFT-CDO-BUSYSTATUS:BUSY
+X-MICROSOFT-CDO-IMPORTANCE:1
+X-MICROSOFT-DISALLOW-COUNTER:FALSE
+X-MS-OLK-ALLOWEXTERNCHECK:TRUE
+X-MS-OLK-AUTOFILLLOCATION:FALSE
+X-MICROSOFT-CDO-ALLDAYEVENT:TRUE
+X-MICROSOFT-MSNCALENDAR-ALLDAYEVENT:TRUE
+X-MS-OLK-CONFTYPE:0
+END:VEVENT
+BEGIN:VEVENT
+CLASS:PUBLIC
+UID:2026-03-08DE416regregion@www.officeholidays.com
+CREATED:20260907T080000Z
+DESCRIPTION:The UN has declared March 8th to be a day to celebrate, recognise and remember women\n\nBerlin, Mecklenburg-Vorpommern\n\nInformation provided by www.officeholidays.com
+URL:https://www.officeholidays.com/holidays/germany/international-womens-day
+DTSTART;VALUE=DATE:20260308
+DTEND;VALUE=DATE:20260309
+DTSTAMP:20260308T000000Z
+LOCATION:Germany: Berlin, Mecklenburg-Vorpommern
+PRIORITY:5
+LAST-MODIFIED:20250222T000000Z
+SEQUENCE:1
+SUMMARY;LANGUAGE=en-us:Germany: International Women's Day (Regional Holiday)
+TRANSP:OPAQUE
+X-MICROSOFT-CDO-BUSYSTATUS:BUSY
+X-MICROSOFT-CDO-IMPORTANCE:1
+X-MICROSOFT-DISALLOW-COUNTER:FALSE
+X-MS-OLK-ALLOWEXTERNCHECK:TRUE
+X-MS-OLK-AUTOFILLLOCATION:FALSE
+X-MICROSOFT-CDO-ALLDAYEVENT:TRUE
+X-MICROSOFT-MSNCALENDAR-ALLDAYEVENT:TRUE
+X-MS-OLK-CONFTYPE:0
+END:VEVENT
+END:VCALENDAR

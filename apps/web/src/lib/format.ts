@@ -28,7 +28,13 @@ export function tageText(tage: number): string {
 }
 
 export function datumText(iso: string): string {
-  return new Date(iso).toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+  // Ein reines Datum (JJJJ-MM-TT) ist ein Kalendertag, kein Zeitpunkt. `new Date` läse
+  // es als Mitternacht UTC; westlich davon stünde dann der Vortag da.
+  const nurDatum = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const d = nurDatum
+    ? new Date(Number(nurDatum[1]), Number(nurDatum[2]) - 1, Number(nurDatum[3]))
+    : new Date(iso);
+  return d.toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export const STATUS_LABEL: Record<ProjektStatus, string> = {

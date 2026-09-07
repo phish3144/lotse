@@ -42,6 +42,8 @@ pub struct AppState {
     home: Mutex<Option<PathBuf>>,
     sitzung: Mutex<Option<Sitzung>>,
     beobachter: Mutex<Option<BeobachterHandle>>,
+    /// Zuletzt geholte Kalender: Adresse → (Zeitpunkt, Inhalt). Nur im Arbeitsspeicher.
+    kalender: Mutex<std::collections::HashMap<String, (i64, String)>>,
 }
 
 type R<T> = Result<T, String>;
@@ -1313,6 +1315,112 @@ fn forge_faellig(state: &State<AppState>) -> bool {
     entscheidung.unwrap_or(false)
 }
 
+// ------------------------------------------------------------------ Kalender
+
+/// Wie lange ein geholter Kalender wiederverwendet wird, bevor er neu geladen wird.
+/// Termine ändern sich nicht im Minutentakt, und jeder Aufruf geht übers Netz.
+const KALENDER_FRISCHE_MS: i64 = 15 * 60 * 1000;
+
+#[derive(Serialize, Clone)]
+struct TerminAnzeige {
+    titel: String,
+    datum: String,
+    uhrzeit: Option<String>,
+    utc: bool,
+    ort: Option<String>,
+    /// Der Termin wiederholt sich; `false` heißt nicht, dass er einmalig ist, sondern
+    /// nur, dass keine Regel dranhängt.
+    wiederholt: bool,
+    /// Die Regel enthält Teile, die Lotse nicht ausrechnet – dann steht hier `true` und
+    /// die Oberfläche sagt es dazu, statt ein Datum zu behaupten.
+    ungenau: bool,
+}
+
+#[derive(Serialize, Clone)]
+struct KalenderErgebnis {
+    quellen: Vec<String>,
+    termine: Vec<TerminAnzeige>,
+    fehler: Vec<String>,
+}
+
+/// Heutiges Datum als `JJJJ-MM-TT`, aus derselben Uhr wie alle Zeitstempel.
+fn heute() -> String {
+    lotse_core::export::iso(now_ms())
+        .chars()
+        .take(10)
+        .collect()
+}
+
+/// Holt einen Kalender, aber höchstens alle 15 Minuten neu. Der Zwischenspeicher liegt
+/// im App-Zustand und ist nach dem Beenden weg – Termine gehören dem Kalender, nicht
+/// Lotse (siehe `kalender.rs`).
+fn kalender_holen(state: &State<AppState>, ziel: &str) -> lotse_core::Result<String> {
+    if let Ok(cache) = state.kalender.lock() {
+        if let Some((geholt, ics)) = cache.get(ziel) {
+            if now_ms() - geholt < KALENDER_FRISCHE_MS {
+                return Ok(ics.clone());
+            }
+        }
+    }
+    let ics = lotse_core::kalender::holen(ziel)?;
+    if let Ok(mut cache) = state.kalender.lock() {
+        cache.insert(ziel.to_string(), (now_ms(), ics.clone()));
+    }
+    Ok(ics)
+}
+
+/// Anstehende Termine eines Projekts aus seinen Kalender-Referenzen.
+#[tauri::command]
+fn kalender_termine(
+    state: State<AppState>,
+    projekt_id: String,
+    tage: Option<u32>,
+) -> R<KalenderErgebnis> {
+    let id = ulid(&projekt_id)?;
+    // Erst sammeln, dann holen: das Netz gehört nicht unter die Sperre.
+    let ziele: Vec<String> = mit(&state, |s| {
+        Ok(s.store
+            .referenzen(id)?
+            .into_iter()
+            .filter(|r| {
+                matches!(r.typ, ReferenzTyp::Url | ReferenzTyp::Datei)
+                    && lotse_core::kalender::ist_kalender(&r.ziel)
+            })
+            .map(|r| r.ziel)
+            .collect())
+    })?;
+
+    let von = heute();
+    let bis = lotse_core::kalender::tage_spaeter(&von, i64::from(tage.unwrap_or(90)));
+    let mut alle = Vec::new();
+    let mut fehler = Vec::new();
+    for ziel in &ziele {
+        match kalender_holen(&state, ziel).map(|ics| lotse_core::kalender::lesen(&ics)) {
+            Ok(t) => alle.extend(t),
+            Err(e) => fehler.push(format!("{ziel}: {e}")),
+        }
+    }
+
+    let termine = lotse_core::kalender::kommende(&alle, &von, &bis, 20)
+        .into_iter()
+        .map(|t| TerminAnzeige {
+            titel: t.titel,
+            datum: t.datum,
+            uhrzeit: t.uhrzeit,
+            utc: t.utc,
+            ort: t.ort,
+            wiederholt: t.wiederholung.is_some(),
+            ungenau: t.wiederholung.is_some_and(|r| !r.genau),
+        })
+        .collect();
+
+    Ok(KalenderErgebnis {
+        quellen: ziele,
+        termine,
+        fehler,
+    })
+}
+
 // ------------------------------------------------------------------ Geräte
 
 #[tauri::command]
@@ -1590,6 +1698,7 @@ pub fn run() {
             forge_auto_setzen,
             forge_projekt,
             forge_abfragen,
+            kalender_termine,
             oeffnen,
             tresor_liste,
             tresor_anlegen,
