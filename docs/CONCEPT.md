@@ -355,6 +355,7 @@ Monaten stabiler Nutzung.
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 2026-09-07 | Remote-Git lesend angebunden, obwohl der Auslöser aus `NON_GOALS.md` nicht eingetreten war. | Vom Nutzer priorisiert. Der Abruf schreibt eine verdichtete Zeile pro Repo, keine Aufgaben — Tickets und Backlogs bleiben ausgeschlossen. Der Token liegt im Tresor, das Modul `forge` liest ihn nie selbst. |
 | 2026-09-06 | Desktop-App ist das Hauptwerkzeug, Web-App ein vollwertiger Zweitclient. | Zugriff von fremden Rechnern ist Anforderung; Beobachter und OS-Integration gehen nur nativ. |
 | 2026-09-06 | Sync über eigene Engine mit Änderungsprotokoll statt Git. | Git merged Textzeilen, keine Datensätze; Binärdateien; Identität an GitHub gebunden; Historie im Klartext bei Dritten. |
 | 2026-09-06 | Ende-zu-Ende-Verschlüsselung, Server sieht nur Ciphertext. | Erledigt die Klartext-Frage, senkt Haftung, ist Verkaufsargument. |

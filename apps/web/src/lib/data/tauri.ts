@@ -166,6 +166,34 @@ export const exportieren = {
   bundle: (ziel: string, passphrase: string) => invoke<BundleBilanz>('export_bundle', { ziel, passphrase }),
 };
 
+export interface ForgeProjekt {
+  projekt_id: string;
+  titel: string;
+  repo: string;
+}
+
+export interface ForgeStatus {
+  projekte: ForgeProjekt[];
+  token_eintrag?: string;
+  token_feld?: string;
+}
+
+export interface ForgeErgebnis {
+  abgefragt: number;
+  notizen: number;
+  fehler: string[];
+}
+
+/**
+ * Remote-Git: liest offene Pull Requests, Issue-Zahl und Prüflauf-Status von GitHub.
+ * Der Token liegt im Tresor; hier steht nur, in welchem Eintrag.
+ */
+export const forge = {
+  status: () => invoke<ForgeStatus>('forge_status'),
+  tokenSetzen: (eintragId: string, feld: string) => invoke<void>('forge_token_setzen', { eintragId, feld }),
+  abfragen: (projektId?: string) => invoke<ForgeErgebnis>('forge_abfragen', { projektId: projektId ?? null }),
+};
+
 export interface BeobachterStatus {
   laeuft: boolean;
   wurzeln: string[];

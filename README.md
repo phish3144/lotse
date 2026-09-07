@@ -22,6 +22,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter | läuft, in der CLI (`lotse beobachten`) und in der Desktop-App |
 | MCP-Server (`lotse mcp`) | läuft |
+| Remote-Git (GitHub: offene PRs, Issue-Zahl, Prüflauf) | läuft im Kern und in der App; GitLab folgt |
 | WebAssembly-Client für den Browser | offen |
 
 ## Ausprobieren (CLI)

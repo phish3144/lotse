@@ -22,6 +22,8 @@ pub mod detect;
 #[cfg(feature = "native")]
 pub mod export;
 #[cfg(feature = "native")]
+pub mod forge;
+#[cfg(feature = "native")]
 pub mod git;
 #[cfg(feature = "native")]
 pub mod konto;

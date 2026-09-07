@@ -821,6 +821,145 @@ fn beobachter_stoppen(state: State<AppState>) -> R<()> {
     Ok(())
 }
 
+// --------------------------------------------------------------- Remote-Git
+
+/// Wo der GitHub-Token liegt: Kennung eines Tresor-Eintrags und Feldname. Der Token
+/// selbst steht nie hier, nur der Zeiger darauf.
+const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
+const META_FORGE_FELD: &str = "forge_token_feld";
+
+#[derive(Serialize)]
+struct ForgeProjekt {
+    projekt_id: String,
+    titel: String,
+    repo: String,
+}
+
+#[derive(Serialize)]
+struct ForgeStatus {
+    /// Projekte mit einer erkannten GitHub-Referenz.
+    projekte: Vec<ForgeProjekt>,
+    token_eintrag: Option<String>,
+    token_feld: Option<String>,
+}
+
+/// Sucht zu jedem Projekt die erste Referenz, die auf GitHub zeigt.
+fn forge_zeiger(
+    s: &mut Sitzung,
+) -> lotse_core::Result<Vec<(Projekt, lotse_core::forge::RepoZeiger)>> {
+    let mut out = Vec::new();
+    for p in s.store.projekte()? {
+        let treffer = s
+            .store
+            .referenzen(p.id)?
+            .into_iter()
+            .find_map(|r| lotse_core::forge::RepoZeiger::erkennen(&r.ziel));
+        if let Some(z) = treffer {
+            out.push((p, z));
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+fn forge_status(state: State<AppState>) -> R<ForgeStatus> {
+    mit(&state, |s| {
+        let projekte = forge_zeiger(s)?
+            .into_iter()
+            .map(|(p, z)| ForgeProjekt {
+                projekt_id: p.id.to_string(),
+                titel: p.titel,
+                repo: z.anzeige(),
+            })
+            .collect();
+        Ok(ForgeStatus {
+            projekte,
+            token_eintrag: s.store.meta_get(META_FORGE_EINTRAG)?,
+            token_feld: s.store.meta_get(META_FORGE_FELD)?,
+        })
+    })
+}
+
+/// Merkt sich, welcher Tresor-Eintrag den Token hält. Leere Kennung löst die Bindung.
+#[tauri::command]
+fn forge_token_setzen(state: State<AppState>, eintrag_id: String, feld: String) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_FORGE_EINTRAG, eintrag_id.trim())?;
+        s.store.meta_set(META_FORGE_FELD, feld.trim())?;
+        Ok(())
+    })
+}
+
+#[derive(Serialize)]
+struct ForgeErgebnis {
+    abgefragt: usize,
+    notizen: usize,
+    fehler: Vec<String>,
+}
+
+/// Fragt den Stand bei GitHub ab und schreibt je Projekt höchstens eine Notiz.
+/// Ohne `projekt_id` alle Projekte mit GitHub-Referenz.
+#[tauri::command]
+fn forge_abfragen(state: State<AppState>, projekt_id: Option<String>) -> R<ForgeErgebnis> {
+    let nur = match projekt_id.as_deref().filter(|s| !s.is_empty()) {
+        Some(p) => Some(ulid(p)?),
+        None => None,
+    };
+
+    // Den Token einmal holen. Der Tresor-Zugriff passiert hier in der Hülle; das
+    // Modul `forge` bekommt ihn hereingereicht (siehe CLAUDE.md).
+    let token = mit(&state, |s| {
+        let Some(id) = s
+            .store
+            .meta_get(META_FORGE_EINTRAG)?
+            .filter(|v| !v.is_empty())
+        else {
+            return Ok(None);
+        };
+        let feld = s
+            .store
+            .meta_get(META_FORGE_FELD)?
+            .unwrap_or_else(|| "token".to_string());
+        let Ok(uid) = Ulid::from_string(&id) else {
+            return Ok(None);
+        };
+        let Some(e) = s.store.tresor_eintrag(uid)? else {
+            return Ok(None);
+        };
+        Ok(Some(e.feld_lesen(&s.vault, &feld)?.to_string()))
+    })?;
+
+    let ziele = mit(&state, forge_zeiger)?;
+    let ziele: Vec<_> = ziele
+        .into_iter()
+        .filter(|(p, _)| nur.is_none_or(|id| p.id == id))
+        .collect();
+
+    let mut notizen = 0usize;
+    let mut fehler = Vec::new();
+    let mut abgefragt = 0usize;
+
+    for (p, z) in ziele {
+        // Ohne gehaltene Sperre abfragen: das geht übers Netz und dauert.
+        match lotse_core::forge::abfragen(&z, token.as_deref()) {
+            Ok(stand) => {
+                abgefragt += 1;
+                if let Some(n) = lotse_core::forge::notiz(p.id, &z, &stand, now_ms()) {
+                    mit(&state, |s| s.store.notiz_speichern(&n))?;
+                    notizen += 1;
+                }
+            }
+            Err(e) => fehler.push(format!("{}: {e}", z.anzeige())),
+        }
+    }
+
+    Ok(ForgeErgebnis {
+        abgefragt,
+        notizen,
+        fehler,
+    })
+}
+
 // ------------------------------------------------------------------ Geräte
 
 #[tauri::command]
@@ -1088,6 +1227,9 @@ pub fn run() {
             beobachter_status,
             beobachter_starten,
             beobachter_stoppen,
+            forge_status,
+            forge_token_setzen,
+            forge_abfragen,
             oeffnen,
             tresor_liste,
             tresor_anlegen,

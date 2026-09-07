@@ -1,0 +1,18 @@
+[
+  {
+    "url": "https://api.github.com/repos/beispiel/repo/pulls/42",
+    "number": 42,
+    "state": "open",
+    "title": "Sync-Client: Wiederverbinden nach Netzwechsel",
+    "draft": false,
+    "user": { "login": "jemand" }
+  },
+  {
+    "url": "https://api.github.com/repos/beispiel/repo/pulls/43",
+    "number": 43,
+    "state": "open",
+    "title": "Landing Page überarbeiten",
+    "draft": true,
+    "user": { "login": "jemand" }
+  }
+]

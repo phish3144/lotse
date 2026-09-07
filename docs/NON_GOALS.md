@@ -37,7 +37,6 @@ Ein Feature kommt nur ins Produkt, wenn alle drei Fragen mit Ja beantwortet sind
 | Semantische Suche, Embeddings | Volltextsuche findet nachweislich nicht mehr |
 | KI-Verdichtung des Briefs | Brief regelmäßig länger als ein Bildschirm |
 | ICS-Kalender lesend | ein terminlastiges Projekt existiert real |
-| Remote-Git (Issues, PRs) per Polling | lokaler Git-Log reicht nachweislich nicht |
 | Proton-Pass-CLI-Anbindung | Verweise werden häufig angeklickt und nerven |
 | Rückfluss aus dem Klartext-Spiegel | Spiegel wird regelmäßig extern bearbeitet |
 | Native Mobile-App | sechs Monate stabile Desktop- und Web-Nutzung |
@@ -47,6 +46,12 @@ Ein Feature kommt nur ins Produkt, wenn alle drei Fragen mit Ja beantwortet sind
 | Browser-Extension, VS-Code-Extension | nie geplant; CLI und MCP decken die Fälle ab |
 | Notion-/Trello-/Obsidian-Import | nie geplant; Ordner-Erkennung ist der Import |
 | Webhook-Engine mit Mapping-UI | nie geplant |
+
+## Vorzeitig aufgenommen
+
+| Feature | Auslöser laut Liste | Warum trotzdem |
+|---|---|---|
+| Remote-Git (Issues, PRs, Prüflauf) per Abruf | „lokaler Git-Log reicht nachweislich nicht“ | Ausdrücklich vom Nutzer priorisiert, bevor der Auslöser eingetreten war. Bewusst überschrieben, nicht übersehen. Der Aufnahmetest ist dabei eingehalten: Frage 1 ja (Faden halten), Frage 2 ja (kein Pflegeaufwand, ein Knopf), Frage 3 nein. Issues werden **nicht** zu offenen Fäden — sonst wäre es die Ticketliste, die dauerhaft ausgeschlossen bleibt. |
 
 ## Abbruchkriterium
 

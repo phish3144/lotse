@@ -6,10 +6,12 @@
   import {
     beobachter,
     exportieren,
+    forge,
     konto,
     sync,
     system,
     type BeobachterStatus,
+    type ForgeStatus,
     type GeraetInfo,
     type KontoStatus,
     type SyncErgebnis,
@@ -112,6 +114,44 @@
     }
   }
 
+  // --- Remote-Git -----------------------------------------------------------
+  let forgeStatus: ForgeStatus | null = $state(null);
+  let tresorEintraege: { id: string; titel: string; felder: { name: string }[] }[] = $state([]);
+  let forgeEintrag = $state('');
+  let forgeFeld = $state('token');
+  let forgeLaeuft = $state(false);
+
+  async function forgeVerbinden(e: Event) {
+    e.preventDefault();
+    try {
+      await forge.tokenSetzen(forgeEintrag, forgeFeld.trim() || 'token');
+      forgeStatus = await forge.status();
+      meldungen.zeigen(forgeEintrag ? 'Token hinterlegt.' : 'Token-Bindung gelöst.');
+    } catch (e2) {
+      meldungen.fehler(e2);
+    }
+  }
+
+  async function forgeAbfragen() {
+    forgeLaeuft = true;
+    try {
+      const r = await forge.abfragen();
+      datenVersion.bump();
+      for (const f of r.fehler) meldungen.zeigen(f, 'fehler');
+      if (r.fehler.length === 0 || r.abgefragt > 0) {
+        meldungen.zeigen(
+          r.notizen > 0
+            ? `${r.abgefragt} Repos abgefragt, ${r.notizen} ${r.notizen === 1 ? 'Notiz' : 'Notizen'} geschrieben.`
+            : `${r.abgefragt} Repos abgefragt, nichts Neues zu melden.`,
+        );
+      }
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      forgeLaeuft = false;
+    }
+  }
+
   // --- Konto, Abgleich, Geräte ---------------------------------------------
   let kontoStatus: KontoStatus | null = $state(null);
   let syncStatus: SyncStatus | null = $state(null);
@@ -132,6 +172,10 @@
       syncStatus = await sync.status();
       beoStatus = await beobachter.status();
       geraete = syncStatus.eingerichtet ? await sync.geraete() : [];
+      forgeStatus = await forge.status();
+      forgeEintrag = forgeStatus.token_eintrag ?? '';
+      forgeFeld = forgeStatus.token_feld ?? 'token';
+      tresorEintraege = await provider.listAllVaultEntries();
     } catch (e) {
       meldungen.fehler(e);
     }
@@ -298,6 +342,48 @@
     </p>
   {:else}
     <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {/if}
+</section>
+
+<section aria-labelledby="forge-titel">
+  <h2 id="forge-titel">GitHub</h2>
+  <p class="hinweis">
+    Holt zu Projekten mit einer GitHub-Referenz, was der lokale Git-Log nicht weiß: offene Pull Requests, die Zahl
+    offener Issues und ob der Prüflauf rot ist. Das landet als eine verdichtete Zeile im Logbuch – Issues werden
+    <strong>nicht</strong> zu offenen Fäden, denn Tickets und Backlogs sind erklärtes Nicht-Ziel.
+  </p>
+  {#if !echteDaten}
+    <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {:else if !forgeStatus}
+    <p class="hinweis">Lade Status…</p>
+  {:else if forgeStatus.projekte.length === 0}
+    <p class="hinweis">
+      Kein Projekt hat bisher eine GitHub-Referenz. Leg auf einer Projektseite unter <em>Referenzen</em> eine an –
+      Typ <em>Git-Repo</em> oder <em>URL</em>, Ziel etwa <code>https://github.com/name/repo</code>.
+    </p>
+  {:else}
+    <ul class="repos">
+      {#each forgeStatus.projekte as p (p.projekt_id)}
+        <li><a href={`#/projekt/${p.projekt_id}`}>{p.titel}</a> <span class="hinweis klein">{p.repo}</span></li>
+      {/each}
+    </ul>
+    <form class="zeile" onsubmit={forgeVerbinden}>
+      <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem Token">
+        <option value="">Ohne Token (nur öffentliche Repos, 60 Anfragen/Stunde)</option>
+        {#each tresorEintraege as t (t.id)}
+          <option value={t.id}>{t.titel}</option>
+        {/each}
+      </select>
+      <input bind:value={forgeFeld} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
+      <button type="submit">Merken</button>
+    </form>
+    <p class="hinweis klein">
+      Für private Repos und ein größeres Kontingent: einen GitHub-Token als Tresor-Eintrag anlegen und hier wählen.
+      Lotse liest ihn nur beim Abfragen und gibt ihn nur an GitHub weiter.
+    </p>
+    <button type="button" class="primaer" onclick={forgeAbfragen} disabled={forgeLaeuft}>
+      {forgeLaeuft ? 'Frage ab …' : 'Jetzt abfragen'}
+    </button>
   {/if}
 </section>
 
@@ -618,6 +704,29 @@
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     overflow-wrap: anywhere;
+  }
+  .repos {
+    list-style: none;
+    margin: 0.8rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.92rem;
+  }
+  select {
+    font: inherit;
+    color: inherit;
+    background: var(--hintergrund);
+    border: 1px solid var(--rahmen);
+    border-radius: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    flex: 1;
+    min-width: 14rem;
+  }
+  .schmal {
+    flex: 0 0 9rem;
+    min-width: 0;
   }
   .ergebnis {
     margin-top: 0.7rem;
