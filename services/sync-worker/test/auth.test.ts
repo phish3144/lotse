@@ -127,6 +127,8 @@ describe("auth", () => {
         new_salt: "bmV3LXNhbHQ=",
         new_kdf: { m: 65536, t: 4, p: 1 },
         wrapped_account_key: requestBody.wrapped_account_key,
+        recovery_auth_key: requestBody.recovery_auth_key,
+        wrapped_account_key_recovery: requestBody.wrapped_account_key_recovery,
       }),
     });
     expect(changeRes.status).toBe(204);
@@ -136,6 +138,67 @@ describe("auth", () => {
 
     const currentAfter = await api("/v1/devices", { token: currentSession });
     expect(currentAfter.status).toBe(200);
+  });
+
+  it("keeps recovery working after a password change", async () => {
+    // Das Recovery-Wrapping haengt am Salt. Wechselt der Salt beim Passwortwechsel,
+    // muessen Wrapping und recovery_auth_key mitwandern -- sonst bekaeme
+    // /auth/recover einen neuen Salt zu einem alten Wrapping und die
+    // Wiederherstellung schluege fehl, gemerkt erst wenn das Passwort weg ist.
+    const { requestBody, session_token: sessionToken } = await registerAccount();
+
+    const neuerRecoveryAuthKey = "bmV1ZXItcmVjb3ZlcnktYXV0aC1rZXktMzJieXRlcw==";
+    const neuesWrapping = "bmV1ZXMtcmVjb3Zlcnktd3JhcHBpbmc=";
+    const neuerSalt = "bmV1ZXItc2FsdC1uYWNoLXdlY2hzZWw=";
+
+    const changeRes = await api("/v1/auth/password", {
+      method: "POST",
+      token: sessionToken,
+      body: JSON.stringify({
+        old_auth_key: requestBody.auth_key,
+        new_auth_key: "bmV3LWF1dGgta2V5LWZvci10ZXN0aW5nLTMyYg==",
+        new_salt: neuerSalt,
+        new_kdf: { m: 65536, t: 4, p: 1 },
+        wrapped_account_key: requestBody.wrapped_account_key,
+        recovery_auth_key: neuerRecoveryAuthKey,
+        wrapped_account_key_recovery: neuesWrapping,
+      }),
+    });
+    expect(changeRes.status).toBe(204);
+
+    // Der alte Code oeffnet nicht mehr.
+    const alt = await api("/v1/auth/recover", {
+      method: "POST",
+      body: JSON.stringify({ email: requestBody.email, recovery_auth_key: requestBody.recovery_auth_key }),
+    });
+    expect(alt.status).toBe(401);
+
+    // Der neue schon, und zwar mit zusammenpassendem Salt und Wrapping.
+    const res = await api("/v1/auth/recover", {
+      method: "POST",
+      body: JSON.stringify({ email: requestBody.email, recovery_auth_key: neuerRecoveryAuthKey }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.wrapped_account_key_recovery).toBe(neuesWrapping);
+    expect(body.salt).toBe(neuerSalt);
+  });
+
+  it("rejects a password change that would strand the recovery code", async () => {
+    const { requestBody, session_token: sessionToken } = await registerAccount();
+    const res = await api("/v1/auth/password", {
+      method: "POST",
+      token: sessionToken,
+      body: JSON.stringify({
+        old_auth_key: requestBody.auth_key,
+        new_auth_key: "bmV3LWF1dGgta2V5LWZvci10ZXN0aW5nLTMyYg==",
+        new_salt: "bmV3LXNhbHQ=",
+        new_kdf: { m: 65536, t: 4, p: 1 },
+        wrapped_account_key: requestBody.wrapped_account_key,
+        // recovery_auth_key und wrapped_account_key_recovery fehlen
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 
   it("recover returns the wrapped recovery key for a valid recovery_auth_key", async () => {

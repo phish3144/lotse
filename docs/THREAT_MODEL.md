@@ -144,3 +144,9 @@ KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor d
 | `FORMAT_VERSION` | Datum | Inhalt |
 |---|---|---|
 | 1 | 2026-09-06 | Hierarchie wie oben. |
+
+## 9. Behobene Mängel
+
+| Datum | Mangel | Behebung |
+|---|---|---|
+| 2026-09-07 | **Passwortwechsel entwertete den Wiederherstellungscode.** Der Recovery Key wird aus dem Wiederherstellungscode **und dem Salt** abgeleitet. `passwort_wechseln` zog einen neuen Salt, ließ `wrapped_account_key_recovery` aber unverändert; im Dienst schrieb `/auth/password` denselben neuen Salt, ohne Wrapping und `recovery_auth_hash` mitzuziehen. Danach lieferte `/auth/recover` einen neuen Salt zu einem alten Wrapping: der Code öffnete das Konto nicht mehr. Bemerkt hätte man es erst, wenn das Passwort weg ist. | `passwort_wechseln` verankert das Recovery-Wrapping am neuen Salt und verlangt dafür `RecoveryWechsel`: entweder den bisherigen Code (wird vorher gegen den alten Header geprüft, damit ein Tippfehler nicht stillschweigend zum neuen Code wird) oder einen neu erzeugten, der einmal angezeigt wird. `/auth/password` verlangt `recovery_auth_key` und `wrapped_account_key_recovery` als Pflichtfelder. Keine Änderung an der Komposition, deshalb bleibt `FORMAT_VERSION = 1` und bestehende Konten öffnen weiter. Tests: `wiederherstellung_ueberlebt_passwortwechsel`, `passwortwechsel_mit_neuem_code_entwertet_den_alten`, `passwortwechsel_lehnt_falschen_code_ab`, `keeps recovery working after a password change`. |

@@ -170,14 +170,29 @@ export async function updateAccountPassword(
     kdfT: number;
     kdfP: number;
     wrappedAccountKey: string;
+    // Das Recovery-Wrapping haengt am Salt. Wechselt der Salt, muss es mitwandern,
+    // sonst liefert /auth/recover einen neuen Salt zu einem alten Wrapping.
+    recoveryAuthHash: string;
+    wrappedAccountKeyRecovery: string;
   },
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE accounts SET auth_hash = ?, salt = ?, kdf_m = ?, kdf_t = ?, kdf_p = ?, wrapped_account_key = ?
+      `UPDATE accounts SET auth_hash = ?, salt = ?, kdf_m = ?, kdf_t = ?, kdf_p = ?, wrapped_account_key = ?,
+        recovery_auth_hash = ?, wrapped_account_key_recovery = ?
        WHERE id = ?`,
     )
-    .bind(account.authHash, account.salt, account.kdfM, account.kdfT, account.kdfP, account.wrappedAccountKey, account.id)
+    .bind(
+      account.authHash,
+      account.salt,
+      account.kdfM,
+      account.kdfT,
+      account.kdfP,
+      account.wrappedAccountKey,
+      account.recoveryAuthHash,
+      account.wrappedAccountKeyRecovery,
+      account.id,
+    )
     .run();
 }
 

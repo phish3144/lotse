@@ -247,6 +247,10 @@ export async function changePassword({ request, env, auth }: RequestContext): Pr
   const newSalt = requireString(body, "new_salt");
   const newKdf = requireKdf(body, "new_kdf");
   const wrappedAccountKey = requireString(body, "wrapped_account_key");
+  // Pflicht: der Client rechnet das Recovery-Wrapping mit dem neuen Salt neu. Ohne das
+  // passt der gespeicherte Wiederherstellungscode nicht mehr zum Konto.
+  const newRecoveryAuthKey = requireString(body, "recovery_auth_key");
+  const wrappedAccountKeyRecovery = requireString(body, "wrapped_account_key_recovery");
 
   const account = await getAccountById(env.DB, auth.accountId);
   if (!account) throw unauthorized("invalid session");
@@ -255,6 +259,7 @@ export async function changePassword({ request, env, auth }: RequestContext): Pr
     throw unauthorized("old_auth_key does not match", "invalid_credentials");
   }
   const newHash = await hashSecret(newAuthKey);
+  const newRecoveryHash = await hashSecret(newRecoveryAuthKey);
 
   await updateAccountPassword(env.DB, {
     id: account.id,
@@ -264,6 +269,8 @@ export async function changePassword({ request, env, auth }: RequestContext): Pr
     kdfT: newKdf.t,
     kdfP: newKdf.p,
     wrappedAccountKey,
+    recoveryAuthHash: newRecoveryHash,
+    wrappedAccountKeyRecovery,
   });
   // "widerruft alle anderen Sitzungen" -- every session except the one used
   // to make this very request.

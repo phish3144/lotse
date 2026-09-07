@@ -474,21 +474,69 @@ pub fn konto_wiederherstellen(header: &KontoHeader, code: &RecoveryCode) -> Resu
 }
 
 /// Neues Passwort setzen: nur das Wrapping wird erneuert, keine Neuverschlüsselung.
+/// Wie das Recovery-Wrapping beim Passwortwechsel neu verankert wird.
+///
+/// Es hängt am Salt, und der Salt wechselt mit dem Passwort. Deshalb muss es bei jedem
+/// Wechsel neu berechnet werden – sonst öffnet der Wiederherstellungscode das Konto
+/// danach nicht mehr, und das fällt erst auf, wenn das Passwort weg ist.
+pub enum RecoveryWechsel<'a> {
+    /// Bisherigen Code behalten. Der Aufrufer muss ihn abfragen; er wird gegen den alten
+    /// Header geprüft, bevor damit neu gewrappt wird.
+    Behalten(&'a RecoveryCode),
+    /// Neuen Code erzeugen. Der bisherige gilt danach nicht mehr und der neue muss einmal
+    /// angezeigt werden.
+    Neu,
+}
+
+/// Ergebnis eines Passwortwechsels. `recovery_auth_key` ändert sich immer mit, weil er
+/// aus dem salzabhängigen Recovery Key stammt – der Dienst muss ihn neu speichern.
+pub struct Passwortwechsel {
+    pub header: KontoHeader,
+    pub auth_key: Key32,
+    pub recovery_auth_key: Key32,
+    /// Gesetzt, wenn ein neuer Code erzeugt wurde. Dann einmal anzeigen.
+    pub neuer_code: Option<RecoveryCode>,
+}
+
 pub fn passwort_wechseln(
     header: &KontoHeader,
     account_key: &Key32,
     new_password: &[u8],
-) -> Result<(KontoHeader, Key32)> {
+    recovery: RecoveryWechsel<'_>,
+) -> Result<Passwortwechsel> {
+    // Einen behaltenen Code erst gegen den alten Header prüfen. Ein Tippfehler würde sonst
+    // stillschweigend zum neuen Code – der aufgeschriebene wäre wertlos.
+    let (code, neuer_code) = match recovery {
+        RecoveryWechsel::Behalten(c) => {
+            konto_wiederherstellen(header, c)?;
+            (c.clone(), None)
+        }
+        RecoveryWechsel::Neu => {
+            let c = RecoveryCode::generate()?;
+            (c.clone(), Some(c))
+        }
+    };
+
     let salt = random_salt()?;
     let stretched = derive_stretched(new_password, &salt, &header.kdf)?;
     let pk = split_password_keys(&stretched);
+    let recovery_key = code.derive_key(&salt, &header.kdf)?;
+
     let mut neu = header.clone();
     neu.salt = salt.to_vec();
     neu.wrapped_account_key = wrap_key(&pk.wrap, &aad_account_key("password"), account_key)?;
-    // Das Recovery-Wrapping hängt am Salt; deshalb muss es mit neuem Salt neu berechnet
-    // werden. Dafür braucht es den Code – der Aufrufer muss ihn abfragen. Bis dahin bleibt
-    // das alte Recovery-Wrapping mit dem alten Salt gültig; wir bewahren es samt Salt auf.
-    Ok((neu, pk.auth))
+    neu.wrapped_account_key_recovery = Some(wrap_key(
+        &recovery_key,
+        &aad_account_key("recovery"),
+        account_key,
+    )?);
+
+    Ok(Passwortwechsel {
+        header: neu,
+        auth_key: pk.auth,
+        recovery_auth_key: recovery_auth_key(&recovery_key),
+        neuer_code,
+    })
 }
 
 #[cfg(test)]
@@ -526,12 +574,89 @@ mod tests {
     }
 
     #[test]
+    fn wiederherstellung_ueberlebt_passwortwechsel() {
+        // Der Wiederherstellungscode muss auch nach einem Passwortwechsel noch öffnen.
+        // Sonst merkt man den Verlust erst, wenn das Passwort weg ist – im schlechtesten
+        // denkbaren Moment.
+        let konto = konto_einrichten(b"alt", KdfParams::schnell_fuer_tests()).unwrap();
+        let code = RecoveryCode::parse(&konto.recovery_code.display()).unwrap();
+        let w = passwort_wechseln(
+            &konto.header,
+            &konto.account_key,
+            b"neues passwort",
+            RecoveryWechsel::Behalten(&code),
+        )
+        .unwrap();
+        assert!(w.neuer_code.is_none());
+        let ak = konto_wiederherstellen(&w.header, &code).unwrap();
+        assert_eq!(ak.as_bytes(), konto.account_key.as_bytes());
+    }
+
+    #[test]
+    fn passwortwechsel_mit_neuem_code_entwertet_den_alten() {
+        let konto = konto_einrichten(b"alt", KdfParams::schnell_fuer_tests()).unwrap();
+        let alt = RecoveryCode::parse(&konto.recovery_code.display()).unwrap();
+        let w = passwort_wechseln(
+            &konto.header,
+            &konto.account_key,
+            b"neues passwort",
+            RecoveryWechsel::Neu,
+        )
+        .unwrap();
+        let frisch = w
+            .neuer_code
+            .as_ref()
+            .expect("neuer Code muss geliefert werden");
+        assert_eq!(
+            konto_wiederherstellen(&w.header, frisch)
+                .unwrap()
+                .as_bytes(),
+            konto.account_key.as_bytes()
+        );
+        assert!(konto_wiederherstellen(&w.header, &alt).is_err());
+    }
+
+    #[test]
+    fn passwortwechsel_lehnt_falschen_code_ab() {
+        // Ein Tippfehler darf nicht stillschweigend zum neuen Code werden.
+        let konto = konto_einrichten(b"alt", KdfParams::schnell_fuer_tests()).unwrap();
+        let falsch = RecoveryCode::generate().unwrap();
+        assert!(passwort_wechseln(
+            &konto.header,
+            &konto.account_key,
+            b"neu",
+            RecoveryWechsel::Behalten(&falsch)
+        )
+        .is_err());
+    }
+
+    #[test]
     fn passwortwechsel_behaelt_account_key() {
         let konto = konto_einrichten(b"alt", KdfParams::schnell_fuer_tests()).unwrap();
-        let (neu, _) = passwort_wechseln(&konto.header, &konto.account_key, b"neu").unwrap();
-        let (ak, _) = konto_entsperren(&neu, b"neu").unwrap();
+        let code = RecoveryCode::parse(&konto.recovery_code.display()).unwrap();
+        let w = passwort_wechseln(
+            &konto.header,
+            &konto.account_key,
+            b"neu",
+            RecoveryWechsel::Behalten(&code),
+        )
+        .unwrap();
+        let (ak, _) = konto_entsperren(&w.header, b"neu").unwrap();
         assert_eq!(ak.as_bytes(), konto.account_key.as_bytes());
-        assert!(konto_entsperren(&neu, b"alt").is_err());
+        assert!(konto_entsperren(&w.header, b"alt").is_err());
+        // Der Auth-Schlüssel für den Dienst wandert mit dem Salt mit.
+        assert_ne!(
+            w.recovery_auth_key.as_bytes(),
+            recovery_auth_key(
+                &code
+                    .derive_key(
+                        konto.header.salt.as_slice().try_into().unwrap(),
+                        &konto.header.kdf
+                    )
+                    .unwrap()
+            )
+            .as_bytes()
+        );
     }
 
     #[test]
