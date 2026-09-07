@@ -23,7 +23,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | Ordner-Beobachter | läuft, in der CLI (`lotse beobachten`) und in der Desktop-App |
 | MCP-Server (`lotse mcp`) | läuft |
 | Remote-Git (GitHub und GitLab: offene PRs/MRs, Issue-Zahl, Prüflauf) | läuft im Kern, in der App und in der CLI (`lotse gegenseite`) |
-| KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App |
+| KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App; standardmäßig aus, Verbrauch und Protokoll sichtbar |
 | Kalender lesend (iCalendar/.ics, auch `webcal://`) | läuft im Kern, in der App und in der CLI (`lotse termine`) |
 | Update-Hinweis (neue Version erkennen, Datei fürs System nennen) | läuft in der App und in der CLI (`lotse update`); lädt bewusst nichts herunter |
 | WebAssembly-Client für den Browser | offen |
@@ -73,7 +73,9 @@ Vollständig, damit nichts überrascht. Alles andere passiert nur auf Knopfdruck
 | Beim Abgleich | Der eingerichtete Sync-Dienst | ja, kein Abgleich eingerichtet = keine Verbindung |
 
 Die KI-Verdichtung sendet nur, wenn jemand auf *Senden* drückt, und zeigt vorher den
-vollständigen Text. Telemetrie gibt es nicht, auch keine anonyme.
+vollständigen Text. Was dabei gesendet wurde – wann, wohin, wie viel –, steht unter
+*Einstellungen → KI-Verdichtung*; der Text selbst wird nicht aufbewahrt. Telemetrie gibt
+es nicht, auch keine anonyme.
 
 ## Ausprobieren (CLI)
 

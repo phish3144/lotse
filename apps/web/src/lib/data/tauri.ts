@@ -194,9 +194,28 @@ export const ki = {
   zielSetzen: (basisUrl: string, modell: string, schluesselEintrag: string, schluesselFeld: string) =>
     invoke<void>('ki_ziel_setzen', { basisUrl, modell, schluesselEintrag, schluesselFeld }),
   modelle: (basisUrl: string) => invoke<string[]>('ki_modelle', { basisUrl }),
-  anfrageText: (projektId: string) => invoke<string>('ki_anfrage_text', { projektId }),
-  verdichten: (eingabe: string) => invoke<string>('ki_verdichten', { eingabe }),
+  verbrauch: () => invoke<KiVerbrauch>('ki_verbrauch'),
+  verbrauchLoeschen: () => invoke<void>('ki_verbrauch_loeschen'),
 };
+
+export interface KiProtokollEintrag {
+  ts: number;
+  zweck: string;
+  /** Nur der Host, nicht die vollständige Adresse. */
+  ziel: string;
+  modell: string;
+  /** Umfang des Gesendeten. Der Text selbst wird nicht aufbewahrt. */
+  zeichen: number;
+  eingabe_token?: number;
+  ausgabe_token?: number;
+}
+
+export interface KiVerbrauch {
+  anfragen: number;
+  eingabe_token: number;
+  ausgabe_token: number;
+  protokoll: KiProtokollEintrag[];
+}
 
 export interface ForgeProjekt {
   projekt_id: string;
@@ -437,6 +456,12 @@ export function createTauriProvider(): DataProvider {
     },
     async confirmCandidate(candidateId, titel) {
       return projekt(await invoke<RohProjekt>('kandidat_uebernehmen', { pfad: candidateId, titel: titel ?? null }));
+    },
+    async kiAnfrageText(projectId) {
+      return invoke<string>('ki_anfrage_text', { projektId: projectId });
+    },
+    async kiVerdichten(eingabe, zweck) {
+      return invoke<string>('ki_verdichten', { eingabe, zweck: zweck ?? null });
     },
     async rejectCandidate(candidateId) {
       await invoke<void>('kandidat_verwerfen', { pfad: candidateId });

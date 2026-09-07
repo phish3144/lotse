@@ -9,12 +9,43 @@ Monetarisierung möglich bleibt, ohne dass heute Bezahl-Code entsteht.
 | Entscheidung | Warum sie jetzt billig und später teuer ist |
 |---|---|
 | `account_id` auf jedem Datensatz im Sync-Dienst | Mandantenfähigkeit nachträglich einzubauen ist eine Migration aller Daten. |
-| `plan` und `flags` am Konto | Feature-Gates werden ein `if`, keine Schema-Änderung. |
+| `plan` und `flags` am Konto | Feature-Gates werden ein `if`, keine Schema-Änderung. Stand heute: Spalten da (`migrations/0001_init.sql`), aber noch tot – kein Endpunkt liefert sie aus. Das ist Absicht, solange es nichts zu gaten gibt. |
+| Verbrauchszähler und Protokoll je Gerät (`ki_anfragen`, `ki_protokoll` in `meta`) | Ohne Zählung ab dem ersten Tag gibt es später keine Grundlage für eine faire Grenze – und keine Antwort auf „was habt ihr gesendet?". |
+| Deckel je KI-Anfrage (`ai::MAX_EINGABE_ZEICHEN`) | Kostenbegrenzung ist beim Bauen kostenlos und nach dem ersten Kostenschock teuer. |
 | Ende-zu-Ende-Verschlüsselung | Ist das Verkaufsargument gegenüber Notion & Co. und senkt Haftung und DSGVO-Aufwand (Auftragsverarbeitung nur für Ciphertext). |
 | Sync-Protokoll gehört uns, Dienst ist ~300 Zeilen | Wechsel von Cloudflare auf eigene Server ist ein Nachmittag, kein Projekt. |
 | Client kann gegen beliebige API-Basis-URL laufen | Selbsthosting bleibt möglich – wichtig für das Open-Core-Modell. |
 | Keine stille Telemetrie | Vertrauen ist bei diesem Publikum das Produkt. |
 | Lizenz noch offen, Repo privat | Eine einmal gewählte Open-Source-Lizenz lässt sich nicht zurücknehmen. |
+
+## 1a. KI als zweiter Weg zur Monetarisierung
+
+Ergänzt Abschnitt 1: Neben bezahltem Sync kommt ein bezahlter KI-Zugang in Frage. Die
+Entscheidung vom 2026-09-07 (siehe `CONCEPT.md` Abschnitt 12) hält beides offen und
+getrennt:
+
+| Weg | Wer zahlt | Was der Betreiber sieht |
+|---|---|---|
+| Lokales Modell | niemand | nichts, es verlässt kein Datum das Gerät |
+| Eigener Schlüssel des Nutzers | der Nutzer, direkt beim Anbieter | nichts, Lotse ist nicht in der Kette |
+| Zugang des Betreibers (verkäuflich) | der Betreiber, deshalb Abo | den einzeln freigegebenen Text, ohne ihn zu speichern |
+
+Die ersten beiden bleiben kostenlos und vollwertig – „bezahlte Bequemlichkeit, nie als
+Bedingung" gilt auch hier. Verkauft wird nicht „KI", sondern *schneller, robuster,
+aktueller*: was ein kleines lokales Modell nachweislich nicht kann (lange oder unordentliche
+Eingaben, komplexe Dokumente, mehrstufiger Werkzeuggebrauch, aktuelles Wissen) und was auf
+schwacher Hardware lokal gar nicht erreichbar ist.
+
+Was der dritte Weg zusätzlich verlangt, bevor Geld fließt: ein Auftragsverarbeitungs-
+vertrag mit dem Modellanbieter samt „kein Training auf diesen Daten", die Nennung dieses
+Anbieters als Unterauftragsverarbeiter, eine Grundlage für den Drittlandtransfer – und
+die Bauweise „nichts speichern", die Auskunft, Löschung und Speicherfristen fast leer
+laufen lässt. Datenschutzerklärung und Impressum sind davon unabhängig schon heute fällig,
+weil der Sync-Dienst E-Mail-Konten führt.
+
+Nicht geklärt und vor dem Verkaufsstart zu klären: ob der Betreiber gegenüber
+Privatkunden Auftragsverarbeiter oder eigener Verantwortlicher ist. Das hängt an der
+Vertragsgestaltung und gehört einmal fachlich geprüft.
 
 ## 2. Modelle, die zur Architektur passen
 
@@ -42,7 +73,16 @@ Vor der ersten Veröffentlichung entscheiden:
 | **Functional Source License (FSL)** oder BSL | Quelloffen, aber kein kommerzielles Konkurrenz-Hosting für zwei Jahre, danach automatisch Apache/MIT. Weniger Akzeptanz in der Community. |
 | **Proprietär, Quelle einsehbar** | Maximale Kontrolle, minimales Vertrauen. |
 
-Bis zur Entscheidung: keine `LICENSE`-Datei, Repo privat. Alle Rechte liegen beim Autor.
+**Stand 2026-09-07: Das Repository ist öffentlich, eine `LICENSE`-Datei gibt es nicht.**
+Damit gilt „alle Rechte vorbehalten" bei öffentlich einsehbarem Code – ein Zustand, kein
+Plan. Die Entscheidung ist damit fällig, nicht mehr aufschiebbar.
+
+Zur Sorge, eine offene Lizenz verbaue den späteren bezahlten KI-Zugang: Sie tut es nicht.
+Als alleiniger Urheber darf derselbe Code zusätzlich anders lizenziert werden. Eng wird es
+erst, wenn Fremdbeiträge ohne Beitragsvereinbarung dazukommen – wer sich die Möglichkeit
+offenhalten will, braucht ab dem ersten fremden Pull Request ein DCO oder eine CLA.
+Unwiderruflich ist nur, was einmal veröffentlicht wurde: diese Fassung bleibt unter der
+gewählten Lizenz, künftige müssen es nicht.
 
 ## 4. Was vor einer Veröffentlichung nötig wäre
 

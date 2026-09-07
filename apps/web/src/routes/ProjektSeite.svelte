@@ -4,7 +4,7 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { forge, kalender, ki, system, type ForgeProjekt, type Termin } from '../lib/data/tauri';
+  import { forge, kalender, system, type ForgeProjekt, type Termin } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -348,7 +348,7 @@
     kiLaeuft = true;
     kiErgebnis = null;
     try {
-      kiText = await ki.anfrageText(id);
+      kiText = await provider.kiAnfrageText(id);
     } catch (e) {
       melde(e);
     } finally {
@@ -360,7 +360,7 @@
     if (!kiText) return;
     kiLaeuft = true;
     try {
-      kiErgebnis = await ki.verdichten(kiText);
+      kiErgebnis = await provider.kiVerdichten(kiText, 'brief_verdichten');
     } catch (e) {
       melde(e);
     } finally {

@@ -16,6 +16,7 @@
     type BeobachterStatus,
     type ForgeStatus,
     type KiStatus,
+    type KiVerbrauch,
     type GeraetInfo,
     type KontoStatus,
     type SyncErgebnis,
@@ -175,6 +176,19 @@
     }
   }
 
+  // --- Was die KI bisher gesendet hat ---------------------------------------
+  let kiVerbrauch: KiVerbrauch | null = $state(null);
+
+  async function kiVerbrauchLoeschen() {
+    try {
+      await ki.verbrauchLoeschen();
+      kiVerbrauch = await ki.verbrauch();
+      meldungen.zeigen('Zähler und Protokoll gelöscht.');
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
   // --- Version und Updates --------------------------------------------------
   let updateStand: UpdateStand | null = $state(null);
   let updateLaeuft = $state(false);
@@ -205,6 +219,7 @@
     try {
       await update.automatischSetzen(an);
       updateStand = await update.pruefen(false);
+      kiVerbrauch = await ki.verbrauch();
     } catch (e) {
       meldungen.fehler(e);
     }
@@ -518,6 +533,30 @@
         <button type="submit" class="primaer" disabled={!kiModell.trim()}>Merken</button>
       </div>
     </form>
+
+    {#if kiVerbrauch}
+      <h3>Was bisher gesendet wurde</h3>
+      {#if kiVerbrauch.anfragen === 0}
+        <p class="hinweis klein">Noch nichts. Hier steht später, was wann an welches Ziel ging.</p>
+      {:else}
+        <p class="hinweis klein">
+          {kiVerbrauch.anfragen}
+          {kiVerbrauch.anfragen === 1 ? 'Anfrage' : 'Anfragen'}, {kiVerbrauch.eingabe_token.toLocaleString('de-DE')} Token
+          hin und {kiVerbrauch.ausgabe_token.toLocaleString('de-DE')} zurück. Der gesendete Text selbst wird nicht
+          aufbewahrt – nur, dass und wohin gesendet wurde.
+        </p>
+        <ul class="protokoll">
+          {#each kiVerbrauch.protokoll.slice(0, 8) as p, i (p.ts + '-' + i)}
+            <li>
+              <span class="termin-datum">{new Date(p.ts).toLocaleString('de-DE')}</span>
+              <span class="hinweis rolle">{p.ziel} · {p.modell}</span>
+              <span class="hinweis rolle">{p.zeichen.toLocaleString('de-DE')} Zeichen</span>
+            </li>
+          {/each}
+        </ul>
+        <button type="button" onclick={kiVerbrauchLoeschen}>Zähler und Protokoll löschen</button>
+      {/if}
+    {/if}
   {/if}
 </section>
 
@@ -852,6 +891,27 @@
   .zeile input {
     flex: 1;
     min-width: 15rem;
+  }
+  .protokoll {
+    list-style: none;
+    margin: 0.6rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+  }
+  .protokoll li {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .termin-datum {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .rolle {
+    font-size: 0.85rem;
   }
   .schalter {
     display: flex;

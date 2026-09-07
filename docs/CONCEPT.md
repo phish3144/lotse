@@ -301,6 +301,12 @@ Gezielt, in dieser Reihenfolge, immer ohne Tresor-Zugriff und ohne stillen Daten
 
 Nicht: KI als Gedächtnis statt Log, Chat als Hauptoberfläche, automatisch erzeugte Aufgaben.
 
+Für jede dieser Stufen und alle künftigen gilt dieselbe Leitplanke: standardmäßig aus,
+einzeln freigegeben, vor dem Senden sichtbar, kein Tresor-Zugriff, kein Aufbewahren des
+Gesendeten, ein Deckel je Anfrage. Ausgeführt in `THREAT_MODEL.md` 6b. Der Zugang über
+den eigenen Schlüssel (lokal oder gehostet) bleibt vollwertig; ein später vom Betreiber
+bereitgestellter Zugang ist ein eigener Dienst und nie Teil des Sync-Dienstes.
+
 ## 10. Tech-Stack
 
 | Schicht | Wahl | Begründung |
@@ -356,6 +362,9 @@ Monaten stabiler Nutzung.
 | Datum | Entscheidung | Begründung |
 |---|---|---|
 | 2026-09-07 | KI-Verdichtung gegen eine OpenAI-kompatible Schnittstelle statt gegen einen einzelnen Anbieter. | Ollama (lokal, ohne Schlüssel), Gemini, Groq, Mistral und OpenRouter sprechen dieselbe Schnittstelle. Ein Client, ein Formular, austauschbares Ziel – und der voreingestellte Fall bleibt der, bei dem die Daten den Rechner nicht verlassen. |
+| 2026-09-07 | Zwei Wege zur KI, als getrennte Dienste: der eigene Schlüssel (lokal oder gehostet) bleibt kostenlos und vollwertig; ein später vom Betreiber bereitgestellter Zugang ist ein **eigener** Dienst, nie Teil des Sync-Dienstes. | Nur der zweite Weg lässt sich verkaufen, weil dort der Betreiber die Rechnung trägt. Getrennt gehalten bleibt »der Sync-Dienst sieht nur Umschläge« wahr, während ein zweiter, klar benannter Dienst Klartext verarbeitet, den ihm jemand ausdrücklich gegeben hat. Zusammengelegt wäre beides gleichzeitig unwahr und unverkäuflich. |
+| 2026-09-07 | Jede KI-Fähigkeit ist standardmäßig aus, wird einzeln freigegeben und zeigt vorher, was gesendet würde. Der gesendete Text wird nicht aufbewahrt; protokolliert wird nur, dass und wohin gesendet wurde. | Ein privates Logbuch kann besondere Kategorien personenbezogener Daten enthalten. Einzelfreigabe erledigt diesen Fall in der Bauart statt in den AGB, und ein Protokoll ohne Inhalt ist der Nachweis, den Rechenschaftspflicht verlangt, ohne selbst eine neue Sammlung zu sein. Ausgeführt in `THREAT_MODEL.md` 6b. |
+| 2026-09-07 | Verbrauch wird von Anfang an gezählt und angezeigt, auch ohne Grenze; ein Deckel je Anfrage ist von Anfang an eingebaut. | Die Token-Zahlen kommen in jeder Antwort ohnehin an. Ohne Zählung ab dem ersten Tag gäbe es später keine Grundlage für eine faire Grenze, und ein Limit, das niemand je gesehen hat, wirkt beim Einführen wie ein Rückzieher. |
 | 2026-09-07 | Update-Hinweis statt selbsttätigem Updater, solange die Bauten unsigniert sind. | Sich selbst mit unsignierten Binärdaten zu überschreiben wäre der bequemste Angriffsweg auf ein Programm, das Geheimnisse hütet. Lotse sagt Bescheid und nennt die passende Datei; den letzten Schritt macht der Mensch. Mit signierten Bauten wird daraus ein echter Updater. |
 | 2026-09-07 | Kalender werden gelesen und angezeigt, nie ins Logbuch kopiert. | Ein Termin gehört dem Kalender. Kopiert, wäre er nach der ersten Verschiebung falsch, und Lotse hätte eine Pflegeaufgabe geschaffen, die es abschaffen will. Gezeigt wird deshalb live, was in den nächsten 90 Tagen ansteht. |
 | 2026-09-07 | Uhrzeiten aus Kalendern werden nicht in die Ortszeit umgerechnet. | Ohne Zeitzonendatenbank wäre die Umrechnung geraten. Angezeigt wird, was im Kalender steht; UTC-Zeiten werden gekennzeichnet. Das ist für „was steht an“ genau genug und nie falsch. |

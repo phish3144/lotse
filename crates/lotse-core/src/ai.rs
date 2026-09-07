@@ -65,6 +65,73 @@ impl Ziel {
 
 // ------------------------------------------------------------------ Anfrage
 
+/// Wozu gefragt wird. Jede Fähigkeit bekommt hier einen Eintrag; die Anweisung an das
+/// Modell hängt am Zweck, nicht an der Aufrufstelle. Sonst wäre jede neue Fähigkeit eine
+/// Kopie von `verdichten()` mit eigenem Zustimmungsfluss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Zweck {
+    /// Den „Wo war ich"-Brief auf wenige Sätze bringen.
+    BriefVerdichten,
+}
+
+impl Zweck {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Zweck::BriefVerdichten => "brief_verdichten",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Zweck> {
+        [Zweck::BriefVerdichten]
+            .into_iter()
+            .find(|z| z.as_str() == s)
+    }
+
+    /// Wie der Zweck in der Oberfläche und im Protokoll heißt.
+    pub fn anzeige(self) -> &'static str {
+        match self {
+            Zweck::BriefVerdichten => "Brief verdichten",
+        }
+    }
+
+    /// Die Anweisung an das Modell.
+    pub fn anweisung(self) -> &'static str {
+        match self {
+            Zweck::BriefVerdichten => {
+                "Du fasst für eine Person zusammen, die nach längerer Pause in ihr eigenes \
+                 Projekt zurückkehrt. Schreibe höchstens fünf Sätze auf Deutsch: wo das \
+                 Projekt steht und was der nächste Schritt wäre. Nenne nur, was in der \
+                 Eingabe steht; erfinde nichts dazu. Keine Anrede, keine Überschrift, keine \
+                 Aufzählung."
+            }
+        }
+    }
+}
+
+/// Obergrenze für eine einzelne Anfrage.
+///
+/// Heute schützt sie davor, versehentlich einen riesigen Text zu senden – bei bezahlten
+/// Zielen kostet jedes Zeichen. Später ist das die Stelle, an der das Kontingent eines
+/// Abos geprüft wird. Ein Deckel, der von Anfang an da ist, ist billig; einer, der nach
+/// dem ersten Kostenschock nachgerüstet wird, ist es nicht.
+pub const MAX_EINGABE_ZEICHEN: usize = 40_000;
+
+/// Was ein Aufruf gekostet hat, so wie das Ziel es meldet.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Verbrauch {
+    pub eingabe_token: u64,
+    pub ausgabe_token: u64,
+}
+
+/// Antwort des Modells samt Verbrauch, soweit das Ziel ihn nennt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Antwort {
+    pub text: String,
+    /// Fehlt, wenn das Ziel keine Zahlen mitschickt.
+    pub verbrauch: Option<Verbrauch>,
+}
+
 /// Baut den Text, der gesendet würde. Getrennt vom Senden, damit die Oberfläche ihn
 /// zeigen kann, bevor etwas das Gerät verlässt.
 pub fn anfrage_text(brief: &str, offene_faeden: &[String], titel: &str) -> String {
@@ -84,12 +151,6 @@ pub fn anfrage_text(brief: &str, offene_faeden: &[String], titel: &str) -> Strin
     }
     s.trim_end().to_string()
 }
-
-#[cfg(feature = "native")]
-const ANWEISUNG: &str = "Du fasst für eine Person zusammen, die nach längerer Pause in ihr \
-eigenes Projekt zurückkehrt. Schreibe höchstens fünf Sätze auf Deutsch: wo das Projekt \
-steht und was der nächste Schritt wäre. Nenne nur, was in der Eingabe steht; erfinde \
-nichts dazu. Keine Anrede, keine Überschrift, keine Aufzählung.";
 
 #[cfg(feature = "native")]
 #[derive(Serialize)]
@@ -114,6 +175,18 @@ struct AnfrageWire<'a> {
 #[derive(Deserialize)]
 struct AntwortWire {
     choices: Vec<Wahl>,
+    /// Die meisten Ziele melden hier die Token-Zahlen; Pflicht ist es nicht.
+    #[serde(default)]
+    usage: Option<VerbrauchWire>,
+}
+
+#[cfg(feature = "native")]
+#[derive(Deserialize)]
+struct VerbrauchWire {
+    #[serde(default)]
+    prompt_tokens: u64,
+    #[serde(default)]
+    completion_tokens: u64,
 }
 
 #[cfg(feature = "native")]
@@ -128,12 +201,16 @@ struct AntwortNachricht {
     content: Option<String>,
 }
 
-/// Liest den Text aus einer OpenAI-kompatiblen Antwort. Getrennt vom Holen, damit es
-/// ohne Netz prüfbar ist.
+/// Liest Text und Verbrauch aus einer OpenAI-kompatiblen Antwort. Getrennt vom Holen,
+/// damit es ohne Netz prüfbar ist.
 #[cfg(feature = "native")]
-fn antwort_lesen(json: &str) -> Result<String> {
+fn antwort_lesen(json: &str) -> Result<Antwort> {
     let a: AntwortWire =
         serde_json::from_str(json).map_err(|e| Error::Other(format!("Antwort unlesbar: {e}")))?;
+    let verbrauch = a.usage.map(|u| Verbrauch {
+        eingabe_token: u.prompt_tokens,
+        ausgabe_token: u.completion_tokens,
+    });
     let text = a
         .choices
         .into_iter()
@@ -144,7 +221,7 @@ fn antwort_lesen(json: &str) -> Result<String> {
     if text.is_empty() {
         return Err(Error::Other("Das Modell hat nichts geantwortet".into()));
     }
-    Ok(text)
+    Ok(Antwort { text, verbrauch })
 }
 
 #[cfg(feature = "native")]
@@ -233,17 +310,25 @@ pub fn modelle(ziel: &Ziel) -> Result<Vec<String>> {
     modelle_lesen(&text)
 }
 
-/// Schickt genau den Text, den `anfrage_text` gebaut hat, und liefert die Zusammenfassung.
+/// Schickt genau den Text, den der Aufrufer gezeigt hat, und liefert die Antwort samt
+/// Verbrauch. Über dem Deckel wird gar nicht erst gesendet.
 #[cfg(feature = "native")]
-pub fn verdichten(ziel: &Ziel, eingabe: &str) -> Result<String> {
+pub fn verdichten(ziel: &Ziel, zweck: Zweck, eingabe: &str) -> Result<Antwort> {
     ziel.pruefen()?;
+    if eingabe.chars().count() > MAX_EINGABE_ZEICHEN {
+        return Err(Error::Invalid(format!(
+            "Die Anfrage ist zu lang ({} Zeichen, erlaubt sind {MAX_EINGABE_ZEICHEN}). \
+             Kürze den Text oder wähle einen kleineren Ausschnitt.",
+            eingabe.chars().count()
+        )));
+    }
     let a = agent();
     let koerper = AnfrageWire {
         model: &ziel.modell,
         messages: vec![
             Nachricht {
                 role: "system",
-                content: ANWEISUNG,
+                content: zweck.anweisung(),
             },
             Nachricht {
                 role: "user",
@@ -305,10 +390,48 @@ mod tests {
           ],
           "usage": { "prompt_tokens": 40, "completion_tokens": 12, "total_tokens": 52 }
         }"#;
+        let a = antwort_lesen(json).unwrap();
+        assert_eq!(a.text, "Das Fundament wartet auf Beton.");
+        // Die Token-Zahlen kommen mit und werden nicht mehr weggeworfen: ohne sie
+        // gäbe es später keine Grundlage für eine faire Grenze.
         assert_eq!(
-            antwort_lesen(json).unwrap(),
-            "Das Fundament wartet auf Beton."
+            a.verbrauch,
+            Some(Verbrauch {
+                eingabe_token: 40,
+                ausgabe_token: 12
+            })
         );
+    }
+
+    #[test]
+    fn antwort_ohne_verbrauchsangabe_ist_kein_fehler() {
+        // Nicht jedes Ziel meldet Token-Zahlen. Fehlen sie, fehlt die Angabe – die
+        // Antwort bleibt gültig.
+        let json = r#"{"choices":[{"message":{"role":"assistant","content":"Kurz."}}]}"#;
+        let a = antwort_lesen(json).unwrap();
+        assert_eq!(a.text, "Kurz.");
+        assert_eq!(a.verbrauch, None);
+    }
+
+    #[test]
+    fn zweck_traegt_seine_anweisung() {
+        assert_eq!(
+            Zweck::parse("brief_verdichten"),
+            Some(Zweck::BriefVerdichten)
+        );
+        assert_eq!(Zweck::parse("erfunden"), None);
+        assert!(Zweck::BriefVerdichten.anweisung().contains("fünf Sätze"));
+        assert_eq!(Zweck::BriefVerdichten.anzeige(), "Brief verdichten");
+    }
+
+    #[test]
+    fn zu_lange_eingabe_wird_gar_nicht_erst_gesendet() {
+        // Der Deckel greift vor dem Netz: ein versehentlich riesiger Text kostet bei
+        // bezahlten Zielen sonst echtes Geld.
+        let ziel = Ziel::ollama("llama3.2");
+        let zu_lang = "ä".repeat(MAX_EINGABE_ZEICHEN + 1);
+        let e = verdichten(&ziel, Zweck::BriefVerdichten, &zu_lang).unwrap_err();
+        assert!(e.to_string().contains("zu lang"), "{e}");
     }
 
     #[test]

@@ -12,6 +12,7 @@ erhöht `FORMAT_VERSION` und wird hier protokolliert.
 | Logbücher, Kurs, Referenzen, Pfade | mittel | hoch | hoch |
 | Master-Passwort, Desktop-Schlüssel, Wiederherstellungscode | höchst | – | – |
 | Metadaten beim Sync (Zeitstempel, IDs, Größen, Gerätenamen) | niedrig | mittel | – |
+| An ein KI-Ziel gesendeter Inhalt (Brief, offene Fäden, künftig mehr) | mittel | – | – |
 
 ## 2. Angreifer und Szenarien
 
@@ -28,6 +29,7 @@ erhöht `FORMAT_VERSION` und wird hier protokolliert.
 | **Vergessenes Master-Passwort** | Wiederherstellungscode, beim Setup einmal angezeigt, mit Pflicht zur kalten Wiedereingabe vor Abschluss des Setups. |
 | **Geräteverlust bei aktiver Sitzung** | Gerät im Konto widerrufen; Sitzungstoken verfallen; Passwortwechsel wrappt den Account-Schlüssel neu. |
 | **Alte Backups/Sync-Snapshots eines gelöschten Tresor-Eintrags** | Envelope-Encryption pro Eintrag; Löschen vernichtet den Eintragsschlüssel (Crypto-Shredding). |
+| **KI-Ziel liest mit oder protokolliert** | Der gesendete Text verlässt das Gerät im Klartext – daran ändert keine Verschlüsselung etwas, das ist die Natur der Sache. Verteidigt wird deshalb an drei Stellen: standardmäßig aus; vor jedem Senden ist der vollständige Text sichtbar; der Tresor ist strukturell unerreichbar (`scripts/modulgrenzen.sh`). Wer nichts senden will, nimmt ein lokales Modell — dann verlässt nichts den Rechner. Ein Protokoll in den Einstellungen hält fest, was wann an welches Ziel ging; der Text selbst wird dabei nicht aufbewahrt. |
 | **Bösartige Abhängigkeit** | Nur RustCrypto/`age`/`zeroize`; Versionen gepinnt; `cargo-deny` und `cargo-audit` in CI; keine Fremdskripte in der Web-App. |
 | **Manipuliertes Update** | Solange die Bauten unsigniert sind, aktualisiert sich Lotse **nicht** selbst: es nennt nur die neue Version und die Datei dazu, herunterladen und installieren tut der Mensch. Ein Programm, das sich selbst mit unsignierten Binärdaten überschreibt, wäre der bequemste Angriffsweg überhaupt. Sobald signierte Bauten existieren (Tauri-Updater mit minisign, privater Schlüssel offline bzw. im Passwortmanager), kann daraus ein echter Updater werden. |
 
@@ -153,6 +155,33 @@ Welche dieser Verbindungen ohne Zutun des Nutzers entstehen, steht vollständig 
 `README.md` unter »Wann Lotse von allein ins Netz geht«. Jede davon ist abschaltbar,
 keine überträgt Inhalte: der Update-Hinweis und die Abfrage der Gegenseite senden nur
 die Anfrage selbst, der Kalender wird gelesen, nicht beschrieben.
+
+## 6b. KI: was gesendet wird und was nicht
+
+Der Grundsatz, an dem sich jede künftige KI-Fähigkeit messen lassen muss:
+
+1. **Standardmäßig aus.** Keine KI-Funktion läuft, bevor ein Mensch sie eingeschaltet hat.
+2. **Einzelfreigabe, nicht Generalvollmacht.** Freigegeben wird ein Vorgang, nicht ein
+   Bestand. Ein privates Logbuch kann Gesundheit, Weltanschauung oder Familie enthalten
+   (Artikel 9 DSGVO); deshalb ist die Freigabe je Aufruf die Bauart, nicht die Ausnahme.
+3. **Vor dem Senden sichtbar.** Der vollständige Text, der das Gerät verlassen würde,
+   ist abrufbar, bevor etwas geschieht (`ai::anfrage_text`).
+4. **Kein Tresor.** `ai` hat keinen Import-Pfad zu `vault`, geprüft in CI.
+5. **Nichts wird stillschweigend behalten.** Der gesendete Text wird nicht aufbewahrt.
+   Protokolliert wird nur, dass und wohin gesendet wurde, samt Umfang — das ist der
+   Nachweis, den Rechenschaftspflicht verlangt, und zugleich das, was der Nutzer sehen
+   können muss.
+6. **Ein Deckel von Anfang an.** `ai::MAX_EINGABE_ZEICHEN` begrenzt eine einzelne
+   Anfrage. Ein Deckel, der erst nach dem ersten Kostenschock eingezogen wird, ist teuer.
+7. **Ein gehosteter KI-Vermittler bleibt ein eigener Dienst.** Er wird nie Teil des
+   Sync-Dienstes. Nur so bleibt der Satz »der Sync-Dienst sieht nur Umschläge« wahr,
+   während ein zweiter, klar benannter Dienst Klartext verarbeitet, den ihm jemand
+   ausdrücklich gegeben hat.
+
+Die Zusage »Dateiinhalte liest Lotse nicht« (`detect`, `watcher`, Landing Page) gilt für
+die automatische Erkennung und den Ordner-Beobachter und bleibt dort gültig. Eine spätere
+Funktion, die Dateien deutet, ist etwas anderes: ausdrücklich benannt, einzeln
+freigegeben, nie im Hintergrund.
 
 ## 7. Betrieb und Konto-Sicherheit
 

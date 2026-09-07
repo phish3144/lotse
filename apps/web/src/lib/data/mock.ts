@@ -593,6 +593,14 @@ export function createMockProvider(): DataProvider {
       };
     },
 
+    // Im Browser gibt es kein Ziel, an das gesendet werden könnte. Ein erfundener
+    // Vorschlag wäre schlimmer als eine klare Absage.
+    async kiAnfrageText() {
+      throw new Error('Die KI-Verdichtung gibt es nur in der Desktop-App.');
+    },
+    async kiVerdichten() {
+      throw new Error('Die KI-Verdichtung gibt es nur in der Desktop-App.');
+    },
     async listCandidates() {
       return clone(candidates);
     },

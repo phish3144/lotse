@@ -96,7 +96,24 @@ export interface DataProvider {
   rejectCandidate(candidateId: Id): Promise<void>;
   /** Durchsucht Wurzelordner nach Erkennungsmarken und merkt die Funde als Kandidaten. */
   scan(wurzeln: string[]): Promise<Kandidat[]>;
+
+  /**
+   * Baut den Text, der an ein Modell ginge – und schickt ihn nicht. Die Oberfläche zeigt
+   * ihn, bevor irgendetwas das Gerät verlässt.
+   */
+  kiAnfrageText(projectId: Id): Promise<string>;
+  /**
+   * Schickt genau diesen Text und liefert den Vorschlag zurück. Er landet nur im
+   * Logbuch, wenn ein Mensch ihn übernimmt.
+   *
+   * Der Zugang liegt hier und nicht in der Tauri-Hülle, damit der Web-Client später
+   * dieselbe Schnittstelle bedienen kann statt einer eigenen.
+   */
+  kiVerdichten(eingabe: string, zweck?: KiZweck): Promise<string>;
 }
+
+/** Wozu gefragt wird. Wächst mit den Fähigkeiten; die Anweisung dazu steht im Kern. */
+export type KiZweck = 'brief_verdichten';
 
 /** Notiz-Arten, die in der Oberfläche von Hand erfasst werden können. */
 export const ERFASSBARE_ARTEN: NotizArt[] = ['log', 'offen', 'entscheidung'];

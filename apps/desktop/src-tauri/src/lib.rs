@@ -15,7 +15,7 @@ use lotse_core::store::{HafenKarte, Store, Treffer};
 use lotse_core::sync::client as sync_client;
 use lotse_core::vault::{TresorEintrag, VaultKeys};
 use lotse_core::{now_ms, Error};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use ulid::Ulid;
 use zeroize::Zeroizing;
@@ -1033,10 +1033,144 @@ fn ki_anfrage_text(state: State<AppState>, projekt_id: String) -> R<String> {
 
 /// Schickt genau den gezeigten Text und liefert die Zusammenfassung zurück. Sie wird
 /// nicht gespeichert – der Mensch entscheidet, ob sie ins Logbuch soll.
+/// Zähler und Protokoll. Beides liegt lokal in `meta` und wird nicht abgeglichen: es
+/// beschreibt dieses Gerät, nicht das Konto.
+const META_KI_ANFRAGEN: &str = "ki_anfragen";
+const META_KI_EINGABE_TOKEN: &str = "ki_eingabe_token";
+const META_KI_AUSGABE_TOKEN: &str = "ki_ausgabe_token";
+const META_KI_PROTOKOLL: &str = "ki_protokoll";
+
+/// So viele Einträge behält das Protokoll. Es soll zeigen, was zuletzt gesendet wurde,
+/// nicht ein zweites Logbuch werden.
+const KI_PROTOKOLL_LAENGE: usize = 50;
+
+#[derive(Serialize, Deserialize, Clone)]
+struct KiProtokollEintrag {
+    ts: i64,
+    /// Wozu gefragt wurde.
+    zweck: String,
+    /// Nur der Host, nicht die vollständige Adresse.
+    ziel: String,
+    modell: String,
+    /// Umfang des Gesendeten – der Text selbst wird bewusst nicht aufbewahrt.
+    zeichen: usize,
+    eingabe_token: Option<u64>,
+    ausgabe_token: Option<u64>,
+}
+
+#[derive(Serialize)]
+struct KiVerbrauch {
+    anfragen: u64,
+    eingabe_token: u64,
+    ausgabe_token: u64,
+    protokoll: Vec<KiProtokollEintrag>,
+}
+
+fn meta_zahl(s: &Sitzung, key: &str) -> lotse_core::Result<u64> {
+    Ok(s.store
+        .meta_get(key)?
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0))
+}
+
+/// Host einer Adresse, ohne Schema und Pfad. Im Protokoll soll stehen, wohin es ging,
+/// nicht die vollständige Adresse mit allem, was daran hängt.
+fn host_von(url: &str) -> String {
+    let ohne_schema = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
+    ohne_schema.split('/').next().unwrap_or(url).to_string()
+}
+
+/// Was bisher an ein Modell ging: Zähler und die letzten Einträge.
 #[tauri::command]
-fn ki_verdichten(state: State<AppState>, eingabe: String) -> R<String> {
+fn ki_verbrauch(state: State<AppState>) -> R<KiVerbrauch> {
+    mit(&state, |s| {
+        let protokoll: Vec<KiProtokollEintrag> = s
+            .store
+            .meta_get(META_KI_PROTOKOLL)?
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or_default();
+        Ok(KiVerbrauch {
+            anfragen: meta_zahl(s, META_KI_ANFRAGEN)?,
+            eingabe_token: meta_zahl(s, META_KI_EINGABE_TOKEN)?,
+            ausgabe_token: meta_zahl(s, META_KI_AUSGABE_TOKEN)?,
+            protokoll,
+        })
+    })
+}
+
+/// Löscht Zähler und Protokoll. Was Lotse über den eigenen Gebrauch führt, muss man
+/// auch wieder loswerden können.
+#[tauri::command]
+fn ki_verbrauch_loeschen(state: State<AppState>) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_KI_ANFRAGEN, "0")?;
+        s.store.meta_set(META_KI_EINGABE_TOKEN, "0")?;
+        s.store.meta_set(META_KI_AUSGABE_TOKEN, "0")?;
+        s.store.meta_set(META_KI_PROTOKOLL, "[]")?;
+        Ok(())
+    })
+}
+
+/// Schreibt Zähler und Protokolleintrag fort. Beides zusammen, damit die Zahlen und die
+/// Liste nicht auseinanderlaufen.
+fn ki_buchen(
+    state: &State<AppState>,
+    zweck: lotse_core::ai::Zweck,
+    ziel: &lotse_core::ai::Ziel,
+    zeichen: usize,
+    verbrauch: Option<lotse_core::ai::Verbrauch>,
+) -> R<()> {
+    let eintrag = KiProtokollEintrag {
+        ts: now_ms(),
+        zweck: zweck.as_str().to_string(),
+        ziel: host_von(&ziel.basis_url),
+        modell: ziel.modell.clone(),
+        zeichen,
+        eingabe_token: verbrauch.map(|v| v.eingabe_token),
+        ausgabe_token: verbrauch.map(|v| v.ausgabe_token),
+    };
+    mit(state, |s| {
+        let mut protokoll: Vec<KiProtokollEintrag> = s
+            .store
+            .meta_get(META_KI_PROTOKOLL)?
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or_default();
+        protokoll.insert(0, eintrag);
+        protokoll.truncate(KI_PROTOKOLL_LAENGE);
+        s.store
+            .meta_set(META_KI_PROTOKOLL, &serde_json::to_string(&protokoll)?)?;
+
+        let anfragen = meta_zahl(s, META_KI_ANFRAGEN)? + 1;
+        s.store.meta_set(META_KI_ANFRAGEN, &anfragen.to_string())?;
+        if let Some(v) = verbrauch {
+            let ein = meta_zahl(s, META_KI_EINGABE_TOKEN)? + v.eingabe_token;
+            let aus = meta_zahl(s, META_KI_AUSGABE_TOKEN)? + v.ausgabe_token;
+            s.store.meta_set(META_KI_EINGABE_TOKEN, &ein.to_string())?;
+            s.store.meta_set(META_KI_AUSGABE_TOKEN, &aus.to_string())?;
+        }
+        Ok(())
+    })
+}
+
+#[tauri::command]
+fn ki_verdichten(state: State<AppState>, zweck: Option<String>, eingabe: String) -> R<String> {
+    let zweck = match zweck.as_deref() {
+        Some(z) => lotse_core::ai::Zweck::parse(z)
+            .ok_or_else(|| format!("Unbekannter Zweck: {z}"))?,
+        None => lotse_core::ai::Zweck::BriefVerdichten,
+    };
     let ziel = mit(&state, ki_ziel)?;
-    lotse_core::ai::verdichten(&ziel, &eingabe).map_err(fehler)
+    // Ohne gehaltene Sperre senden: das geht übers Netz und dauert.
+    let antwort = lotse_core::ai::verdichten(&ziel, zweck, &eingabe).map_err(fehler)?;
+    // Gebucht wird erst, wenn wirklich etwas gesendet wurde.
+    ki_buchen(
+        &state,
+        zweck,
+        &ziel,
+        eingabe.chars().count(),
+        antwort.verbrauch,
+    )?;
+    Ok(antwort.text)
 }
 
 // --------------------------------------------------------------- Remote-Git
@@ -1802,6 +1936,8 @@ pub fn run() {
             ki_modelle,
             ki_anfrage_text,
             ki_verdichten,
+            ki_verbrauch,
+            ki_verbrauch_loeschen,
             forge_status,
             forge_token_setzen,
             forge_auto_setzen,
