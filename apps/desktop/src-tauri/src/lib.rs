@@ -256,10 +256,21 @@ fn passwort_aendern(
             .map_err(|_| "Das bisherige Passwort stimmt nicht".to_string())?;
 
     let geparst = match code.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        Some(s) => Some(
-            RecoveryCode::parse(s)
-                .map_err(|_| "Das ist kein gültiger Wiederherstellungscode".to_string())?,
-        ),
+        Some(s) => {
+            // Geräte, die per Anmeldung dazukamen, haben das Recovery-Wrapping nicht
+            // lokal – der Dienst hält es. Ohne Wrapping lässt sich ein Code hier nicht
+            // prüfen, und ungeprüft übernehmen wäre schlimmer als absagen.
+            if k.header.wrapped_account_key_recovery.is_none() {
+                return Err("Auf diesem Gerät liegt kein Wiederherstellungs-Wrapping; \
+                     es kam per Anmeldung dazu. Lass das Code-Feld leer, dann entsteht \
+                     ein neuer Wiederherstellungscode, der für alle Geräte gilt."
+                    .into());
+            }
+            Some(
+                RecoveryCode::parse(s)
+                    .map_err(|_| "Das ist kein gültiger Wiederherstellungscode".to_string())?,
+            )
+        }
         None => None,
     };
     let wahl = match &geparst {
@@ -766,11 +777,18 @@ fn beobachter_starten(
                 break;
             }
         }
-        // Eigenen Eintrag räumen, damit der Status nicht „läuft“ behauptet.
+        // Eigenen Eintrag räumen, damit der Status nicht „läuft“ behauptet. Nur den
+        // eigenen: nach Anhalten und sofortigem Neustart läuft schon ein anderer
+        // Thread, und dessen Eintrag darf dieser hier nicht wegräumen.
         {
             let ergebnis = zustand.beobachter.lock();
             if let Ok(mut g) = ergebnis {
-                *g = None;
+                let ist_meiner = g
+                    .as_ref()
+                    .is_some_and(|h| std::sync::Arc::ptr_eq(&h.stop, &stop_thread));
+                if ist_meiner {
+                    *g = None;
+                }
             }
         }
     });
