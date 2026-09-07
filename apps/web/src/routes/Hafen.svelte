@@ -4,6 +4,7 @@
   import { provider } from '../lib/data/store';
   import { datenVersion } from '../lib/data/version.svelte';
   import { erfassung } from '../lib/erfassung.svelte';
+  import { meldungen } from '../lib/meldung.svelte';
   import { VORLAGEN_LABEL } from '../lib/format';
   import NeuesProjekt from '../lib/components/NeuesProjekt.svelte';
   import type { Kandidat, Notiz, Projekt } from '../lib/data/types';
@@ -40,10 +41,12 @@
     bestaetigtWirdGerade = kandidat.id;
     fehlerText = null;
     try {
-      await provider.confirmCandidate(kandidat.id);
+      const projekt = await provider.confirmCandidate(kandidat.id);
       datenVersion.bump();
+      meldungen.zeigen(`„${projekt.titel}“ übernommen.`);
     } catch (e) {
       fehlerText = e instanceof Error ? e.message : String(e);
+      meldungen.fehler(e);
     } finally {
       bestaetigtWirdGerade = undefined;
     }
@@ -55,8 +58,10 @@
     try {
       await provider.rejectCandidate(kandidat.id);
       datenVersion.bump();
+      meldungen.zeigen(`„${kandidat.titel_vorschlag}“ verworfen.`);
     } catch (e) {
       fehlerText = e instanceof Error ? e.message : String(e);
+      meldungen.fehler(e);
     } finally {
       bestaetigtWirdGerade = undefined;
     }
@@ -91,9 +96,12 @@
   {@const heuteWichtig = sortiertNachAuffaelligkeit(
     eintraege.filter((e) => e.grad !== 'ruhig' && e.projekt.status !== 'abgeschlossen' && e.projekt.status !== 'eingemottet'),
   ).slice(0, 3)}
-  {@const aufSee = sortiertNachAuffaelligkeit(eintraege.filter((e) => e.projekt.status === 'aktiv'))}
-  {@const vorAnker = sortiertNachAuffaelligkeit(eintraege.filter((e) => e.projekt.status === 'pausiert' || e.projekt.status === 'wartet'))}
-  {@const ideen = sortiertNachAuffaelligkeit(eintraege.filter((e) => e.projekt.status === 'idee'))}
+  <!-- Was oben schon Aufmerksamkeit bekommt, wird unten nicht wiederholt. -->
+  {@const obenGezeigt = new Set(heuteWichtig.map((e) => e.projekt.id))}
+  {@const uebrig = eintraege.filter((e) => !obenGezeigt.has(e.projekt.id))}
+  {@const aufSee = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'aktiv'))}
+  {@const vorAnker = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'pausiert' || e.projekt.status === 'wartet'))}
+  {@const ideen = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'idee'))}
 
   {#if heuteWichtig.length > 0}
     <section aria-labelledby="heute-wichtig-titel">

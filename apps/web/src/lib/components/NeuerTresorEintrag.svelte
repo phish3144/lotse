@@ -3,6 +3,7 @@
   // und werden hier nach dem Speichern sofort verworfen.
   import { provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
+  import { meldungen } from '../meldung.svelte';
   import { STUFE_LABEL } from '../format';
   import type { Id, Projekt, TresorStufe } from '../data/types';
 
@@ -60,6 +61,7 @@
       // Werte nicht länger als nötig im Speicher der Oberfläche halten.
       felder = [{ name: 'Passwort', wert: '' }];
       datenVersion.bump();
+      meldungen.zeigen('Zugang gespeichert.');
       offen = false;
     } catch (e2) {
       fehler = e2 instanceof Error ? e2.message : String(e2);

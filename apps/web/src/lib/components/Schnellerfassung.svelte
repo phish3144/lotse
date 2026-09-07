@@ -5,6 +5,7 @@
   import { provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
   import { erfassung } from '../erfassung.svelte';
+  import { meldungen } from '../meldung.svelte';
   import { ART_LABEL } from '../format';
   import type { NotizArt, Projekt } from '../data/types';
 
@@ -70,6 +71,7 @@
       const zielProjekt = projekt ?? (await provider.postkorb());
       await provider.addNote(zielProjekt.id, { quelle: 'mensch', art: erfassung.art, text });
       datenVersion.bump();
+      meldungen.zeigen(`→ ${zielProjekt.titel}`);
       eingabe = '';
       erfassung.schliessen();
     } catch (e) {

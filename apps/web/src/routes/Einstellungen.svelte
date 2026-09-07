@@ -3,14 +3,24 @@
   // Sync und Konto sind Belange der Hülle: im Browser gibt es sie (noch) nicht.
   import { echteDaten, provider } from '../lib/data/store';
   import { datenVersion } from '../lib/data/version.svelte';
-  import { konto, sync, type KontoStatus, type SyncErgebnis, type SyncStatus } from '../lib/data/tauri';
+  import { konto, sync, system, type KontoStatus, type SyncErgebnis, type SyncStatus } from '../lib/data/tauri';
   import { datumText } from '../lib/format';
+  import { meldungen } from '../lib/meldung.svelte';
 
   // --- Ordner durchsuchen ---------------------------------------------------
   let wurzel = $state('');
   let scanLaeuft = $state(false);
   let scanErgebnis: string | null = $state(null);
   let scanFehler: string | null = $state(null);
+
+  async function ordnerWaehlen() {
+    try {
+      const gewaehlt = await system.ordnerWaehlen();
+      if (gewaehlt) wurzel = gewaehlt;
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
 
   async function scannen(e: Event) {
     e.preventDefault();
@@ -117,6 +127,7 @@
         placeholder={navigator.platform.toLowerCase().startsWith('win') ? 'C:\\Users\\du\\Projekte' : '/home/du/Projekte'}
         aria-label="Wurzelordner"
       />
+      <button type="button" onclick={ordnerWaehlen}>Ordner wählen …</button>
       <button type="submit" class="primaer" disabled={!wurzel.trim() || scanLaeuft}>
         {scanLaeuft ? 'Suche …' : 'Durchsuchen'}
       </button>

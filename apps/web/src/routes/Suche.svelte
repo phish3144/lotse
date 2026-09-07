@@ -1,41 +1,78 @@
 <script lang="ts">
+  // Sucht beim Tippen. Die Adresse wird dabei nur ersetzt, nicht fortgeschrieben,
+  // sonst führt jeder Tastendruck einen Schritt in den Zurück-Weg ein.
   import NoteText from '../lib/components/NoteText.svelte';
   import { provider } from '../lib/data/store';
   import { alterInTagenText, PRUEFSTATUS_LABEL } from '../lib/format';
-  import { navigiereZu } from '../lib/router.svelte';
+  import { ersetze } from '../lib/router.svelte';
 
   let { query }: { query: string } = $props();
 
+  const VERZOEGERUNG_MS = 180;
+
   let eingabe = $state('');
+  let begriff = $state('');
+  let inputEl: HTMLInputElement | undefined = $state();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Zuletzt aus der Adresse übernommener Begriff. Bewusst kein $state: dient nur dazu,
+  // eigene Adressänderungen von fremden (Link, Zurück-Weg) zu unterscheiden.
+  let ausAdresse: string | null = null;
+
   $effect(() => {
-    eingabe = query;
+    if (query !== ausAdresse) {
+      ausAdresse = query;
+      eingabe = query;
+      begriff = query.trim();
+    }
   });
 
-  let ergebnisPromise = $derived(provider.search(query));
+  // Beim Betreten der Seite steht der Fokus im Feld; die Suche ist ein Tastaturwerkzeug.
+  $effect(() => {
+    inputEl?.focus();
+  });
 
-  function suchen(e: SubmitEvent) {
-    e.preventDefault();
-    navigiereZu(`#/suche?q=${encodeURIComponent(eingabe)}`);
+  function beiEingabe() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      begriff = eingabe.trim();
+      ausAdresse = begriff;
+      ersetze(begriff ? `#/suche?q=${encodeURIComponent(begriff)}` : '#/suche');
+    }, VERZOEGERUNG_MS);
   }
+
+  $effect(() => () => {
+    if (timer) clearTimeout(timer);
+  });
+
+  let ergebnisPromise = $derived(begriff ? provider.search(begriff) : Promise.resolve(null));
 </script>
 
 <svelte:head><title>Suche · Lotse</title></svelte:head>
 
 <h1>Suche</h1>
-<form class="suchform" onsubmit={suchen}>
-  <input type="search" placeholder="Projekte, Logbuch, Referenzen, Tresor-Titel …" bind:value={eingabe} aria-label="Suche" />
-  <button type="submit">Suchen</button>
-</form>
+<div class="suchform">
+  <input
+    bind:this={inputEl}
+    bind:value={eingabe}
+    oninput={beiEingabe}
+    type="search"
+    placeholder="Projekte, Logbuch, Referenzen, Tresor-Titel …"
+    aria-label="Suche"
+  />
+</div>
 
-{#if !query.trim()}
-  <p class="hinweis">Suchbegriff eingeben.</p>
+{#if !begriff}
+  <p class="hinweis">Tippen genügt – gesucht wird über alle Projekte, Logbücher, Referenzen und Tresor-Titel.</p>
 {:else}
   {#await ergebnisPromise}
     <p class="hinweis">Suche läuft…</p>
   {:then ergebnis}
+    {#if !ergebnis}
+      <p class="hinweis">Tippen genügt.</p>
+    {:else}
     {@const gesamt = ergebnis.projects.length + ergebnis.notes.length + ergebnis.references.length + ergebnis.vaultEntries.length}
     {#if gesamt === 0}
-      <p class="hinweis">Keine Treffer für „{query}“.</p>
+      <p class="hinweis">Keine Treffer für „{begriff}“.</p>
     {:else}
       {#if ergebnis.projects.length > 0}
         <section>
@@ -80,11 +117,12 @@
           <h2>Zugänge</h2>
           <ul class="treffer-liste">
             {#each ergebnis.vaultEntries as v (v.id)}
-              <li>{v.titel}</li>
+              <li><a href="#/tresor">{v.titel}</a></li>
             {/each}
           </ul>
         </section>
       {/if}
+    {/if}
     {/if}
   {:catch fehler}
     <p class="hinweis fehler">Suche fehlgeschlagen: {fehler.message}</p>

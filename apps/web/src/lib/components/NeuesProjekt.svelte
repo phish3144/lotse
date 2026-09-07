@@ -3,6 +3,7 @@
   // Erkennungsmarken); das Datenmodell ist für alle Projektarten dasselbe.
   import { provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
+  import { meldungen } from '../meldung.svelte';
   import { VORLAGEN_LABEL } from '../format';
   import { navigiereZu } from '../router.svelte';
   import type { VorlagenId } from '../data/types';
@@ -37,6 +38,7 @@
       const projekt = await provider.createProject(titel.trim(), vorlage, kurs.trim() || undefined);
       datenVersion.bump();
       offen = false;
+      meldungen.zeigen(`„${projekt.titel}“ angelegt.`);
       navigiereZu(`#/projekt/${projekt.id}`);
     } catch (e2) {
       fehler = e2 instanceof Error ? e2.message : String(e2);

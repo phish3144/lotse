@@ -3,8 +3,11 @@
   import NeuerTresorEintrag from '../lib/components/NeuerTresorEintrag.svelte';
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
-  import { provider } from '../lib/data/store';
+  import { echteDaten, provider } from '../lib/data/store';
+  import { system } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
+  import { meldungen } from '../lib/meldung.svelte';
+  import { navigiereZu } from '../lib/router.svelte';
   import {
     alterInTagenText,
     ANLEGBARE_REFERENZ_TYPEN,
@@ -27,14 +30,18 @@
   const REFERENZ_TYPEN = ANLEGBARE_REFERENZ_TYPEN;
   const REFERENZ_ROLLEN = Object.keys(REFERENZ_ROLLE_LABEL) as ReferenzRolle[];
 
+  /** Referenzen, die das System öffnen kann. Ein Regal im Keller kann es nicht. */
+  const OEFFENBAR: ReferenzTyp[] = ['ordner', 'git_repo', 'url', 'datei'];
+
   async function laden(projektId: string) {
-    const [projekt, notizen, referenzen, zugaenge] = await Promise.all([
+    const [projekt, notizen, referenzen, zugaenge, projekte] = await Promise.all([
       provider.getProject(projektId),
       provider.listNotes(projektId),
       provider.listReferences(projektId),
       provider.listVaultEntries(projektId),
+      provider.listProjects(),
     ]);
-    return { projekt, notizen, referenzen, zugaenge };
+    return { projekt, notizen, referenzen, zugaenge, projekte };
   }
 
   let datenPromise = $derived.by(() => {
@@ -47,6 +54,45 @@
 
   function melde(e: unknown) {
     fehlerText = e instanceof Error ? e.message : String(e);
+    meldungen.fehler(e);
+  }
+
+  // --- Referenz öffnen, Notiz umsortieren, Projekt löschen ------------------
+  let verschiebeNotiz: Id | null = $state(null);
+  let loeschenGefragt = $state(false);
+
+  async function referenzOeffnen(ziel: string) {
+    try {
+      await system.oeffnen(ziel);
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  async function notizVerschieben(notizId: Id, zielId: Id) {
+    verschiebeNotiz = null;
+    try {
+      await provider.moveNote(notizId, zielId);
+      datenVersion.bump();
+      meldungen.zeigen('Notiz verschoben.');
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  async function projektLoeschen(titel: string) {
+    wirdGespeichert = true;
+    try {
+      await provider.deleteProject(id);
+      datenVersion.bump();
+      meldungen.zeigen(`„${titel}“ gelöscht.`);
+      navigiereZu('#/');
+    } catch (e) {
+      melde(e);
+    } finally {
+      wirdGespeichert = false;
+      loeschenGefragt = false;
+    }
   }
 
   // --- Statuswechsel: braucht bei pausiert/wartet eine Übergabenotiz (CONCEPT.md 4) ---
@@ -110,6 +156,7 @@
       notizText = '';
       notizArt = 'log';
       datenVersion.bump();
+      meldungen.zeigen('Eingetragen.');
     } catch (e) {
       melde(e);
     } finally {
@@ -129,6 +176,7 @@
     try {
       await provider.completeThread(notizId);
       datenVersion.bump();
+      meldungen.zeigen('Faden abgehakt.');
     } catch (e) {
       melde(e);
     }
@@ -170,6 +218,7 @@
       });
       bearbeiten = false;
       datenVersion.bump();
+      meldungen.zeigen('Gespeichert.');
     } catch (e) {
       melde(e);
     } finally {
@@ -194,6 +243,7 @@
       rZiel = '';
       referenzFormular = false;
       datenVersion.bump();
+      meldungen.zeigen('Referenz angelegt.');
     } catch (e2) {
       melde(e2);
     } finally {
@@ -233,7 +283,7 @@
 
 {#await datenPromise}
   <p class="hinweis">Lade Projekt…</p>
-{:then { projekt, notizen, referenzen, zugaenge }}
+{:then { projekt, notizen, referenzen, zugaenge, projekte }}
   {#if !projekt}
     <p class="hinweis fehler">Projekt nicht gefunden.</p>
   {:else}
@@ -315,6 +365,17 @@
           <input bind:value={eTags} type="text" placeholder="haus, 2026" />
         </label>
         <div class="aktionen">
+          {#if loeschenGefragt}
+            <span class="loesch-frage">
+              „{projekt.titel}“ mit allen Notizen löschen?
+              <button type="button" class="gefahr" onclick={() => projektLoeschen(projekt.titel)} disabled={wirdGespeichert}>
+                Ja, löschen
+              </button>
+              <button type="button" onclick={() => (loeschenGefragt = false)}>Nein</button>
+            </span>
+          {:else}
+            <button type="button" class="gefahr links-weg" onclick={() => (loeschenGefragt = true)}>Löschen</button>
+          {/if}
           <button type="button" onclick={() => (bearbeiten = false)}>Abbrechen</button>
           <button type="button" class="primaer" onclick={() => kopfSpeichern(projekt)} disabled={wirdGespeichert}>
             Speichern
@@ -437,7 +498,18 @@
           {#each referenzen as ref (ref.id)}
             <li>
               <span class="referenz-typ">{REFERENZ_TYP_LABEL[ref.typ]}</span>
-              <span class="referenz-ziel">{ref.ziel}</span>
+              {#if echteDaten && OEFFENBAR.includes(ref.typ)}
+                <button
+                  type="button"
+                  class="referenz-ziel oeffnen"
+                  onclick={() => referenzOeffnen(ref.ziel)}
+                  title="Im System öffnen"
+                >
+                  {ref.ziel}
+                </button>
+              {:else}
+                <span class="referenz-ziel">{ref.ziel}</span>
+              {/if}
               <span class="hinweis rolle">{REFERENZ_ROLLE_LABEL[ref.rolle]}</span>
               <span class="badge badge--{ref.pruefstatus}">{PRUEFSTATUS_LABEL[ref.pruefstatus]}</span>
               <button type="button" class="schlicht" onclick={() => referenzPruefen(ref.id)} disabled={geprueftWird === ref.id}>
@@ -470,8 +542,34 @@
                 <span class="hinweis">{ART_LABEL[notiz.art]}</span>
                 {#if notiz.erledigt_am}<span class="hinweis">· erledigt</span>{/if}
                 <span class="alter" title={datumText(notiz.ts)}>{alterInTagenText(notiz.ts)}</span>
+                <button
+                  type="button"
+                  class="schlicht umsortieren"
+                  title="Einem anderen Projekt zuordnen"
+                  onclick={() => (verschiebeNotiz = verschiebeNotiz === notiz.id ? null : notiz.id)}
+                >
+                  ⇢
+                </button>
               </div>
               <NoteText text={notiz.text} />
+              {#if verschiebeNotiz === notiz.id}
+                <div class="verschieben">
+                  <label for={`ziel-${notiz.id}`}>Zuordnen zu</label>
+                  <select
+                    id={`ziel-${notiz.id}`}
+                    onchange={(e) => {
+                      const ziel = (e.currentTarget as HTMLSelectElement).value;
+                      if (ziel) notizVerschieben(notiz.id, ziel);
+                    }}
+                  >
+                    <option value="">Projekt wählen …</option>
+                    {#each projekte.filter((p) => p.id !== projekt.id) as p (p.id)}
+                      <option value={p.id}>{p.titel}</option>
+                    {/each}
+                  </select>
+                  <button type="button" class="schlicht" onclick={() => (verschiebeNotiz = null)}>Abbrechen</button>
+                </div>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -735,6 +833,61 @@
     padding: 0.2rem 0.6rem;
     font-size: 0.8rem;
     background: transparent;
+  }
+  button.gefahr {
+    color: var(--farbe-ueberfaellig);
+    border-color: var(--farbe-ueberfaellig);
+  }
+  .links-weg {
+    margin-right: auto;
+  }
+  .loesch-frage {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    font-size: 0.88rem;
+    color: var(--farbe-ueberfaellig);
+    margin-right: auto;
+  }
+  .umsortieren {
+    padding: 0 0.4rem;
+    line-height: 1.4;
+    color: var(--text-gedaempft);
+  }
+  .verschieben {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--rahmen);
+    font-size: 0.85rem;
+  }
+  .verschieben label {
+    color: var(--text-gedaempft);
+  }
+  .verschieben select {
+    font: inherit;
+    color: inherit;
+    background: var(--hintergrund);
+    border: 1px solid var(--rahmen);
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.4rem;
+  }
+  button.oeffnen {
+    text-align: left;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--akzent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font: inherit;
+  }
+  button.oeffnen:hover {
+    text-decoration-thickness: 2px;
   }
 
   .referenz-formular {

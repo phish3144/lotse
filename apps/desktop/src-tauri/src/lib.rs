@@ -239,6 +239,12 @@ fn postkorb(state: State<AppState>) -> R<Projekt> {
 }
 
 #[tauri::command]
+fn projekt_loeschen(state: State<AppState>, id: String) -> R<()> {
+    let id = ulid(&id)?;
+    mit(&state, |s| s.store.projekt_loeschen(id))
+}
+
+#[tauri::command]
 fn brief(state: State<AppState>, projekt_id: String) -> R<Brief> {
     let id = ulid(&projekt_id)?;
     mit(&state, |s| s.store.brief(id, now_ms()))
@@ -276,6 +282,25 @@ fn notiz_anlegen(
 fn faden_erledigen(state: State<AppState>, id: String) -> R<()> {
     let id = ulid(&id)?;
     mit(&state, |s| s.store.faden_erledigen(id))
+}
+
+/// Ordnet eine Notiz einem anderen Projekt zu – der Weg aus dem Postkorb heraus.
+/// Der Text bleibt unangetastet; nur die Zuordnung ändert sich.
+#[tauri::command]
+fn notiz_verschieben(state: State<AppState>, id: String, projekt_id: String) -> R<Notiz> {
+    let id = ulid(&id)?;
+    let ziel = ulid(&projekt_id)?;
+    mit(&state, |s| {
+        let Some(mut n) = s.store.notiz(id)? else {
+            return Err(Error::NotFound(format!("Notiz {id}")));
+        };
+        if s.store.projekt(ziel)?.is_none() {
+            return Err(Error::NotFound(format!("Projekt {ziel}")));
+        }
+        n.projekt_id = ziel;
+        s.store.notiz_speichern(&n)?;
+        Ok(n)
+    })
 }
 
 #[tauri::command]
@@ -382,6 +407,41 @@ fn scan(state: State<AppState>, wurzeln: Vec<String>) -> R<Vec<Kandidat>> {
         s.store.kandidaten_merken(&neu)?;
         Ok(neu)
     })
+}
+
+/// Systemdialog zur Ordnerwahl. Spart das Abtippen von Pfaden beim ersten Scan.
+/// `Ok(None)`, wenn der Nutzer abbricht.
+#[tauri::command]
+async fn ordner_waehlen(app: tauri::AppHandle) -> R<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog().file().pick_folder(move |pfad| {
+        let _ = tx.send(pfad);
+    });
+    let gewaehlt = rx.recv().map_err(|_| "Auswahl abgebrochen".to_string())?;
+    Ok(gewaehlt
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string()))
+}
+
+/// Öffnet eine Referenz im System: Ordner im Dateimanager, URL im Browser.
+/// Nur auf ausdrücklichen Klick, nie automatisch.
+#[tauri::command]
+fn oeffnen(app: tauri::AppHandle, ziel: String) -> R<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let ziel = ziel.trim();
+    if ziel.is_empty() {
+        return Err("Kein Ziel".into());
+    }
+    if ziel.starts_with("http://") || ziel.starts_with("https://") {
+        app.opener()
+            .open_url(ziel, None::<&str>)
+            .map_err(|e| e.to_string())
+    } else {
+        app.opener()
+            .open_path(ziel, None::<&str>)
+            .map_err(|e| e.to_string())
+    }
 }
 
 // ----------------------------------------------------------------- Tresor
@@ -575,6 +635,7 @@ async fn sync_login(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .setup(|app| {
             let fallback = app.path().app_data_dir().ok();
@@ -597,11 +658,13 @@ pub fn run() {
             projekt_anlegen,
             projekt_speichern,
             postkorb,
+            projekt_loeschen,
             brief,
             notizen,
             notiz,
             notiz_anlegen,
             faden_erledigen,
+            notiz_verschieben,
             status_setzen,
             offene_faeden,
             suche,
@@ -612,6 +675,8 @@ pub fn run() {
             kandidat_uebernehmen,
             kandidat_verwerfen,
             scan,
+            ordner_waehlen,
+            oeffnen,
             tresor_liste,
             tresor_anlegen,
             tresor_feld_lesen,

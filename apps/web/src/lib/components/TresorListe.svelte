@@ -4,6 +4,7 @@
   // (THREAT_MODEL.md: der Klartext soll so kurz wie möglich am Bildschirm stehen).
   import { provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
+  import { meldungen } from '../meldung.svelte';
   import { STUFE_LABEL } from '../format';
   import type { Id, Projekt, TresorEintrag } from '../data/types';
 
@@ -72,6 +73,7 @@
       loeschKandidat = null;
       verdecken();
       datenVersion.bump();
+      meldungen.zeigen('Eintrag gelöscht, Schlüssel vernichtet.');
     } catch (e) {
       fehler = e instanceof Error ? e.message : String(e);
     }

@@ -88,6 +88,38 @@ describe('DataProvider (Mock)', () => {
     await expect(provider.readVaultField(eintrag.id, 'Passwort')).rejects.toThrow();
   });
 
+  it('ordnet eine Notiz einem anderen Projekt zu, ohne den Text zu ändern', async () => {
+    const postkorb = await provider.postkorb();
+    const ziel = await provider.createProject('Heizung', 'hardware_maker');
+    const notiz = await provider.addNote(postkorb.id, {
+      quelle: 'mensch',
+      art: 'log',
+      text: 'Vorlauftemperatur prüfen.',
+    });
+
+    const verschoben = await provider.moveNote(notiz.id, ziel.id);
+    expect(verschoben.projekt_id).toBe(ziel.id);
+    expect(verschoben.text).toBe('Vorlauftemperatur prüfen.');
+
+    expect((await provider.listNotes(postkorb.id)).some((n) => n.id === notiz.id)).toBe(false);
+    expect((await provider.listNotes(ziel.id)).some((n) => n.id === notiz.id)).toBe(true);
+
+    await expect(provider.moveNote(notiz.id, 'p_gibtsnicht')).rejects.toThrow(/Unbekanntes Projekt/);
+  });
+
+  it('löscht ein Projekt samt Notizen und Referenzen', async () => {
+    const projekt = await provider.createProject('Wegwerf', 'generisch');
+    await provider.addNote(projekt.id, { quelle: 'mensch', art: 'log', text: 'Eine Zeile.' });
+    await provider.addReference(projekt.id, 'url', 'https://example.invalid', 'doku');
+
+    await provider.deleteProject(projekt.id);
+
+    expect(await provider.getProject(projekt.id)).toBeUndefined();
+    expect(await provider.listNotes(projekt.id)).toHaveLength(0);
+    expect(await provider.listReferences(projekt.id)).toHaveLength(0);
+    expect((await provider.listProjects()).some((p) => p.id === projekt.id)).toBe(false);
+  });
+
   it('verwirft einen Kandidaten dauerhaft', async () => {
     const vorher = await provider.listCandidates();
     expect(vorher.length).toBeGreaterThan(0);

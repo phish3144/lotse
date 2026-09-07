@@ -3,6 +3,7 @@
   import { provider } from '../lib/data/store';
   import { datenVersion } from '../lib/data/version.svelte';
   import { alterInTagenText } from '../lib/format';
+  import { meldungen } from '../lib/meldung.svelte';
 
   async function laden() {
     const [faeden, projekte] = await Promise.all([provider.listOpenThreads(), provider.listProjects()]);
@@ -24,6 +25,7 @@
     try {
       await provider.completeThread(notizId);
       datenVersion.bump();
+      meldungen.zeigen('Faden abgehakt.');
     } catch (e) {
       fehlerText = e instanceof Error ? e.message : String(e);
     } finally {

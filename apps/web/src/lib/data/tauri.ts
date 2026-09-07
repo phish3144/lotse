@@ -137,6 +137,17 @@ export const sync = {
 /** Ist auf diesem Gerät die Tresor-Stufe »nur Desktop« lesbar? */
 export const kannNurDesktop = () => invoke<boolean>('kann_nur_desktop');
 
+/**
+ * Zugriffe auf das System, die es nur in der Hülle gibt. Im Browser sind sie nicht
+ * verfügbar; die Oberfläche blendet die zugehörigen Knöpfe dort aus.
+ */
+export const system = {
+  /** Systemdialog zur Ordnerwahl. `null`, wenn abgebrochen. */
+  ordnerWaehlen: () => invoke<string | null>('ordner_waehlen'),
+  /** Öffnet Ordner, Datei oder URL im System – nur auf ausdrücklichen Klick. */
+  oeffnen: (ziel: string) => invoke<void>('oeffnen', { ziel }),
+};
+
 export function createTauriProvider(): DataProvider {
   return {
     async listProjects() {
@@ -156,6 +167,9 @@ export function createTauriProvider(): DataProvider {
     async postkorb() {
       return projekt(await invoke<RohProjekt>('postkorb'));
     },
+    async deleteProject(id) {
+      await invoke<void>('projekt_loeschen', { id });
+    },
     async listNotes(projectId) {
       return (await invoke<RohNotiz[]>('notizen', { projektId: projectId })).map(notiz);
     },
@@ -165,6 +179,9 @@ export function createTauriProvider(): DataProvider {
     },
     async completeThread(noteId) {
       await invoke<void>('faden_erledigen', { id: noteId });
+    },
+    async moveNote(noteId, projectId) {
+      return notiz(await invoke<RohNotiz>('notiz_verschieben', { id: noteId, projektId: projectId }));
     },
     async setStatus(projectId, status: ProjektStatus, uebergabeText, wiedervorlage) {
       return projekt(

@@ -413,6 +413,20 @@ export function createMockProvider(): DataProvider {
       return clone(project);
     },
 
+    async deleteProject(id) {
+      const index = projects.findIndex((p) => p.id === id);
+      if (index < 0) {
+        throw new Error(`Unbekanntes Projekt: ${id}`);
+      }
+      projects.splice(index, 1);
+      for (let i = notes.length - 1; i >= 0; i--) {
+        if (notes[i].projekt_id === id) notes.splice(i, 1);
+      }
+      for (let i = references.length - 1; i >= 0; i--) {
+        if (references[i].projekt_id === id) references.splice(i, 1);
+      }
+    },
+
     async listNotes(projectId) {
       return clone(notes.filter((n) => n.projekt_id === projectId)).sort((a, b) => b.ts.localeCompare(a.ts));
     },
@@ -442,6 +456,18 @@ export function createMockProvider(): DataProvider {
         throw new Error(`Unbekannte Notiz: ${noteId}`);
       }
       note.erledigt_am = new Date().toISOString();
+    },
+
+    async moveNote(noteId, projectId) {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note) {
+        throw new Error(`Unbekannte Notiz: ${noteId}`);
+      }
+      if (!projects.some((p) => p.id === projectId)) {
+        throw new Error(`Unbekanntes Projekt: ${projectId}`);
+      }
+      note.projekt_id = projectId;
+      return clone(note);
     },
 
     async setStatus(projectId, status, uebergabeText) {

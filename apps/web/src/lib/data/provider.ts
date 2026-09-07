@@ -32,12 +32,19 @@ export interface DataProvider {
   saveProject(projekt: Projekt): Promise<Projekt>;
   /** Auffangprojekt für Gedanken ohne Zuordnung. Wird beim ersten Zugriff angelegt. */
   postkorb(): Promise<Projekt>;
+  /** Löscht ein Projekt samt seiner Notizen und Referenzen. */
+  deleteProject(id: Id): Promise<void>;
 
   listNotes(projectId: Id): Promise<Notiz[]>;
   /** Legt eine neue Notiz an. Notizen werden nie überschrieben. */
   addNote(projectId: Id, note: Pick<Notiz, 'quelle' | 'art' | 'text'> & Partial<Pick<Notiz, 'erledigt_am'>>): Promise<Notiz>;
   /** Hakt einen offenen Faden ab. Der Eintrag bleibt im Logbuch stehen. */
   completeThread(noteId: Id): Promise<void>;
+  /**
+   * Ordnet eine Notiz einem anderen Projekt zu – der Weg aus dem Postkorb heraus.
+   * Der Text bleibt unangetastet, nur die Zuordnung ändert sich.
+   */
+  moveNote(noteId: Id, projectId: Id): Promise<Notiz>;
 
   /**
    * Setzt den Projektstatus. Beim Wechsel auf `pausiert` oder `wartet` ist
