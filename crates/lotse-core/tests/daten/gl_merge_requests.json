@@ -1,0 +1,243 @@
+[
+ {
+  "id": 528731480,
+  "iid": 7306,
+  "project_id": 250833,
+  "title": "Fix after_script timeout clamping to job timeout",
+  "description": "## What does this MR do?\n\nPreserves configured positive stage timeouts when they exceed the remaining job timeout, allowing the parent context deadline to clamp them.\n\nAdds a regression test for `RUNNER_AFTER_SCRIPT_TIMEOUT`.\n\n## Why was this MR needed?\n\n`getStageTimeoutContexts` logged that an oversized timeout would be clamped but did not store the parsed duration. For `after_script`, this left the default timeout of 5 minutes in place.\n\n## What's the best way to test this MR?\n\n```shell\ngo test ./common -run TestGetStageTimeoutContexts -count=1\ngo test -race ./common -run TestGetStageTimeoutContexts -count=1\ngo vet ./common\n```\n\n## What are the relevant issue numbers?\n\nCloses gitlab-org/gitlab-runner#39717",
+  "state": "opened",
+  "created_at": "2026-09-07T00:30:54.101Z",
+  "updated_at": "2026-09-07T01:12:06.929Z",
+  "merged_by": null,
+  "merge_user": null,
+  "merged_at": null,
+  "closed_by": null,
+  "closed_at": null,
+  "target_branch": "main",
+  "source_branch": "fix/issue-39717-clamp-after-script-timeout",
+  "user_notes_count": 2,
+  "upvotes": 0,
+  "downvotes": 0,
+  "author": {
+   "id": 30668295,
+   "username": "iseccard",
+   "public_email": "",
+   "name": "Igor Eccard",
+   "state": "active",
+   "locked": false,
+   "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/30668295/avatar.png?v=1788740479",
+   "web_url": "https://gitlab.com/iseccard"
+  },
+  "assignees": [
+   {
+    "id": 30668295,
+    "username": "iseccard",
+    "public_email": "",
+    "name": "Igor Eccard",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/30668295/avatar.png?v=1788740479",
+    "web_url": "https://gitlab.com/iseccard"
+   }
+  ],
+  "assignee": {
+   "id": 30668295,
+   "username": "iseccard",
+   "public_email": "",
+   "name": "Igor Eccard",
+   "state": "active",
+   "locked": false,
+   "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/30668295/avatar.png?v=1788740479",
+   "web_url": "https://gitlab.com/iseccard"
+  },
+  "reviewers": [
+   {
+    "id": 21826781,
+    "username": "GitLabDuo",
+    "public_email": null,
+    "name": "GitLab Duo",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/21826781/duo-bot.png?v=1781708173",
+    "web_url": "https://gitlab.com/GitLabDuo"
+   }
+  ],
+  "source_project_id": 86160396,
+  "target_project_id": 250833,
+  "labels": [
+   "Community contribution",
+   "devops::verify",
+   "group::runner core",
+   "linked-issue",
+   "section::ci",
+   "type::bug",
+   "workflow::in dev"
+  ],
+  "draft": false,
+  "imported": false,
+  "imported_from": "none",
+  "work_in_progress": false,
+  "milestone": null,
+  "merge_when_pipeline_succeeds": false,
+  "merge_status": "can_be_merged",
+  "detailed_merge_status": "not_approved",
+  "merge_after": null,
+  "sha": "f9231d6a223ba33cc243500710df721aa67ca22a",
+  "merge_commit_sha": null,
+  "squash_commit_sha": null,
+  "discussion_locked": null,
+  "should_remove_source_branch": null,
+  "force_remove_source_branch": true,
+  "prepared_at": "2026-09-07T00:30:58.970Z",
+  "allow_collaboration": true,
+  "allow_maintainer_to_push": true,
+  "reference": "!7306",
+  "references": {
+   "short": "!7306",
+   "relative": "!7306",
+   "full": "gitlab-org/gitlab-runner!7306"
+  },
+  "web_url": "https://gitlab.com/gitlab-org/gitlab-runner/-/merge_requests/7306",
+  "time_stats": {
+   "time_estimate": 0,
+   "total_time_spent": 0,
+   "human_time_estimate": null,
+   "human_total_time_spent": null
+  },
+  "squash": true,
+  "squash_on_merge": true,
+  "task_completion_status": {
+   "count": 0,
+   "completed_count": 0
+  },
+  "has_conflicts": false,
+  "blocking_discussions_resolved": true,
+  "approvals_before_merge": null
+ },
+ {
+  "id": 528714853,
+  "iid": 7305,
+  "project_id": 250833,
+  "title": "Clone the pipeline SHA instead of the mutable merge ref",
+  "description": "## What does this MR do?\n\n`writeCloneRevisionCmd` builds the `git clone` invocation used when `FF_USE_GIT_NATIVE_CLONE` is enabled. It passed `GitInfo.Ref` to `git clone --revision`, so the remote resolved that ref at clone time.\n\nThis MR makes it prefer `GitInfo.Sha` when the job supplies one. The existing handling of a fully qualified `refs/` ref and of a plain branch name is kept unchanged as a fallback, so nothing regresses for jobs that arrive without a SHA.\n\n## Why was this MR needed?\n\nOn merged results pipelines `GitInfo.Ref` is `refs/merge-requests/<iid>/merge`. GitLab rewrites that ref every time the target branch advances, so it is not a stable pointer. When the runner clones by that ref, the remote resolves it to whatever the ref points at _now_, which can be a tree that no longer contains the SHA the job was created for. `writeCheckoutCmd` then tries to check out `GitInfo.Sha` against that tree and the job fails with:\n\nfatal: reference is not a tree:\n\nThe failure is a race, so it shows up intermittently on busy target branches and is hard to reproduce on demand.\n\nThe non-native fetch path never had this problem: it asks the remote for the SHA directly through `GitInfo.Refspecs` rather than resolving a mutable ref. Cloning the SHA brings the native clone path in line with that behaviour, which fixes the root cause rather than retrying or re-fetching after the checkout has already failed.\n\n## Differences\n\n**Before:** With `FF_USE_GIT_NATIVE_CLONE` enabled, a merged results pipeline ran `git clone --no-checkout <url> <dir> --revision refs/merge-requests/<iid>/merge`. If the target branch moved between pipeline creation and the clone, the resulting tree did not contain the pipeline SHA and the subsequent checkout aborted with `fatal: reference is not a tree`.\n\n**After:** The same job runs `git clone --no-checkout <url> <dir> --revision <pipeline sha>`. The SHA is immutable, so the cloned tree always contains the commit that the checkout step asks for, and the job is unaffected by activity on the target branch. Jobs that arrive without a SHA still clone by `--revision <refs/...>` or `--branch <name>` exactly as before.\n\n## What's the best way to test this MR?\n\nThe change is covered by a new table-driven test in `shells/abstract_test.go`:\n\n```\ngo test ./shells/ -run TestCloneRevisionPrefersPipelineSha -v\n```\n\nIt asserts all four branches of the new `switch`: a merged results job (SHA plus merge ref) and a branch job (SHA plus branch name) both clone by `--revision <sha>`, while a job with no SHA still falls back to `--revision <ref>` for a fully qualified ref and `--branch <name>` for a branch name.\n\nTwo existing expectations in `TestGitCloneFlags` and `TestAbstractShell_handleGetSourcesStrategy` were updated, since they previously asserted the old `--branch` argument for a job that does carry a SHA.\n\nThe whole package passes:\n\n```\ngo build ./... && go vet ./shells/ && go test ./shells/\n```\n\nEnd to end, run any job with `FF_USE_GIT_NATIVE_CLONE: \"true\"` in a merged results pipeline and push to the target branch while it is queued — before this change the job intermittently fails on checkout, after it does not.\n\n## What are the relevant issue numbers?\n\nCloses https://gitlab.com/gitlab-org/gitlab-runner/-/issues/39641",
+  "state": "opened",
+  "created_at": "2026-09-06T21:56:56.660Z",
+  "updated_at": "2026-09-06T22:45:44.648Z",
+  "merged_by": null,
+  "merge_user": null,
+  "merged_at": null,
+  "closed_by": null,
+  "closed_at": null,
+  "target_branch": "main",
+  "source_branch": "fix/39641-native-clone-pipeline-sha",
+  "user_notes_count": 8,
+  "upvotes": 0,
+  "downvotes": 0,
+  "author": {
+   "id": 42048126,
+   "username": "sjestonsingh",
+   "public_email": "sjestonsingh@gmail.com",
+   "name": "S. Jeston Singh",
+   "state": "active",
+   "locked": false,
+   "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/42048126/avatar.png?v=1788753140",
+   "web_url": "https://gitlab.com/sjestonsingh"
+  },
+  "assignees": [
+   {
+    "id": 42048126,
+    "username": "sjestonsingh",
+    "public_email": "sjestonsingh@gmail.com",
+    "name": "S. Jeston Singh",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/42048126/avatar.png?v=1788753140",
+    "web_url": "https://gitlab.com/sjestonsingh"
+   }
+  ],
+  "assignee": {
+   "id": 42048126,
+   "username": "sjestonsingh",
+   "public_email": "sjestonsingh@gmail.com",
+   "name": "S. Jeston Singh",
+   "state": "active",
+   "locked": false,
+   "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/42048126/avatar.png?v=1788753140",
+   "web_url": "https://gitlab.com/sjestonsingh"
+  },
+  "reviewers": [
+   {
+    "id": 21826781,
+    "username": "GitLabDuo",
+    "public_email": null,
+    "name": "GitLab Duo",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/21826781/duo-bot.png?v=1781708173",
+    "web_url": "https://gitlab.com/GitLabDuo"
+   },
+   {
+    "id": 37702883,
+    "username": "lachie-gitlab",
+    "public_email": "",
+    "name": "Lachlan Grant",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/37702883/avatar.png?v=1788758649",
+    "web_url": "https://gitlab.com/lachie-gitlab"
+   }
+  ],
+  "source_project_id": 41490860,
+  "target_project_id": 250833,
+  "labels": [
+   "1st contribution",
+   "Community contribution",
+   "devops::verify",
+   "group::runner core",
+   "linked-issue",
+   "section::ci",
+   "type::bug",
+   "workflow::ready for review"
+  ],
+  "draft": false,
+  "imported": false,
+  "imported_from": "none",
+  "work_in_progress": false,
+  "milestone": null,
+  "merge_when_pipeline_succeeds": false,
+  "merge_status": "can_be_merged",
+  "detailed_merge_status": "not_approved",
+  "merge_after": null,
+  "sha": "8157cf8e322647d49653890791518518cded7df3",
+  "merge_commit_sha": null,
+  "squash_commit_sha": null,
+  "discussion_locked": null,
+  "should_remove_source_branch": null,
+  "force_remove_source_branch": true,
+  "prepared_at": "2026-09-06T21:57:05.369Z",
+  "allow_collaboration": true,
+  "allow_maintainer_to_push": true,
+  "reference": "!7305",
+  "references": {
+   "short": "!7305",
+   "relative": "!7305",
+   "full": "gitlab-org/gitlab-runner!7305"
+  },
+  "web_url": "https://gitlab.com/gitlab-org/gitlab-runner/-/merge_requests/7305",
+  "time_stats": {
+   "time_estimate": 0,
+   "total_time_spent": 0,
+   "human_time_estimate": null,
+   "human_total_time_spent": null
+  },
+  "squash": false,
+  "squash_on_merge": false,
+  "task_completion_status": {
+   "count": 0,
+   "completed_count": 0
+  },
+  "has_conflicts": false,
+  "blocking_discussions_resolved": true,
+  "approvals_before_merge": null
+ }
+]

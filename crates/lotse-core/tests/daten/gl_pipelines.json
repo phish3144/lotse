@@ -1,0 +1,15 @@
+[
+ {
+  "id": 2826094328,
+  "iid": 51370,
+  "project_id": 250833,
+  "sha": "7b010e09cf59b26a3e095126a8fb6a4dc948a1a3",
+  "ref": "main",
+  "status": "running",
+  "source": "push",
+  "created_at": "2026-09-07T10:08:46.614Z",
+  "updated_at": "2026-09-07T10:08:50.541Z",
+  "web_url": "https://gitlab.com/gitlab-org/gitlab-runner/-/pipelines/2826094328",
+  "name": null
+ }
+]

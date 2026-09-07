@@ -202,12 +202,19 @@ export interface ForgeProjekt {
   projekt_id: string;
   titel: string;
   repo: string;
+  anbieter: 'GitHub' | 'GitLab';
+  url: string;
+  /** Woher das Repo bekannt ist: aus einer eingetragenen Adresse oder aus dem Git-Remote eines Ordners. */
+  herkunft: 'adresse' | 'ordner';
 }
 
 export interface ForgeStatus {
   projekte: ForgeProjekt[];
   token_eintrag?: string;
   token_feld?: string;
+  /** Läuft der Ordner-Beobachter, fragt er GitHub in großem Abstand mit ab. */
+  auto: boolean;
+  zuletzt?: number;
 }
 
 export interface ForgeErgebnis {
@@ -217,12 +224,14 @@ export interface ForgeErgebnis {
 }
 
 /**
- * Remote-Git: liest offene Pull Requests, Issue-Zahl und Prüflauf-Status von GitHub.
- * Der Token liegt im Tresor; hier steht nur, in welchem Eintrag.
+ * Remote-Git: liest offene Pull bzw. Merge Requests, Issue-Zahl und Prüflauf-Status
+ * von GitHub und GitLab. Der Token liegt im Tresor; hier steht nur, in welchem Eintrag.
  */
 export const forge = {
   status: () => invoke<ForgeStatus>('forge_status'),
   tokenSetzen: (eintragId: string, feld: string) => invoke<void>('forge_token_setzen', { eintragId, feld }),
+  autoSetzen: (an: boolean) => invoke<void>('forge_auto_setzen', { an }),
+  projekt: (projektId: string) => invoke<ForgeProjekt | null>('forge_projekt', { projektId }),
   abfragen: (projektId?: string) => invoke<ForgeErgebnis>('forge_abfragen', { projektId: projektId ?? null }),
 };
 

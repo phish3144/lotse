@@ -58,6 +58,45 @@ pub fn log(repo: &Path, seit_ms: Option<i64>, limit: usize) -> Result<Vec<Commit
     Ok(commits)
 }
 
+/// Liest die Remote-URLs eines Repos, `origin` zuerst. Leer, wenn der Pfad kein Repo
+/// ist, kein Remote gesetzt ist oder kein git installiert ist – alles drei ist ein
+/// Zustand, kein Fehler. Funktioniert auch aus einem Unterordner heraus.
+pub fn remotes(repo: &Path) -> Vec<String> {
+    let out = match Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .arg("remote")
+        .arg("-v")
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut gefunden: Vec<(String, String)> = Vec::new();
+    for line in text.lines() {
+        // Format: "origin\tgit@github.com:o/r.git (fetch)"
+        let Some((name, rest)) = line.split_once('\t') else {
+            continue;
+        };
+        let url = rest.split(" (").next().unwrap_or("").trim();
+        if url.is_empty() {
+            continue;
+        }
+        // `remote -v` nennt jedes Remote zweimal (fetch und push).
+        if gefunden.iter().any(|(n, u)| n == name && u == url) {
+            continue;
+        }
+        gefunden.push((name.to_string(), url.to_string()));
+    }
+    // Stabil: `origin` nach vorn, der Rest behält seine Reihenfolge.
+    gefunden.sort_by_key(|(n, _)| u8::from(n != "origin"));
+    gefunden.into_iter().map(|(_, u)| u).collect()
+}
+
 /// Verdichtet Commits zu einer Notiz pro Tag (UTC), rückdatiert auf den letzten Commit
 /// des Tages.
 pub fn verdichten(projekt_id: Ulid, commits: &[Commit], quelle: Quelle) -> Vec<Notiz> {
@@ -149,5 +188,49 @@ mod tests {
         assert!(log(t.path(), Some(crate::now_ms() + 60_000), 50)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn remotes_nennt_origin_zuerst() {
+        let t = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            Command::new("git")
+                .arg("-C")
+                .arg(t.path())
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        if !run(&["init", "-q"]).status.success() {
+            return; // kein git in dieser Umgebung
+        }
+        // Ohne Remote ist die Liste leer, nicht fehlerhaft.
+        assert!(remotes(t.path()).is_empty());
+
+        run(&["remote", "add", "spiegel", "https://example.invalid/s.git"]);
+        run(&[
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:phish3144/lotse.git",
+        ]);
+        let r = remotes(t.path());
+        assert_eq!(r.len(), 2, "{r:?}");
+        // Nicht auf die genaue Schreibweise prüfen: git schreibt URLs um, wenn in der
+        // Umgebung `insteadOf` konfiguriert ist. Entscheidend ist, welches Remote vorn steht.
+        assert!(r[0].contains("phish3144/lotse"), "{r:?}");
+        assert!(r[1].contains("example.invalid"), "{r:?}");
+
+        // Auch aus einem Unterordner heraus, denn Referenzen zeigen oft dorthin.
+        let unter = t.path().join("crates");
+        std::fs::create_dir(&unter).unwrap();
+        assert_eq!(
+            remotes(&unter).first().map(String::as_str),
+            r.first().map(String::as_str)
+        );
+
+        // Ein Ordner ohne Repo ergibt nichts.
+        let leer = tempfile::tempdir().unwrap();
+        assert!(remotes(leer.path()).is_empty());
     }
 }

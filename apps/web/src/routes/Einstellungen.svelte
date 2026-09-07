@@ -135,6 +135,20 @@
     }
   }
 
+  async function forgeAutoUmschalten(an: boolean) {
+    try {
+      await forge.autoSetzen(an);
+      forgeStatus = await forge.status();
+      meldungen.zeigen(
+        an
+          ? 'Die Gegenseite wird vom Ordner-Beobachter mit abgefragt, höchstens alle 30 Minuten.'
+          : 'Die Gegenseite wird nur noch auf Knopfdruck abgefragt.',
+      );
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
   async function forgeAbfragen() {
     forgeLaeuft = true;
     try {
@@ -464,11 +478,11 @@
 </section>
 
 <section aria-labelledby="forge-titel">
-  <h2 id="forge-titel">GitHub</h2>
+  <h2 id="forge-titel">GitHub und GitLab</h2>
   <p class="hinweis">
-    Holt zu Projekten mit einer GitHub-Referenz, was der lokale Git-Log nicht weiß: offene Pull Requests, die Zahl
-    offener Issues und ob der Prüflauf rot ist. Das landet als eine verdichtete Zeile im Logbuch – Issues werden
-    <strong>nicht</strong> zu offenen Fäden, denn Tickets und Backlogs sind erklärtes Nicht-Ziel.
+    Holt zu Projekten mit einem Repo auf der Gegenseite, was der lokale Git-Log nicht weiß: offene Pull bzw. Merge
+    Requests, die Zahl offener Issues und ob der Prüflauf rot ist. Das landet als eine verdichtete Zeile im Logbuch –
+    Issues werden <strong>nicht</strong> zu offenen Fäden, denn Tickets und Backlogs sind erklärtes Nicht-Ziel.
   </p>
   {#if !echteDaten}
     <p class="nur-desktop">Nur in der Desktop-App.</p>
@@ -476,18 +490,23 @@
     <p class="hinweis">Lade Status…</p>
   {:else if forgeStatus.projekte.length === 0}
     <p class="hinweis">
-      Kein Projekt hat bisher eine GitHub-Referenz. Leg auf einer Projektseite unter <em>Referenzen</em> eine an –
-      Typ <em>Git-Repo</em> oder <em>URL</em>, Ziel etwa <code>https://github.com/name/repo</code>.
+      Kein Projekt zeigt bisher auf ein Repo bei GitHub oder GitLab. Am wenigsten Arbeit macht eine Ordner-Referenz
+      auf einen geklonten Arbeitsordner: Lotse liest dessen Git-Remote selbst. Sonst eine Referenz vom Typ
+      <em>URL</em> mit <code>https://github.com/name/repo</code> oder <code>https://gitlab.com/gruppe/repo</code>.
     </p>
   {:else}
     <ul class="repos">
       {#each forgeStatus.projekte as p (p.projekt_id)}
-        <li><a href={`#/projekt/${p.projekt_id}`}>{p.titel}</a> <span class="hinweis klein">{p.repo}</span></li>
+        <li>
+          <a href={`#/projekt/${p.projekt_id}`}>{p.titel}</a>
+          <span class="hinweis klein">{p.anbieter}: {p.repo}</span>
+          {#if p.herkunft === 'ordner'}<span class="hinweis klein">– aus dem Ordner erkannt</span>{/if}
+        </li>
       {/each}
     </ul>
     <form class="zeile" onsubmit={forgeVerbinden}>
       <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem Token">
-        <option value="">Ohne Token (nur öffentliche Repos, 60 Anfragen/Stunde)</option>
+        <option value="">Ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
         {#each tresorEintraege as t (t.id)}
           <option value={t.id}>{t.titel}</option>
         {/each}
@@ -496,8 +515,23 @@
       <button type="submit">Merken</button>
     </form>
     <p class="hinweis klein">
-      Für private Repos und ein größeres Kontingent: einen GitHub-Token als Tresor-Eintrag anlegen und hier wählen.
-      Lotse liest ihn nur beim Abfragen und gibt ihn nur an GitHub weiter.
+      Für private Repos und ein größeres Kontingent: einen Token als Tresor-Eintrag anlegen und hier wählen. Lotse
+      liest ihn nur beim Abfragen und schickt ihn nur an den Hoster, zu dem das Repo gehört.
+    </p>
+    <label class="schalter">
+      <input
+        type="checkbox"
+        checked={forgeStatus.auto}
+        onchange={(e) => forgeAutoUmschalten(e.currentTarget.checked)}
+      />
+      Mit dem Ordner-Beobachter mitlaufen lassen
+    </label>
+    <p class="hinweis klein">
+      Dann fragt Lotse die Gegenseite selbsttätig ab, solange der Beobachter läuft – höchstens alle 30 Minuten,
+      damit das Kontingent reicht.
+      {#if forgeStatus.zuletzt}
+        Zuletzt: {new Date(forgeStatus.zuletzt).toLocaleString('de-DE')}.
+      {/if}
     </p>
     <button type="button" class="primaer" onclick={forgeAbfragen} disabled={forgeLaeuft}>
       {forgeLaeuft ? 'Frage ab …' : 'Jetzt abfragen'}
@@ -693,6 +727,17 @@
   .zeile input {
     flex: 1;
     min-width: 15rem;
+  }
+  .schalter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+  }
+  .schalter input {
+    width: auto;
+    margin: 0;
   }
   .beobachter {
     display: flex;

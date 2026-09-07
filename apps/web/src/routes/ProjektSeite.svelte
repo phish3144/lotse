@@ -4,7 +4,7 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { ki, system } from '../lib/data/tauri';
+  import { forge, ki, system, type ForgeProjekt } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -261,6 +261,46 @@
       melde(e);
     } finally {
       geprueftWird = null;
+    }
+  }
+
+  // --- Gegenseite (GitHub) --------------------------------------------------
+  // Das Repo kommt aus einer eingetragenen Adresse oder aus dem Git-Remote eines
+  // Ordners; niemand muss es von Hand hinterlegen.
+  let gegenseite: ForgeProjekt | null = $state(null);
+  let gegenseiteLaeuft = $state(false);
+
+  $effect(() => {
+    const projektId = id;
+    gegenseite = null;
+    if (!echteDaten) return;
+    let gilt = true;
+    forge
+      .projekt(projektId)
+      .then((p) => {
+        if (gilt) gegenseite = p;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  async function gegenseiteAbfragen() {
+    gegenseiteLaeuft = true;
+    try {
+      const r = await forge.abfragen(id);
+      for (const f of r.fehler) meldungen.zeigen(f, 'fehler');
+      if (r.notizen > 0) {
+        datenVersion.bump();
+        meldungen.zeigen('Stand der Gegenseite im Logbuch.');
+      } else if (r.abgefragt > 0) {
+        meldungen.zeigen('Abgefragt, nichts Neues zu melden.');
+      }
+    } catch (e) {
+      melde(e);
+    } finally {
+      gegenseiteLaeuft = false;
     }
   }
 
@@ -566,6 +606,24 @@
           </select>
           <button type="submit" class="primaer" disabled={!rZiel.trim() || wirdGespeichert}>Speichern</button>
         </form>
+      {/if}
+
+      {#if gegenseite}
+        <p class="gegenseite">
+          <span class="referenz-typ">{gegenseite.anbieter}</span>
+          <button
+            type="button"
+            class="referenz-ziel oeffnen"
+            onclick={() => referenzOeffnen(gegenseite!.url)}
+            title="Im Browser öffnen"
+          >
+            {gegenseite.repo}
+          </button>
+          {#if gegenseite.herkunft === 'ordner'}<span class="hinweis rolle">aus dem Ordner erkannt</span>{/if}
+          <button type="button" class="schlicht" onclick={gegenseiteAbfragen} disabled={gegenseiteLaeuft}>
+            {gegenseiteLaeuft ? '…' : 'Stand holen'}
+          </button>
+        </p>
       {/if}
 
       {#if referenzen.length === 0}
@@ -1048,6 +1106,17 @@
   .faden-text {
     flex: 1;
     min-width: 10rem;
+  }
+  .gegenseite {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin: 0 0 0.8rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--rahmen);
+    border-radius: 0.5rem;
+    background: var(--karten-hintergrund);
   }
   .referenz-typ {
     font-size: 0.75rem;

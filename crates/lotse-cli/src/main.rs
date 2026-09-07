@@ -96,6 +96,14 @@ enum Cmd {
     Sync(SyncCmd),
     /// MCP-Server über stdin/stdout für KI-Assistenten (z. B. `claude mcp add lotse -- lotse mcp`)
     Mcp,
+    /// Stand auf der Gegenseite holen (GitHub, GitLab) und verdichtet ins Logbuch schreiben
+    Gegenseite {
+        /// Nur dieses Projekt; ohne Angabe alle mit erkanntem Repo
+        projekt: Option<String>,
+        /// Nur zeigen, nichts ins Logbuch schreiben
+        #[arg(long)]
+        trocken: bool,
+    },
     /// Wurzelordner beobachten und Änderungen verdichtet ins Logbuch schreiben (läuft bis Strg+C)
     Beobachten {
         /// Wurzelordner; ohne Angabe die gemerkten. Mit --merken dauerhaft speichern.
@@ -350,12 +358,120 @@ fn run() -> Result<()> {
             lotse_core::mcp::bedienen(&mut store, stdin.lock(), stdout.lock())?;
             Ok(())
         }
+        Cmd::Gegenseite { projekt, trocken } => gegenseite(
+            &mut store,
+            &ak,
+            konto_daten.geraet_id,
+            projekt.as_deref(),
+            trocken,
+        ),
         Cmd::Beobachten {
             wurzeln,
             merken,
             intervall,
         } => beobachten(&mut store, wurzeln, merken, intervall),
     }
+}
+
+/// Zeiger auf den Tresor-Eintrag mit dem Token – dieselben Schlüssel wie in der App,
+/// damit beide Oberflächen dieselbe Einstellung nutzen.
+const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
+const META_FORGE_FELD: &str = "forge_token_feld";
+
+/// Holt den Stand von GitHub oder GitLab. Den Token liefert entweder die Umgebung
+/// (`LOTSE_FORGE_TOKEN`) oder der in der App hinterlegte Tresor-Eintrag.
+fn gegenseite(
+    store: &mut Store,
+    ak: &Key32,
+    geraet_id: Ulid,
+    projekt: Option<&str>,
+    trocken: bool,
+) -> Result<()> {
+    use lotse_core::forge;
+
+    let nur = projekt.map(|p| finde_projekt(store, p)).transpose()?;
+
+    let mut ziele = Vec::new();
+    for p in store.projekte()? {
+        if nur.as_ref().is_some_and(|n| n.id != p.id) {
+            continue;
+        }
+        let refs = store.referenzen(p.id)?;
+        if let Some((z, h)) = forge::zeiger_aus_referenzen(&refs, geraet_id) {
+            ziele.push((p, z, h));
+        }
+    }
+    if ziele.is_empty() {
+        bail!(
+            "Kein Projekt zeigt auf ein Repo bei GitHub oder GitLab. Eine Ordner-Referenz auf \
+             einen geklonten Arbeitsordner genügt – das Remote liest Lotse selbst."
+        );
+    }
+
+    let token = match std::env::var("LOTSE_FORGE_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty())
+    {
+        Some(t) => Some(t),
+        None => forge_token_aus_tresor(store, ak, geraet_id)?,
+    };
+
+    for (p, z, h) in ziele {
+        let stand = match forge::abfragen(&z, token.as_deref()) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("{}: {e}", z.anzeige());
+                continue;
+            }
+        };
+        let woher = match h {
+            forge::Herkunft::Adresse => "eingetragen",
+            forge::Herkunft::Ordner => "am Ordner erkannt",
+        };
+        println!(
+            "{}  {} ({}, {woher})",
+            p.titel,
+            z.anzeige(),
+            z.anbieter.as_str()
+        );
+        println!(
+            "  {} offen zur Übernahme, {} offene Issues, Prüflauf {} auf {}",
+            stand.offene_prs,
+            stand.offene_issues,
+            stand.ci.as_str(),
+            stand.standard_branch
+        );
+        match forge::notiz(p.id, &z, &stand, now_ms()) {
+            Some(n) if !trocken => {
+                store.notiz_speichern(&n)?;
+                println!("  → Logbuch");
+            }
+            Some(_) => println!("  (trocken: nichts geschrieben)"),
+            None => println!("  nichts zu melden"),
+        }
+    }
+    Ok(())
+}
+
+/// Liest den Token aus dem Tresor, falls in der App ein Eintrag hinterlegt wurde.
+fn forge_token_aus_tresor(store: &Store, ak: &Key32, geraet_id: Ulid) -> Result<Option<String>> {
+    let Some(id) = store
+        .meta_get(META_FORGE_EINTRAG)?
+        .filter(|v| !v.is_empty())
+    else {
+        return Ok(None);
+    };
+    let Ok(uid) = Ulid::from_string(&id) else {
+        return Ok(None);
+    };
+    let Some(e) = store.tresor_eintrag(uid)? else {
+        return Ok(None);
+    };
+    let feld = store
+        .meta_get(META_FORGE_FELD)?
+        .unwrap_or_else(|| "token".to_string());
+    let keys = vault_keys(ak, geraet_id)?;
+    Ok(Some(e.feld_lesen(&keys, &feld)?.to_string()))
 }
 
 fn beobachten(

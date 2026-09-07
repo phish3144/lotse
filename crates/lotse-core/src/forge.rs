@@ -20,60 +20,158 @@ use ulid::Ulid;
 use crate::model::{Art, Notiz, Quelle};
 use crate::{Error, Result};
 
-/// Unterstützte Hoster. GitLab folgt demselben Muster, ist aber noch nicht gebaut –
-/// ungetesteter Code gegen eine Schnittstelle, die hier niemand ausprobieren kann,
-/// wäre schlechter als keiner.
+/// Unterstützte Hoster. Beide werden gegen echte, aufgezeichnete Antworten geprüft
+/// (`tests/daten/`); geraten wird an keiner Stelle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Anbieter {
     GitHub,
+    GitLab,
+}
+
+impl Anbieter {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Anbieter::GitHub => "GitHub",
+            Anbieter::GitLab => "GitLab",
+        }
+    }
+
+    fn host(self) -> &'static str {
+        match self {
+            Anbieter::GitHub => "github.com",
+            Anbieter::GitLab => "gitlab.com",
+        }
+    }
 }
 
 /// Zeiger auf ein Repository beim Hoster, aus einer Referenz gewonnen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepoZeiger {
     pub anbieter: Anbieter,
+    /// Bei GitLab kann das eine verschachtelte Gruppe sein (`gruppe/untergruppe`).
     pub owner: String,
     pub repo: String,
 }
 
+/// Schneidet Host und Schema ab und sagt, wer die Gegenseite ist.
+fn wegweiser(z: &str) -> Option<(Anbieter, &str)> {
+    for anbieter in [Anbieter::GitHub, Anbieter::GitLab] {
+        let host = anbieter.host();
+        for muster in [
+            format!("git@{host}:"),
+            format!("https://{host}/"),
+            format!("http://{host}/"),
+            format!("ssh://git@{host}/"),
+            format!("{host}/"),
+        ] {
+            if let Some(rest) = z.strip_prefix(&muster) {
+                return Some((anbieter, rest));
+            }
+        }
+    }
+    None
+}
+
 impl RepoZeiger {
-    /// Erkennt `git@github.com:owner/repo.git`, `https://github.com/owner/repo(.git)`
-    /// und `ssh://git@github.com/owner/repo`. Alles andere ergibt `None` – das ist kein
+    /// Erkennt `git@github.com:owner/repo.git`, `https://github.com/owner/repo(.git)`,
+    /// `ssh://git@github.com/owner/repo` und dieselben Schreibweisen für gitlab.com,
+    /// dort auch mit verschachtelten Gruppen. Alles andere ergibt `None` – das ist kein
     /// Fehler, sondern heißt nur: dazu gibt es keine Gegenseite.
     pub fn erkennen(ziel: &str) -> Option<RepoZeiger> {
-        let z = ziel.trim();
-        let rest = if let Some(r) = z.strip_prefix("git@github.com:") {
-            r
-        } else if let Some(r) = z.strip_prefix("https://github.com/") {
-            r
-        } else if let Some(r) = z.strip_prefix("http://github.com/") {
-            r
-        } else if let Some(r) = z.strip_prefix("ssh://git@github.com/") {
-            r
-        } else if let Some(r) = z.strip_prefix("github.com/") {
-            r
-        } else {
-            return None;
-        };
+        let (anbieter, rest) = wegweiser(ziel.trim())?;
+        // GitLab hängt seine Weboberfläche hinter `/-/` an: `.../repo/-/issues/3`.
+        let rest = rest.split("/-/").next().unwrap_or(rest);
         let rest = rest.trim_start_matches('/').trim_end_matches('/');
         let rest = rest.strip_suffix(".git").unwrap_or(rest);
-        let mut teile = rest.split('/');
-        let owner = teile.next()?.trim();
-        let repo = teile.next()?.trim();
-        // Alles dahinter (z. B. /tree/main) gehört nicht zum Repo-Namen, stört aber nicht.
+        let teile: Vec<&str> = rest.split('/').filter(|t| !t.is_empty()).collect();
+        if teile.len() < 2 {
+            return None;
+        }
+        let (owner, repo) = match anbieter {
+            // Alles hinter owner/repo (z. B. /tree/main) gehört nicht zum Namen.
+            Anbieter::GitHub => (teile[0].to_string(), teile[1].to_string()),
+            // Bei GitLab ist alles bis auf das letzte Stück der Namensraum.
+            Anbieter::GitLab => (
+                teile[..teile.len() - 1].join("/"),
+                teile[teile.len() - 1].to_string(),
+            ),
+        };
         if owner.is_empty() || repo.is_empty() {
             return None;
         }
         Some(RepoZeiger {
-            anbieter: Anbieter::GitHub,
-            owner: owner.to_string(),
-            repo: repo.to_string(),
+            anbieter,
+            owner,
+            repo,
         })
+    }
+
+    /// Erkennt das Repo eines lokalen Ordners an seinen Git-Remotes, `origin` zuerst.
+    /// Damit genügt eine Ordner-Referenz; niemand muss die Adresse von Hand eintragen.
+    /// Kein Netz, kein Tresor: nur `git remote -v`.
+    pub fn aus_ordner(pfad: &std::path::Path) -> Option<RepoZeiger> {
+        crate::git::remotes(pfad)
+            .iter()
+            .find_map(|u| RepoZeiger::erkennen(u))
     }
 
     pub fn anzeige(&self) -> String {
         format!("{}/{}", self.owner, self.repo)
     }
+
+    /// Adresse zum Öffnen im Browser.
+    pub fn web_url(&self) -> String {
+        format!(
+            "https://{}/{}/{}",
+            self.anbieter.host(),
+            self.owner,
+            self.repo
+        )
+    }
+}
+
+/// Woher das Repo bekannt ist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Herkunft {
+    /// Aus einer eingetragenen Adresse (Referenz vom Typ URL oder Git-Repo).
+    Adresse,
+    /// Aus dem Git-Remote eines Ordners, der auf diesem Gerät liegt.
+    Ordner,
+}
+
+impl Herkunft {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Herkunft::Adresse => "adresse",
+            Herkunft::Ordner => "ordner",
+        }
+    }
+}
+
+/// Findet zu den Referenzen eines Projekts das Repo auf der Gegenseite: erst eine
+/// eingetragene Adresse, sonst das Git-Remote eines Ordners, der auf diesem Gerät gilt.
+///
+/// Ruft `git` auf, hält aber nichts: Desktop und CLI rufen die Funktion außerhalb
+/// jeder Sperre auf, damit die Oberfläche nicht ansteht.
+pub fn zeiger_aus_referenzen(
+    referenzen: &[crate::model::Referenz],
+    geraet: Ulid,
+) -> Option<(RepoZeiger, Herkunft)> {
+    use crate::model::ReferenzTyp;
+    if let Some(z) = referenzen
+        .iter()
+        .find_map(|r| RepoZeiger::erkennen(&r.ziel))
+    {
+        return Some((z, Herkunft::Adresse));
+    }
+    referenzen
+        .iter()
+        .filter(|r| {
+            matches!(r.typ, ReferenzTyp::Ordner | ReferenzTyp::GitRepo)
+                && r.geraet_id.is_none_or(|g| g == geraet)
+        })
+        .find_map(|r| RepoZeiger::aus_ordner(std::path::Path::new(&r.ziel)))
+        .map(|z| (z, Herkunft::Ordner))
 }
 
 /// Zustand der Prüfläufe auf dem Standard-Branch.
@@ -110,26 +208,6 @@ pub struct Stand {
 
 // --------------------------------------------------------------- Abfrage
 
-#[derive(Deserialize)]
-struct RepoWire {
-    default_branch: String,
-    /// Zählt bei GitHub Issues **und** Pull Requests zusammen.
-    open_issues_count: usize,
-}
-
-#[derive(Deserialize)]
-struct PrWire {
-    title: String,
-    draft: Option<bool>,
-}
-
-#[derive(Deserialize)]
-struct StatusWire {
-    state: String,
-    /// Leer, wenn niemand einen Status gemeldet hat.
-    statuses: Vec<serde_json::Value>,
-}
-
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(20))
@@ -137,18 +215,27 @@ fn agent() -> ureq::Agent {
         .build()
 }
 
+/// Ein GET mit den Kopfzeilen des jeweiligen Hosters. `kopf` trägt den Token: GitHub
+/// nimmt `Authorization: Bearer`, GitLab `PRIVATE-TOKEN`.
 fn hole<T: serde::de::DeserializeOwned>(
     agent: &ureq::Agent,
     url: &str,
+    anbieter: Anbieter,
     token: Option<&str>,
 ) -> Result<T> {
-    let mut r = agent
-        .get(url)
-        .set("Accept", "application/vnd.github+json")
-        .set("X-GitHub-Api-Version", "2022-11-28");
-    if let Some(t) = token {
-        r = r.set("Authorization", &format!("Bearer {t}"));
+    let mut r = agent.get(url).set("Accept", "application/json");
+    if anbieter == Anbieter::GitHub {
+        r = r
+            .set("Accept", "application/vnd.github+json")
+            .set("X-GitHub-Api-Version", "2022-11-28");
     }
+    if let Some(t) = token {
+        r = match anbieter {
+            Anbieter::GitHub => r.set("Authorization", &format!("Bearer {t}")),
+            Anbieter::GitLab => r.set("PRIVATE-TOKEN", t),
+        };
+    }
+    let name = anbieter.as_str();
     match r.call() {
         Ok(resp) => resp
             .into_json::<T>()
@@ -170,71 +257,218 @@ fn hole<T: serde::de::DeserializeOwned>(
                 Err(Error::Invalid("Keine Berechtigung für dieses Repo".into()))
             }
         }
+        // GitLab drosselt mit 429 statt mit 403.
+        Err(ureq::Error::Status(429, _)) => Err(Error::Invalid(format!(
+            "{name} drosselt gerade (429). Später noch einmal."
+        ))),
         Err(ureq::Error::Status(404, _)) => Err(Error::NotFound(
             "Repo nicht gefunden. Bei privaten Repos braucht es einen Token.".into(),
         )),
-        Err(ureq::Error::Status(s, _)) => Err(Error::Netz(format!("GitHub antwortete {s}"))),
+        Err(ureq::Error::Status(s, _)) => Err(Error::Netz(format!("{name} antwortete {s}"))),
         Err(e) => Err(Error::Netz(e.to_string())),
     }
 }
 
-/// Setzt die drei Antworten zu einer Momentaufnahme zusammen. Getrennt vom Holen,
-/// damit genau dieser Teil gegen echte GitHub-Antworten prüfbar ist, ohne Netz.
-fn stand_aus(repo: RepoWire, prs: Vec<PrWire>, status: Option<StatusWire>) -> Stand {
-    let ci = match status {
-        // Kein gemeldeter Status heißt „nicht eingerichtet", nicht „läuft". GitHub
-        // antwortet in dem Fall mit state = "pending" und leerer Liste.
-        Some(s) if s.statuses.is_empty() => Ci::Unbekannt,
-        Some(s) => match s.state.as_str() {
-            "success" => Ci::Gruen,
-            "failure" | "error" => Ci::Rot,
-            "pending" => Ci::Laeuft,
-            _ => Ci::Unbekannt,
-        },
-        None => Ci::Unbekannt,
-    };
+/// GitHub: ein Aufruf für das Repo, einer für die Pull Requests, einer für den Prüflauf.
+mod github {
+    use super::*;
 
-    let offene_prs = prs.len();
-    Stand {
-        // GitHub zählt Pull Requests bei den Issues mit; hier sollen sie getrennt stehen.
-        offene_issues: repo.open_issues_count.saturating_sub(offene_prs),
-        offene_prs,
-        pr_titel: prs
-            .into_iter()
-            .map(|p| {
-                if p.draft.unwrap_or(false) {
-                    format!("{} (Entwurf)", p.title)
-                } else {
-                    p.title
-                }
-            })
-            .collect(),
-        ci,
-        standard_branch: repo.default_branch,
+    #[derive(Deserialize)]
+    pub struct RepoWire {
+        pub default_branch: String,
+        /// Zählt bei GitHub Issues **und** Pull Requests zusammen.
+        pub open_issues_count: usize,
+    }
+
+    #[derive(Deserialize)]
+    pub struct PrWire {
+        pub title: String,
+        pub draft: Option<bool>,
+    }
+
+    #[derive(Deserialize)]
+    pub struct StatusWire {
+        pub state: String,
+        /// Leer, wenn niemand einen Status gemeldet hat.
+        pub statuses: Vec<serde_json::Value>,
+    }
+
+    /// Setzt die drei Antworten zu einer Momentaufnahme zusammen. Getrennt vom Holen,
+    /// damit genau dieser Teil gegen echte Antworten prüfbar ist, ohne Netz.
+    pub fn stand_aus(repo: RepoWire, prs: Vec<PrWire>, status: Option<StatusWire>) -> Stand {
+        let ci = match status {
+            // Kein gemeldeter Status heißt „nicht eingerichtet", nicht „läuft". GitHub
+            // antwortet in dem Fall mit state = "pending" und leerer Liste.
+            Some(s) if s.statuses.is_empty() => Ci::Unbekannt,
+            Some(s) => match s.state.as_str() {
+                "success" => Ci::Gruen,
+                "failure" | "error" => Ci::Rot,
+                "pending" => Ci::Laeuft,
+                _ => Ci::Unbekannt,
+            },
+            None => Ci::Unbekannt,
+        };
+
+        let offene_prs = prs.len();
+        Stand {
+            // GitHub zählt Pull Requests bei den Issues mit; hier sollen sie getrennt stehen.
+            offene_issues: repo.open_issues_count.saturating_sub(offene_prs),
+            offene_prs,
+            pr_titel: prs
+                .into_iter()
+                .map(|p| {
+                    if p.draft.unwrap_or(false) {
+                        format!("{} (Entwurf)", p.title)
+                    } else {
+                        p.title
+                    }
+                })
+                .collect(),
+            ci,
+            standard_branch: repo.default_branch,
+        }
+    }
+
+    pub fn abfragen(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
+        let basis = format!("https://api.github.com/repos/{}/{}", z.owner, z.repo);
+        let anbieter = Anbieter::GitHub;
+        let repo: RepoWire = hole(a, &basis, anbieter, token)?;
+        let prs: Vec<PrWire> = hole(
+            a,
+            &format!("{basis}/pulls?state=open&per_page=20"),
+            anbieter,
+            token,
+        )?;
+        // Der Prüflauf-Status ist eine Bequemlichkeit, kein Muss: schlägt er fehl, bleibt
+        // der Rest trotzdem nützlich.
+        let status = hole::<StatusWire>(
+            a,
+            &format!("{basis}/commits/{}/status", repo.default_branch),
+            anbieter,
+            token,
+        )
+        .ok();
+        Ok(stand_aus(repo, prs, status))
     }
 }
 
-/// Fragt den Stand ab. Ohne Token gilt das kleine, IP-weite Kontingent von GitHub;
+/// GitLab: dieselbe Frage, vier Aufrufe. Die Zahl offener Issues steht nicht im
+/// Projekt-Datensatz (jedenfalls nicht ohne Anmeldung), sondern in `issues_statistics`.
+mod gitlab {
+    use super::*;
+
+    #[derive(Deserialize)]
+    pub struct ProjektWire {
+        pub default_branch: String,
+    }
+
+    #[derive(Deserialize)]
+    pub struct MrWire {
+        pub title: String,
+        pub draft: Option<bool>,
+        /// Ältere GitLab-Stände nennen es so.
+        pub work_in_progress: Option<bool>,
+    }
+
+    #[derive(Deserialize)]
+    pub struct IssuesWire {
+        pub statistics: IssuesStatistik,
+    }
+
+    #[derive(Deserialize)]
+    pub struct IssuesStatistik {
+        pub counts: IssuesZahlen,
+    }
+
+    #[derive(Deserialize)]
+    pub struct IssuesZahlen {
+        pub opened: usize,
+    }
+
+    #[derive(Deserialize)]
+    pub struct PipelineWire {
+        pub status: String,
+    }
+
+    /// Pfad mit Namensraum, wie GitLab ihn in der API erwartet: `gruppe%2Frepo`.
+    pub fn pfad(z: &RepoZeiger) -> String {
+        format!("{}/{}", z.owner, z.repo).replace('/', "%2F")
+    }
+
+    pub fn stand_aus(
+        projekt: ProjektWire,
+        mrs: Vec<MrWire>,
+        issues: Option<IssuesWire>,
+        pipelines: &[PipelineWire],
+    ) -> Stand {
+        let ci = match pipelines.first().map(|p| p.status.as_str()) {
+            Some("success") => Ci::Gruen,
+            Some("failed") => Ci::Rot,
+            Some(
+                "running"
+                | "pending"
+                | "created"
+                | "preparing"
+                | "scheduled"
+                | "waiting_for_resource",
+            ) => Ci::Laeuft,
+            // canceled, skipped, manual und alles Unbekannte: kein Urteil.
+            _ => Ci::Unbekannt,
+        };
+        Stand {
+            // GitLab zählt Merge Requests **nicht** bei den Issues mit; kein Abzug.
+            offene_issues: issues.map(|i| i.statistics.counts.opened).unwrap_or(0),
+            offene_prs: mrs.len(),
+            pr_titel: mrs
+                .into_iter()
+                .map(|m| {
+                    if m.draft.or(m.work_in_progress).unwrap_or(false) {
+                        format!("{} (Entwurf)", m.title)
+                    } else {
+                        m.title
+                    }
+                })
+                .collect(),
+            ci,
+            standard_branch: projekt.default_branch,
+        }
+    }
+
+    pub fn abfragen(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
+        let basis = format!("https://gitlab.com/api/v4/projects/{}", pfad(z));
+        let anbieter = Anbieter::GitLab;
+        let projekt: ProjektWire = hole(a, &basis, anbieter, token)?;
+        let mrs: Vec<MrWire> = hole(
+            a,
+            &format!("{basis}/merge_requests?state=opened&per_page=20"),
+            anbieter,
+            token,
+        )?;
+        // Issue-Zahl und Prüflauf sind Beiwerk: fehlen sie, bleibt der Rest nützlich.
+        let issues =
+            hole::<IssuesWire>(a, &format!("{basis}/issues_statistics"), anbieter, token).ok();
+        let pipelines = hole::<Vec<PipelineWire>>(
+            a,
+            &format!(
+                "{basis}/pipelines?ref={}&per_page=1",
+                projekt.default_branch
+            ),
+            anbieter,
+            token,
+        )
+        .unwrap_or_default();
+        Ok(stand_aus(projekt, mrs, issues, &pipelines))
+    }
+}
+
+/// Fragt den Stand ab. Ohne Token gilt das kleine, IP-weite Kontingent des Hosters;
 /// für private Repos ist er Pflicht.
 pub fn abfragen(zeiger: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
     let a = agent();
-    let basis = format!(
-        "https://api.github.com/repos/{}/{}",
-        zeiger.owner, zeiger.repo
-    );
-
-    let repo: RepoWire = hole(&a, &basis, token)?;
-    let prs: Vec<PrWire> = hole(&a, &format!("{basis}/pulls?state=open&per_page=20"), token)?;
-    // Der Prüflauf-Status ist eine Bequemlichkeit, kein Muss: schlägt er fehl, bleibt
-    // der Rest trotzdem nützlich.
-    let status = hole::<StatusWire>(
-        &a,
-        &format!("{basis}/commits/{}/status", repo.default_branch),
-        token,
-    )
-    .ok();
-
-    Ok(stand_aus(repo, prs, status))
+    match zeiger.anbieter {
+        Anbieter::GitHub => github::abfragen(&a, zeiger, token),
+        Anbieter::GitLab => gitlab::abfragen(&a, zeiger, token),
+    }
 }
 
 /// Eine verdichtete Zeile für das Logbuch. `None`, wenn es nichts zu sagen gibt –
@@ -250,11 +484,16 @@ pub fn notiz(projekt_id: Ulid, zeiger: &RepoZeiger, stand: &Stand, jetzt_ms: i64
         zeilen.push(format!("- Prüflauf auf {} ist rot.", stand.standard_branch));
     }
     if stand.offene_prs > 0 {
-        zeilen.push(format!(
-            "- {} offene Pull Request{}:",
-            stand.offene_prs,
-            if stand.offene_prs == 1 { "" } else { "s" }
-        ));
+        // GitLab nennt sie Merge Requests. Wer beides nutzt, will die eigene Sprache lesen.
+        let art = match zeiger.anbieter {
+            Anbieter::GitHub => "Pull Request",
+            Anbieter::GitLab => "Merge Request",
+        };
+        zeilen.push(if stand.offene_prs == 1 {
+            format!("- 1 offener {art}:")
+        } else {
+            format!("- {} offene {art}s:", stand.offene_prs)
+        });
         for t in stand.pr_titel.iter().take(5) {
             zeilen.push(format!("  - {t}"));
         }
@@ -283,6 +522,11 @@ pub fn notiz(projekt_id: Ulid, zeiger: &RepoZeiger, stand: &Stand, jetzt_ms: i64
 mod tests {
     use super::*;
 
+    use super::github::{PrWire, RepoWire, StatusWire};
+    use super::gitlab::{
+        IssuesStatistik, IssuesWire, IssuesZahlen, MrWire, PipelineWire, ProjektWire,
+    };
+
     #[test]
     fn erkennt_die_ueblichen_schreibweisen() {
         let erwartet = RepoZeiger {
@@ -310,14 +554,144 @@ mod tests {
     fn erkennt_nichts_bei_fremden_zielen() {
         for ziel in [
             "/home/du/Projekte/lotse",
-            "https://gitlab.com/du/lotse",
+            "https://bitbucket.org/du/lotse",
             "Keller, Regal 3",
             "https://github.com/",
             "https://github.com/nurowner",
+            "https://gitlab.com/nurgruppe",
             "",
         ] {
             assert!(RepoZeiger::erkennen(ziel).is_none(), "{ziel}");
         }
+    }
+
+    #[test]
+    fn erkennt_gitlab_mit_verschachtelten_gruppen() {
+        for (ziel, owner, repo) in [
+            ("https://gitlab.com/du/lotse", "du", "lotse"),
+            (
+                "git@gitlab.com:gitlab-org/gitlab-runner.git",
+                "gitlab-org",
+                "gitlab-runner",
+            ),
+            (
+                "https://gitlab.com/gruppe/untergruppe/lotse",
+                "gruppe/untergruppe",
+                "lotse",
+            ),
+            // Die Weboberfläche hängt hinter `/-/` an; das gehört nicht zum Namen.
+            (
+                "https://gitlab.com/gruppe/lotse/-/merge_requests/7",
+                "gruppe",
+                "lotse",
+            ),
+        ] {
+            let z = RepoZeiger::erkennen(ziel).unwrap_or_else(|| panic!("{ziel}"));
+            assert_eq!(z.anbieter, Anbieter::GitLab, "{ziel}");
+            assert_eq!(z.owner, owner, "{ziel}");
+            assert_eq!(z.repo, repo, "{ziel}");
+        }
+        assert_eq!(
+            RepoZeiger::erkennen("https://gitlab.com/gruppe/untergruppe/lotse")
+                .unwrap()
+                .web_url(),
+            "https://gitlab.com/gruppe/untergruppe/lotse"
+        );
+    }
+
+    #[test]
+    fn erkennt_das_repo_am_ordner() {
+        let t = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(t.path())
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        if !run(&["init", "-q"]).status.success() {
+            return; // kein git in dieser Umgebung
+        }
+        // Ohne Remote gibt es keine Gegenseite – und das ist kein Fehler.
+        assert!(RepoZeiger::aus_ordner(t.path()).is_none());
+
+        run(&[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/phish3144/lotse.git",
+        ]);
+        let z = RepoZeiger::aus_ordner(t.path()).expect("origin");
+        assert_eq!(z.anzeige(), "phish3144/lotse");
+    }
+
+    #[test]
+    fn ueberspringt_remotes_ohne_gegenseite() {
+        let t = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(t.path())
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        if !run(&["init", "-q"]).status.success() {
+            return;
+        }
+        // origin zeigt auf einen eigenen Server, ein weiteres Remote auf GitHub:
+        // dann zählt das GitHub-Remote, nicht die Reihenfolge.
+        run(&[
+            "remote",
+            "add",
+            "origin",
+            "https://git.example.invalid/lotse.git",
+        ]);
+        run(&[
+            "remote",
+            "add",
+            "gh",
+            "https://github.com/phish3144/lotse.git",
+        ]);
+        assert_eq!(
+            RepoZeiger::aus_ordner(t.path()).map(|z| z.anzeige()),
+            Some("phish3144/lotse".to_string())
+        );
+    }
+
+    #[test]
+    fn adresse_schlaegt_ordner() {
+        use crate::model::{Referenz, ReferenzTyp, Rolle};
+        let projekt = Ulid::new();
+        let geraet = Ulid::new();
+        let refs = vec![
+            Referenz::neu(
+                projekt,
+                ReferenzTyp::Ordner,
+                "/pfad/ohne/repo",
+                Rolle::Material,
+            ),
+            Referenz::neu(
+                projekt,
+                ReferenzTyp::Url,
+                "https://github.com/phish3144/lotse",
+                Rolle::Doku,
+            ),
+        ];
+        let (z, h) = zeiger_aus_referenzen(&refs, geraet).unwrap();
+        assert_eq!(z.anzeige(), "phish3144/lotse");
+        assert_eq!(h, Herkunft::Adresse);
+
+        // Ordner eines fremden Geräts werden nicht angefasst: der Pfad gilt hier nicht.
+        let mut fremd = Referenz::neu(
+            projekt,
+            ReferenzTyp::Ordner,
+            "/pfad/vom/anderen/gerät",
+            Rolle::Material,
+        );
+        fremd.geraet_id = Some(Ulid::new());
+        assert!(zeiger_aus_referenzen(&[fremd], geraet).is_none());
     }
 
     fn zeiger() -> RepoZeiger {
@@ -339,7 +713,7 @@ mod tests {
         let status: StatusWire = serde_json::from_str(&daten("gh_status.json")).unwrap();
 
         assert!(!repo.default_branch.is_empty());
-        let stand = stand_aus(repo, prs, Some(status));
+        let stand = github::stand_aus(repo, prs, Some(status));
         // Zum Zeitpunkt der Aufnahme: keine offenen PRs, keine Issues, kein gemeldeter
         // Prüflauf-Status. Letzteres ist der Fall, den GitHub als "pending" mit leerer
         // Liste ausdrückt – „unbekannt“, nicht „läuft“.
@@ -352,7 +726,7 @@ mod tests {
     fn deutet_offene_pull_requests() {
         let repo: RepoWire = serde_json::from_str(&daten("gh_repo.json")).unwrap();
         let prs: Vec<PrWire> = serde_json::from_str(&daten("gh_pulls_beispiel.json")).unwrap();
-        let stand = stand_aus(repo, prs, None);
+        let stand = github::stand_aus(repo, prs, None);
         assert_eq!(stand.offene_prs, 2);
         assert_eq!(
             stand.pr_titel[0],
@@ -381,7 +755,7 @@ mod tests {
                 draft: None,
             },
         ];
-        let stand = stand_aus(repo, prs, None);
+        let stand = github::stand_aus(repo, prs, None);
         assert_eq!(stand.offene_issues, 3);
         assert_eq!(stand.offene_prs, 2);
     }
@@ -402,7 +776,100 @@ mod tests {
                 draft: None,
             },
         ];
-        assert_eq!(stand_aus(repo, prs, None).offene_issues, 0);
+        assert_eq!(github::stand_aus(repo, prs, None).offene_issues, 0);
+    }
+
+    /// `gl_projekt.json`, `gl_merge_requests.json`, `gl_issues_statistics.json` und
+    /// `gl_pipelines.json` sind Antworten von gitlab.com für gitlab-org/gitlab-runner,
+    /// nur die Liste der Merge Requests ist auf zwei Einträge gekürzt.
+    #[test]
+    fn deutet_echte_gitlab_antworten() {
+        let projekt: ProjektWire = serde_json::from_str(&daten("gl_projekt.json")).unwrap();
+        let mrs: Vec<MrWire> = serde_json::from_str(&daten("gl_merge_requests.json")).unwrap();
+        let issues: IssuesWire = serde_json::from_str(&daten("gl_issues_statistics.json")).unwrap();
+        let pipelines: Vec<PipelineWire> =
+            serde_json::from_str(&daten("gl_pipelines.json")).unwrap();
+
+        assert_eq!(projekt.default_branch, "main");
+        let stand = gitlab::stand_aus(projekt, mrs, Some(issues), &pipelines);
+        assert_eq!(stand.offene_prs, 2);
+        // Bei GitLab zählen Merge Requests nicht als Issues: die Zahl bleibt, wie sie ist.
+        assert_eq!(stand.offene_issues, 2605);
+        assert_eq!(stand.ci, Ci::Laeuft);
+        assert!(stand.pr_titel[0].starts_with("Fix after_script"));
+    }
+
+    #[test]
+    fn deutet_gitlab_pipeline_zustaende() {
+        let fall = |status: &str| {
+            gitlab::stand_aus(
+                ProjektWire {
+                    default_branch: "main".into(),
+                },
+                vec![],
+                None,
+                &[PipelineWire {
+                    status: status.into(),
+                }],
+            )
+            .ci
+        };
+        assert_eq!(fall("success"), Ci::Gruen);
+        assert_eq!(fall("failed"), Ci::Rot);
+        assert_eq!(fall("running"), Ci::Laeuft);
+        assert_eq!(fall("canceled"), Ci::Unbekannt);
+        // Ohne Pipeline gibt es kein Urteil, keinen Fehler.
+        let ohne = gitlab::stand_aus(
+            ProjektWire {
+                default_branch: "main".into(),
+            },
+            vec![],
+            None,
+            &[],
+        );
+        assert_eq!(ohne.ci, Ci::Unbekannt);
+        assert_eq!(ohne.offene_issues, 0);
+    }
+
+    #[test]
+    fn kennzeichnet_gitlab_entwuerfe_in_beiden_schreibweisen() {
+        let stand = gitlab::stand_aus(
+            ProjektWire {
+                default_branch: "main".into(),
+            },
+            vec![
+                MrWire {
+                    title: "Neu".into(),
+                    draft: Some(true),
+                    work_in_progress: None,
+                },
+                MrWire {
+                    title: "Alt".into(),
+                    draft: None,
+                    work_in_progress: Some(true),
+                },
+                MrWire {
+                    title: "Fertig".into(),
+                    draft: Some(false),
+                    work_in_progress: Some(false),
+                },
+            ],
+            Some(IssuesWire {
+                statistics: IssuesStatistik {
+                    counts: IssuesZahlen { opened: 1 },
+                },
+            }),
+            &[],
+        );
+        assert_eq!(stand.pr_titel[0], "Neu (Entwurf)");
+        assert_eq!(stand.pr_titel[1], "Alt (Entwurf)");
+        assert_eq!(stand.pr_titel[2], "Fertig");
+    }
+
+    #[test]
+    fn kodiert_den_gitlab_pfad() {
+        let z = RepoZeiger::erkennen("https://gitlab.com/gruppe/untergruppe/lotse").unwrap();
+        assert_eq!(gitlab::pfad(&z), "gruppe%2Funtergruppe%2Flotse");
     }
 
     #[test]
@@ -451,6 +918,21 @@ mod tests {
     }
 
     #[test]
+    fn nennt_bei_gitlab_merge_requests() {
+        let z = RepoZeiger::erkennen("https://gitlab.com/gruppe/lotse").unwrap();
+        let stand = Stand {
+            offene_issues: 0,
+            offene_prs: 2,
+            pr_titel: vec!["Eins".into(), "Zwei".into()],
+            ci: Ci::Gruen,
+            standard_branch: "main".into(),
+        };
+        let n = notiz(Ulid::new(), &z, &stand, 1).unwrap();
+        assert!(n.text.contains("2 offene Merge Requests"), "{}", n.text);
+        assert!(!n.text.contains("Pull"), "{}", n.text);
+    }
+
+    #[test]
     fn einzahl_und_mehrzahl() {
         let stand = Stand {
             offene_issues: 1,
@@ -460,9 +942,7 @@ mod tests {
             standard_branch: "main".into(),
         };
         let n = notiz(Ulid::new(), &zeiger(), &stand, 1).unwrap();
-        assert!(
-            n.text.contains("1 offener Pull Request") || n.text.contains("1 offene Pull Request")
-        );
+        assert!(n.text.contains("1 offener Pull Request"), "{}", n.text);
         assert!(n.text.contains("1 offene Issue"));
     }
 }
@@ -473,20 +953,36 @@ mod tests {
 mod live {
     use super::*;
 
-    #[test]
-    #[ignore]
-    fn forge_live_gegen_echtes_repo() {
-        let zeiger = RepoZeiger::erkennen("https://github.com/phish3144/lotse").unwrap();
-        let token = std::env::var("GITHUB_TOKEN").ok();
+    fn zeigen(ziel: &str, token: Option<String>) {
+        let zeiger = RepoZeiger::erkennen(ziel).unwrap();
         let stand = abfragen(&zeiger, token.as_deref()).expect("Abfrage");
         println!(
-            "{}: {} Issues, {} PRs, Prüflauf {} auf {}",
+            "{} ({}): {} Issues, {} offen zur Übernahme, Prüflauf {} auf {}",
             zeiger.anzeige(),
+            zeiger.anbieter.as_str(),
             stand.offene_issues,
             stand.offene_prs,
             stand.ci.as_str(),
             stand.standard_branch
         );
         assert!(!stand.standard_branch.is_empty());
+    }
+
+    #[test]
+    #[ignore]
+    fn forge_live_gegen_echtes_repo() {
+        zeigen(
+            "https://github.com/phish3144/lotse",
+            std::env::var("GITHUB_TOKEN").ok(),
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn forge_live_gegen_gitlab() {
+        zeigen(
+            "https://gitlab.com/gitlab-org/gitlab-runner",
+            std::env::var("GITLAB_TOKEN").ok(),
+        );
     }
 }

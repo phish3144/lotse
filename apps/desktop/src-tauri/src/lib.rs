@@ -849,15 +849,39 @@ fn beobachter_starten(
             }
         };
 
+        // Die Gegenseite (GitHub) in großem Abstand mitnehmen, falls eingeschaltet.
+        // Sie hängt am selben Thread, weil sie dieselbe Frage beantwortet: was hat sich
+        // getan, seit ich weg war.
+        let ferne = |app: &tauri::AppHandle, stop: &std::sync::atomic::AtomicBool| {
+            let zustand = app.state::<AppState>();
+            if !forge_faellig(&zustand) {
+                return;
+            }
+            match forge_lauf(&zustand, None, Some(stop)) {
+                Ok(e) if e.abgefragt > 0 => {
+                    let _ = app.emit("forge-bilanz", e);
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    let _ = app.emit("forge-fehler", e);
+                }
+            }
+        };
+
         if !schreiben(&mut b) {
             return;
         }
+        ferne(&app, &stop_thread);
         while !stop_thread.load(Ordering::SeqCst) {
             // Ohne Sperre warten, sonst stünde die Oberfläche die ganze Zeit an.
             b.verarbeiten(std::time::Duration::from_secs(20));
             if stop_thread.load(Ordering::SeqCst) || !schreiben(&mut b) {
                 break;
             }
+            if stop_thread.load(Ordering::SeqCst) {
+                break;
+            }
+            ferne(&app, &stop_thread);
         }
         // Eigenen Eintrag räumen, damit der Status nicht „läuft“ behauptet. Nur den
         // eigenen: nach Anhalten und sofortigem Neustart läuft schon ein anderer
@@ -1052,55 +1076,92 @@ fn ki_verdichten(state: State<AppState>, eingabe: String) -> R<String> {
 /// selbst steht nie hier, nur der Zeiger darauf.
 const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
 const META_FORGE_FELD: &str = "forge_token_feld";
+/// „Von allein mitlaufen“: der Beobachter fragt GitHub in großem Abstand mit ab.
+const META_FORGE_AUTO: &str = "forge_auto";
+/// Zeitpunkt der letzten Abfrage, damit ein Neustart nicht sofort wieder anfragt.
+const META_FORGE_ZULETZT: &str = "forge_zuletzt";
+
+/// Abstand zwischen zwei selbsttätigen Abfragen. Der Stand auf der Gegenseite ändert
+/// sich in Minuten, nicht in Sekunden; das Kontingent von GitHub ist begrenzt.
+const FORGE_ABSTAND_MS: i64 = 30 * 60 * 1000;
 
 #[derive(Serialize)]
 struct ForgeProjekt {
     projekt_id: String,
     titel: String,
     repo: String,
+    /// „GitHub“ oder „GitLab“.
+    anbieter: &'static str,
+    /// Adresse zum Öffnen im Browser.
+    url: String,
+    /// Wie das Repo gefunden wurde: „adresse“ oder „ordner“.
+    herkunft: &'static str,
 }
 
 #[derive(Serialize)]
 struct ForgeStatus {
-    /// Projekte mit einer erkannten GitHub-Referenz.
+    /// Projekte mit einem erkannten GitHub-Repo.
     projekte: Vec<ForgeProjekt>,
     token_eintrag: Option<String>,
     token_feld: Option<String>,
+    auto: bool,
+    zuletzt: Option<i64>,
 }
 
-/// Sucht zu jedem Projekt die erste Referenz, die auf GitHub zeigt.
-fn forge_zeiger(
-    s: &mut Sitzung,
-) -> lotse_core::Result<Vec<(Projekt, lotse_core::forge::RepoZeiger)>> {
-    let mut out = Vec::new();
-    for p in s.store.projekte()? {
-        let treffer = s
-            .store
-            .referenzen(p.id)?
-            .into_iter()
-            .find_map(|r| lotse_core::forge::RepoZeiger::erkennen(&r.ziel));
-        if let Some(z) = treffer {
-            out.push((p, z));
+/// Sucht zu jedem Projekt das Repo auf der Gegenseite.
+///
+/// Zweistufig, weil das Erkennen `git` aufruft: gesammelt wird unter der Sperre,
+/// nachgesehen wird ohne sie. Sonst stünde die Oberfläche bei vielen Projekten an.
+fn forge_ziele(
+    state: &State<AppState>,
+    nur: Option<Ulid>,
+) -> R<Vec<(Projekt, lotse_core::forge::RepoZeiger, lotse_core::forge::Herkunft)>> {
+    let gesammelt: Vec<(Projekt, Vec<Referenz>, Ulid)> = mit(state, |s| {
+        let geraet = s.store.device_id();
+        let mut out = Vec::new();
+        for p in s.store.projekte()? {
+            if nur.is_some_and(|id| p.id != id) {
+                continue;
+            }
+            let refs = s.store.referenzen(p.id)?;
+            if !refs.is_empty() {
+                out.push((p, refs, geraet));
+            }
         }
-    }
-    Ok(out)
+        Ok(out)
+    })?;
+
+    Ok(gesammelt
+        .into_iter()
+        .filter_map(|(p, refs, geraet)| {
+            lotse_core::forge::zeiger_aus_referenzen(&refs, geraet).map(|(z, h)| (p, z, h))
+        })
+        .collect())
 }
 
 #[tauri::command]
 fn forge_status(state: State<AppState>) -> R<ForgeStatus> {
+    let projekte = forge_ziele(&state, None)?
+        .into_iter()
+        .map(|(p, z, herkunft)| ForgeProjekt {
+            projekt_id: p.id.to_string(),
+            titel: p.titel,
+            repo: z.anzeige(),
+            anbieter: z.anbieter.as_str(),
+            url: z.web_url(),
+            herkunft: herkunft.as_str(),
+        })
+        .collect();
     mit(&state, |s| {
-        let projekte = forge_zeiger(s)?
-            .into_iter()
-            .map(|(p, z)| ForgeProjekt {
-                projekt_id: p.id.to_string(),
-                titel: p.titel,
-                repo: z.anzeige(),
-            })
-            .collect();
         Ok(ForgeStatus {
             projekte,
             token_eintrag: s.store.meta_get(META_FORGE_EINTRAG)?,
             token_feld: s.store.meta_get(META_FORGE_FELD)?,
+            auto: s.store.meta_get(META_FORGE_AUTO)?.as_deref() == Some("1"),
+            zuletzt: s
+                .store
+                .meta_get(META_FORGE_ZULETZT)?
+                .and_then(|v| v.parse().ok()),
         })
     })
 }
@@ -1115,25 +1176,26 @@ fn forge_token_setzen(state: State<AppState>, eintrag_id: String, feld: String) 
     })
 }
 
-#[derive(Serialize)]
+/// Schaltet die selbsttätige Abfrage im Beobachter ein oder aus.
+#[tauri::command]
+fn forge_auto_setzen(state: State<AppState>, an: bool) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_FORGE_AUTO, if an { "1" } else { "0" })?;
+        Ok(())
+    })
+}
+
+#[derive(Serialize, Clone)]
 struct ForgeErgebnis {
     abgefragt: usize,
     notizen: usize,
     fehler: Vec<String>,
 }
 
-/// Fragt den Stand bei GitHub ab und schreibt je Projekt höchstens eine Notiz.
-/// Ohne `projekt_id` alle Projekte mit GitHub-Referenz.
-#[tauri::command]
-fn forge_abfragen(state: State<AppState>, projekt_id: Option<String>) -> R<ForgeErgebnis> {
-    let nur = match projekt_id.as_deref().filter(|s| !s.is_empty()) {
-        Some(p) => Some(ulid(p)?),
-        None => None,
-    };
-
-    // Den Token einmal holen. Der Tresor-Zugriff passiert hier in der Hülle; das
-    // Modul `forge` bekommt ihn hereingereicht (siehe CLAUDE.md).
-    let token = mit(&state, |s| {
+/// Holt den Token aus dem Tresor. Der Tresor-Zugriff passiert hier in der Hülle; das
+/// Modul `forge` bekommt den Token hereingereicht (siehe `CLAUDE.md`).
+fn forge_token(state: &State<AppState>) -> R<Option<String>> {
+    mit(state, |s| {
         let Some(id) = s
             .store
             .meta_get(META_FORGE_EINTRAG)?
@@ -1152,25 +1214,41 @@ fn forge_abfragen(state: State<AppState>, projekt_id: Option<String>) -> R<Forge
             return Ok(None);
         };
         Ok(Some(e.feld_lesen(&s.vault, &feld)?.to_string()))
-    })?;
+    })
+}
 
-    let ziele = mit(&state, forge_zeiger)?;
-    let ziele: Vec<_> = ziele
-        .into_iter()
-        .filter(|(p, _)| nur.is_none_or(|id| p.id == id))
-        .collect();
+/// Fragt den Stand bei GitHub ab und schreibt je Projekt höchstens eine Notiz.
+///
+/// `abbruch` ist der Stop-Schalter des Beobachters: nach „Anhalten“ oder „Sperren“
+/// wird nichts mehr geschrieben, auch wenn eine Anfrage noch unterwegs war.
+fn forge_lauf(
+    state: &State<AppState>,
+    nur: Option<Ulid>,
+    abbruch: Option<&std::sync::atomic::AtomicBool>,
+) -> R<ForgeErgebnis> {
+    use std::sync::atomic::Ordering;
+    let angehalten = || abbruch.is_some_and(|a| a.load(Ordering::SeqCst));
+
+    let token = forge_token(state)?;
+    let ziele = forge_ziele(state, nur)?;
 
     let mut notizen = 0usize;
     let mut fehler = Vec::new();
     let mut abgefragt = 0usize;
 
-    for (p, z) in ziele {
+    for (p, z, _) in ziele {
+        if angehalten() {
+            break;
+        }
         // Ohne gehaltene Sperre abfragen: das geht übers Netz und dauert.
         match lotse_core::forge::abfragen(&z, token.as_deref()) {
             Ok(stand) => {
                 abgefragt += 1;
+                if angehalten() {
+                    break;
+                }
                 if let Some(n) = lotse_core::forge::notiz(p.id, &z, &stand, now_ms()) {
-                    mit(&state, |s| s.store.notiz_speichern(&n))?;
+                    mit(state, |s| s.store.notiz_speichern(&n))?;
                     notizen += 1;
                 }
             }
@@ -1178,11 +1256,61 @@ fn forge_abfragen(state: State<AppState>, projekt_id: Option<String>) -> R<Forge
         }
     }
 
+    if abgefragt > 0 && !angehalten() {
+        mit(state, |s| {
+            s.store.meta_set(META_FORGE_ZULETZT, &now_ms().to_string())
+        })?;
+    }
+
     Ok(ForgeErgebnis {
         abgefragt,
         notizen,
         fehler,
     })
+}
+
+/// Das Repo eines einzelnen Projekts, für die Projektseite. `None`, wenn es keins gibt.
+#[tauri::command]
+fn forge_projekt(state: State<AppState>, projekt_id: String) -> R<Option<ForgeProjekt>> {
+    let id = ulid(&projekt_id)?;
+    Ok(forge_ziele(&state, Some(id))?
+        .into_iter()
+        .next()
+        .map(|(p, z, herkunft)| ForgeProjekt {
+            projekt_id: p.id.to_string(),
+            titel: p.titel,
+            repo: z.anzeige(),
+            anbieter: z.anbieter.as_str(),
+            url: z.web_url(),
+            herkunft: herkunft.as_str(),
+        }))
+}
+
+/// Von Hand angestoßen. Ohne `projekt_id` alle Projekte mit erkanntem Repo.
+#[tauri::command]
+fn forge_abfragen(state: State<AppState>, projekt_id: Option<String>) -> R<ForgeErgebnis> {
+    let nur = match projekt_id.as_deref().filter(|s| !s.is_empty()) {
+        Some(p) => Some(ulid(p)?),
+        None => None,
+    };
+    forge_lauf(&state, nur, None)
+}
+
+/// Ein Durchlauf aus dem Beobachter heraus, wenn er eingeschaltet und der letzte lange
+/// genug her ist. Antwortet `true`, wenn abgefragt wurde.
+fn forge_faellig(state: &State<AppState>) -> bool {
+    let entscheidung = mit(state, |s| {
+        if s.store.meta_get(META_FORGE_AUTO)?.as_deref() != Some("1") {
+            return Ok(false);
+        }
+        let zuletzt: i64 = s
+            .store
+            .meta_get(META_FORGE_ZULETZT)?
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        Ok(now_ms() - zuletzt >= FORGE_ABSTAND_MS)
+    });
+    entscheidung.unwrap_or(false)
 }
 
 // ------------------------------------------------------------------ Geräte
@@ -1459,6 +1587,8 @@ pub fn run() {
             ki_verdichten,
             forge_status,
             forge_token_setzen,
+            forge_auto_setzen,
+            forge_projekt,
             forge_abfragen,
             oeffnen,
             tresor_liste,
