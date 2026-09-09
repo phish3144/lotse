@@ -108,7 +108,9 @@
       const ruhtSeit = performance.now() - letzteRegung;
       const restS = Math.ceil((grenzeMs - ruhtSeit) / 1000);
       if (restS <= 0) {
-        clearInterval(uhr);
+        // Den Zähler nicht abräumen: schlüge das Sperren fehl, käme es sonst nie
+        // wieder dazu. Stattdessen von vorn zählen und es erneut versuchen.
+        letzteRegung = performance.now();
         warnungLaeuft = 0;
         void konto
           .sperren()
