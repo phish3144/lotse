@@ -626,7 +626,7 @@ footer a { color: var(--ink-2); }
       <article class="benefit reveal">
         <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></div>
         <h3>KI, die dein Projekt kennt</h3>
-        <p>Claude Code und andere Assistenten lesen über den eingebauten MCP-Server den Projektkontext und tragen ins Logbuch ein, was sie erledigt haben.</p>
+        <p>Claude Code und andere Assistenten lesen über den eingebauten MCP-Server den Projektkontext und tragen ins Logbuch ein, was sie erledigt haben. Ein Klick in den Einstellungen öffnet den Zugang; er hört nur auf diesem Rechner und schließt sich, sobald Lotse sperrt.</p>
         <div class="how">Der Tresor ist über diese Schnittstelle nicht erreichbar, nicht einmal die Titel der Einträge.</div>
       </article>
     </div>
@@ -763,7 +763,7 @@ Zeit      6. September 2026, 21:14</pre></div>
       <div>
         <h3>Für Tastatur-Menschen und KI-Assistenten</h3>
         <p>Die Kommandozeile kann alles, was die App kann: erfassen, suchen, Tresor, Ordner scannen, exportieren. Sie erkennt das Projekt am Ordner, in dem du gerade stehst.</p>
-        <p>Über <code>lotse mcp</code> bekommen Claude Code und andere Assistenten den Kontext deines Projekts und schreiben ihre Arbeit ins Logbuch. Der Tresor bleibt für sie unsichtbar.</p>
+        <p>Über <code>lotse mcp</code> bekommen Claude Code und andere Assistenten den Kontext deines Projekts und schreiben ihre Arbeit ins Logbuch. Der Tresor bleibt für sie unsichtbar. Wer die App ohnehin offen hat, öffnet den Zugang dort mit einem Klick – dann braucht kein Passwort in einer Konfigurationsdatei zu stehen.</p>
         <p>Und wenn du Lotse irgendwann nicht mehr willst: Ein Befehl legt alle Projekte als Markdown-Ordner ab, ein anderer sichert alles in einer verschlüsselten Datei, die sich ohne Lotse öffnen lässt.</p>
       </div>
     </div>
@@ -815,7 +815,7 @@ export LOTSE_HOME=~/.lotse
       <details class="q reveal"><summary>Was sieht der Sync-Dienst?</summary><p>Verschlüsselte Umschläge mit einer Kennung, einem Zeitstempel und der Art des Datensatzes. Keine Titel, keine Texte, keine Passwörter. Er kann Datensätze auch nicht unbemerkt vertauschen, weil jeder Umschlag an seine Kennung gebunden ist.</p></details>
       <details class="q reveal"><summary>Was passiert, wenn ich mein Passwort vergesse?</summary><p>Du nutzt den Wiederherstellungscode, den Lotse beim Einrichten einmal anzeigt. Bewahre ihn im Passwortmanager auf. Ohne Passwort und ohne Code kann niemand die Daten öffnen, auch wir nicht.</p></details>
       <details class="q reveal"><summary>Ersetzt Lotse meinen Passwortmanager?</summary><p>Nein, und das soll es auch nicht. Web-Logins gehören weiter in Proton Pass, Bitwarden oder 1Password. Lotse hält, was zu einem Projekt gehört und sonst in einer Textdatei landen würde: der Router vom Bauprojekt, der API-Schlüssel der Website, der Kundenzugang.</p></details>
-      <details class="q reveal"><summary>Wie fertig ist das Ganze?</summary><p>Eine frühe Vorschau. Der Kern (Speicher, Verschlüsselung, Tresor, Sync, Erkennung, Beobachter, Abruf von GitHub und GitLab) ist getestet und läuft in der Kommandozeile. Die Desktop-App bindet ihn an und wächst gerade; Systemleiste, automatisches Sperren und Updates folgen. Der Zugriff aus dem Browser ist der nächste große Schritt.</p></details>
+      <details class="q reveal"><summary>Wie fertig ist das Ganze?</summary><p>Eine frühe Vorschau. Der Kern (Speicher, Verschlüsselung, Tresor, Sync, Erkennung, Beobachter, Abruf von GitHub und GitLab) ist getestet und läuft in der Kommandozeile. Die Desktop-App bindet ihn an und wächst gerade: automatisches Sperren, die Update-Prüfung und der MCP-Zugang für Assistenten laufen, die Systemleiste folgt. Der Zugriff aus dem Browser ist der nächste große Schritt.</p></details>
       <details class="q reveal"><summary>Warum sind die Installer unsigniert?</summary><p>Signaturzertifikate kosten Geld und Zeit, die im Moment in die Anwendung gehen. Der Quellcode ist öffentlich, jeder Build entsteht nachvollziehbar aus ihm, und neben jedem Archiv liegt eine Prüfsumme. Solange das so ist, ersetzt sich Lotse nicht selbst: es sagt nur Bescheid, wenn eine neue Version da ist, und nennt die Datei für dein System. Den letzten Schritt machst du.</p></details>
     </div>
   </div>

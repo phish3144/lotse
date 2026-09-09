@@ -132,8 +132,10 @@ innerhalb des Ciphertexts.)
 
 Der Tresor ist ein eigenes Modul in `lotse-core` (`vault`). Folgende Module haben
 **keinen** Import-Pfad dorthin, geprüft von `scripts/modulgrenzen.sh` bei jedem
-CI-Lauf: `watcher`, `detect`, `mcp`, `ai`, `forge`, `git`, `kalender`, `update`,
-`export::spiegel`. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
+CI-Lauf: `watcher`, `detect`, `dokument`, `mcp` (samt `mcp::dienst`), `ai`, `forge`, `git`,
+`kalender`, `netz`, `update`, `export::spiegel`. Die Prüfung folgt einem Modul, das auf
+mehrere Dateien aufgeteilt wird, und schlägt an, wenn ein Name aus der Liste verschwindet –
+sonst verschwände die Regel unbemerkt mit ihm. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
 Module holen sie nie selbst.
 KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor dem Senden an.
 
@@ -189,6 +191,42 @@ Ausschlussliste (`detect::NIE_LESEN`: `.env`, `*.pem`, `*.key`, `id_rsa*`, `*.kd
 `*.p12`) gilt auch dann, wenn jemand eine solche Datei ausdrücklich wählt. PDF wird in
 `catch_unwind` geparst: eine beschädigte Datei von außen ergibt einen Fehler, keinen
 Absturz.
+
+## 6c. MCP: der Zugang für Assistenten
+
+Ein Assistent (Claude Code u. a.) kann Projektkontext lesen und ins Logbuch schreiben.
+Zwei Wege, dieselben fünf Werkzeuge, dieselbe Grenze zum Tresor:
+
+- **`lotse mcp` über stdin/stdout.** Der Assistent startet den Prozess. Er braucht dafür
+  das Passwort in der Umgebung (`LOTSE_PASSWORD`) – deshalb ist das der Weg für Skripte
+  und Dienste, nicht für den Alltag.
+- **`http://127.0.0.1:<port>/mcp` aus der laufenden App** (`mcp::dienst`). Die App hält
+  die entsperrte Sitzung, der Assistent klopft an. Kein Passwort irgendwo in einer
+  Konfigurationsdatei.
+
+Der HTTP-Weg ist ein offener Port auf dem Rechner und wird entsprechend behandelt:
+
+| Maßnahme | Wogegen |
+|---|---|
+| Lauscher an `127.0.0.1`, nie `0.0.0.0` | Zugriff aus dem lokalen Netz |
+| `Origin` muss localhost sein, wenn gesetzt; keine CORS-Kopfzeilen, keine Antwort auf `OPTIONS` | DNS-Rebinding: eine Seite im Browser gibt sich als lokaler Client aus |
+| `Authorization: Bearer` mit 32 B Zufall, verglichen ohne frühen Abbruch | anderes Programm auf demselben Rechner; Rückschluss aus der Laufzeit |
+| Endet, sobald die Sitzung gesperrt ist – und `sperren` schließt den Port sofort | Zugriff, während niemand am Rechner ist |
+| Standardmäßig aus; wird in den Einstellungen ausdrücklich geöffnet | stiller Port |
+| Zeitgrenzen auf Lesen und Schreiben, Obergrenzen für Kopf (8 KiB) und Rumpf (1 MiB) | hängende oder überlange Anfragen |
+
+Token und Port stehen im lokalen `meta`-Speicher und werden **nicht** synchronisiert: der
+Zugang gilt für dieses Gerät. „Token erneuern“ schließt den Zugang und macht alle bisher
+eingetragenen Token ungültig.
+
+Was **nicht** verteidigt wird: ein anderes Programm mit den Rechten der Nutzerin auf
+demselben Rechner. Es kann den lokalen Speicher lesen, sobald die App entsperrt ist – der
+MCP-Port ändert daran nichts, er ist nur kein zusätzlicher Weg dorthin.
+
+Der Tresor ist über beide Wege unerreichbar. Es gibt kein Werkzeug, das Tresor-Einträge
+auch nur auflistet; die Volltextsuche wirft Treffer der Art `tresor` weg, bevor sie
+antwortet. `crates/lotse-core/tests/mcp_http.rs` legt einen echten Eintrag mit Passwort an
+und sucht über den echten Socket danach.
 
 ## 7. Betrieb und Konto-Sicherheit
 

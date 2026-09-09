@@ -8,6 +8,8 @@
 //! Dieses Modul importiert **nie** aus `vault`. Es gibt kein Werkzeug, das Tresor-Einträge
 //! auch nur auflistet; das ist Modulgrenze, nicht Konvention (`THREAT_MODEL.md`, 6).
 
+pub mod dienst;
+
 use std::io::{BufRead, Write};
 
 use serde_json::{json, Value};
@@ -18,7 +20,25 @@ use crate::model::{Art, Notiz, Quelle, Status};
 use crate::store::Store;
 use crate::{now_ms, Result};
 
-pub const PROTOKOLL_VERSION: &str = "2025-06-18";
+/// Fassungen des Protokolls, die dieser Server bedienen kann – neueste zuerst.
+///
+/// Für einen Server, der nur Werkzeuge anbietet, ist das Drahtformat von `initialize`,
+/// `tools/list` und `tools/call` in allen dreien dasselbe. Die Unterschiede betreffen
+/// Dinge, die Lotse gar nicht anbietet (Ressourcen, Prompts, Elicitation). Deshalb wird
+/// die erbetene Fassung zurückgegeben, wenn sie in dieser Liste steht: ein Client, der
+/// nur die ältere spricht, soll nicht abbrechen müssen.
+pub const PROTOKOLL_VERSIONEN: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
+
+/// Die Fassung, die der Server nennt, wenn der Client keine oder eine unbekannte bittet.
+pub const PROTOKOLL_VERSION: &str = PROTOKOLL_VERSIONEN[0];
+
+/// Antwortet mit der erbetenen Fassung, sofern sie bedient wird, sonst mit der eigenen.
+/// So sieht es die Spezifikation vor: der Client entscheidet dann, ob er damit lebt.
+fn version_aushandeln(gewuenscht: Option<&str>) -> &'static str {
+    gewuenscht
+        .and_then(|v| PROTOKOLL_VERSIONEN.iter().find(|k| **k == v).copied())
+        .unwrap_or(PROTOKOLL_VERSION)
+}
 
 /// Werkzeugbeschreibungen, wie `tools/list` sie liefert.
 pub fn werkzeuge() -> Value {
@@ -290,7 +310,9 @@ pub fn anfrage(store: &mut Store, req: &Value) -> Option<Value> {
     };
     match method {
         "initialize" => antwort(json!({
-            "protocolVersion": PROTOKOLL_VERSION,
+            "protocolVersion": version_aushandeln(
+                params.get("protocolVersion").and_then(Value::as_str)
+            ),
             "capabilities": { "tools": {} },
             "serverInfo": { "name": "lotse", "version": env!("CARGO_PKG_VERSION") },
             "instructions": "Lotse ist das Logbuch für alle Vorhaben der Nutzerin. Hole zu Beginn den Kontext mit get_project_context und trage am Ende einer Sitzung mit log_activity kurz ein, was getan wurde und was der nächste Schritt ist. Tresor-Inhalte sind über diese Schnittstelle nie erreichbar."
@@ -422,6 +444,30 @@ mod tests {
         )
         .unwrap();
         assert_eq!(fehl["error"]["code"], -32601);
+    }
+
+    #[test]
+    fn nennt_die_fassung_die_der_client_spricht() {
+        let ak = Key32::random().unwrap();
+        let mut store = Store::open_in_memory(&ak, Ulid::new()).unwrap();
+        let mut frage = |v: Option<&str>| {
+            let params = match v {
+                Some(v) => json!({ "protocolVersion": v }),
+                None => json!({}),
+            };
+            let req = json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":params});
+            anfrage(&mut store, &req).unwrap()["result"]["protocolVersion"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        // Bekannte Fassungen werden bestätigt – sonst bricht ein älterer Client ab.
+        for v in PROTOKOLL_VERSIONEN {
+            assert_eq!(frage(Some(v)), *v);
+        }
+        // Unbekannte oder fehlende: die eigene, neueste.
+        assert_eq!(frage(Some("1999-01-01")), PROTOKOLL_VERSION);
+        assert_eq!(frage(None), PROTOKOLL_VERSION);
     }
 
     #[test]

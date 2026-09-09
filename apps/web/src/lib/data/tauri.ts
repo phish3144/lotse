@@ -340,6 +340,27 @@ export const kalender = {
     invoke<KalenderErgebnis>('kalender_termine', { projektId, tage: tage ?? null }),
 };
 
+export interface McpStatus {
+  laeuft: boolean;
+  adresse: string;
+  token: string;
+  port: number;
+  /** Fertige Zeile für `claude mcp add`, damit niemand ein Token abtippt. */
+  befehl: string;
+}
+
+/**
+ * MCP-Zugang für Assistenten. Läuft auf `127.0.0.1`, nur solange Lotse entsperrt ist,
+ * und verlangt das Token. Der Tresor ist über MCP nicht erreichbar – das ist
+ * Modulgrenze im Kern, nicht eine Einstellung hier.
+ */
+export const mcp = {
+  status: () => invoke<McpStatus>('mcp_status'),
+  starten: (port?: number) => invoke<McpStatus>('mcp_starten', { port: port ?? null }),
+  stoppen: () => invoke<void>('mcp_stoppen'),
+  tokenErneuern: () => invoke<McpStatus>('mcp_token_erneuern'),
+};
+
 export interface BeobachterStatus {
   laeuft: boolean;
   wurzeln: string[];

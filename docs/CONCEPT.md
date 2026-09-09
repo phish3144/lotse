@@ -294,6 +294,10 @@ Gezielt, in dieser Reihenfolge, immer ohne Tresor-Zugriff und ohne stillen Daten
    `log_activity`, `search`, `list_open_threads`. Claude Code liest beim Start den Kontext
    und schreibt am Ende einer Sitzung eine Zusammenfassung mit Quelle `mcp`. Kostet über
    das bestehende Abo nichts. Einträge sind filter- und sammelweise löschbar.
+   Zwei Wege dorthin: `lotse mcp` über stdin/stdout (der Assistent startet den Prozess und
+   braucht `LOTSE_PASSWORD` – für Skripte) und ein Zugang auf `127.0.0.1` aus der
+   laufenden App, der die schon entsperrte Sitzung mitbenutzt (für den Alltag).
+   Standardmäßig aus; er endet, sobald Lotse sperrt (`THREAT_MODEL.md`, 6c).
 2. **Verdichteter Brief.** Bei viel Aktivität seit dem letzten Besuch. Modell wahlweise
    lokal (Ollama) oder per eigenem API-Key. Opt-in, pro Aufruf sichtbar, was gesendet wird.
 3. **Klassifizierung von Kandidaten**, wenn die Heuristik keine Vorlage erkennt.

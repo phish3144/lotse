@@ -37,11 +37,19 @@ struct BeobachterHandle {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
+/// Laufender MCP-Dienst. Wie beim Beobachter hält der Thread den Lauscher; hier steht
+/// der Schalter und das, was die Oberfläche anzeigen muss.
+struct McpHandle {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    adresse: String,
+}
+
 #[derive(Default)]
 pub struct AppState {
     home: Mutex<Option<PathBuf>>,
     sitzung: Mutex<Option<Sitzung>>,
     beobachter: Mutex<Option<BeobachterHandle>>,
+    mcp: Mutex<Option<McpHandle>>,
     /// Zuletzt geholte Kalender: Adresse → (Zeitpunkt, Inhalt). Nur im Arbeitsspeicher.
     kalender: Mutex<std::collections::HashMap<String, (i64, String)>>,
 }
@@ -373,8 +381,12 @@ fn passwort_aendern(
 
 #[tauri::command]
 fn sperren(state: State<AppState>) -> R<()> {
-    // Erst den Beobachter anhalten: er greift sonst weiter auf die Sitzung zu.
+    // Erst die Hintergrundarbeit anhalten: sie greift sonst weiter auf die Sitzung zu.
+    // Der MCP-Dienst würde sich auch von selbst beenden, sobald er eine gesperrte Sitzung
+    // sieht – aber erst bei der nächsten Anfrage, und die kann ausbleiben. Hier fällt der
+    // Schalter sofort; der Lauscher schließt beim nächsten Durchlauf seiner Schleife.
     beobachter_stoppen(state.clone())?;
+    mcp_stoppen(state.clone())?;
     *sperre(&state.sitzung) = None;
     Ok(())
 }
@@ -916,6 +928,155 @@ fn beobachter_stoppen(state: State<AppState>) -> R<()> {
         h.stop.store(true, Ordering::SeqCst);
     }
     Ok(())
+}
+
+// --------------------------------------------------------------------- MCP
+
+/// Zugangstoken und Port des MCP-Dienstes. Beides steht im lokalen `meta`-Speicher und
+/// wird **nicht** synchronisiert: es gilt für dieses Gerät, und der eingetragene Zugang
+/// im Assistenten soll einen Neustart überleben.
+const META_MCP_TOKEN: &str = "mcp_token";
+const META_MCP_PORT: &str = "mcp_port";
+
+#[derive(Serialize)]
+struct McpStatus {
+    laeuft: bool,
+    adresse: String,
+    token: String,
+    port: u16,
+    /// Fertige Zeile für `claude mcp add`, damit niemand Token abtippen muss.
+    befehl: String,
+}
+
+fn mcp_zugang(s: &mut Sitzung) -> lotse_core::Result<(String, u16)> {
+    let token = match s.store.meta_get(META_MCP_TOKEN)? {
+        Some(t) if !t.is_empty() => t,
+        _ => {
+            let t = lotse_core::mcp::dienst::token_erzeugen()?;
+            s.store.meta_set(META_MCP_TOKEN, &t)?;
+            t
+        }
+    };
+    let port = s
+        .store
+        .meta_get(META_MCP_PORT)?
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(lotse_core::mcp::dienst::PORT_STANDARD);
+    Ok((token, port))
+}
+
+fn mcp_antwort(laeuft: bool, adresse: String, token: String, port: u16) -> McpStatus {
+    let befehl =
+        format!("claude mcp add --transport http lotse {adresse} --header \"Authorization: Bearer {token}\"");
+    McpStatus {
+        laeuft,
+        adresse,
+        token,
+        port,
+        befehl,
+    }
+}
+
+#[tauri::command]
+fn mcp_status(state: State<AppState>) -> R<McpStatus> {
+    let laufende = sperre(&state.mcp).as_ref().map(|h| h.adresse.clone());
+    let (token, port) = mit(&state, mcp_zugang)?;
+    let adresse = laufende
+        .clone()
+        .unwrap_or_else(|| format!("http://127.0.0.1:{port}{}", lotse_core::mcp::dienst::PFAD));
+    Ok(mcp_antwort(laufende.is_some(), adresse, token, port))
+}
+
+/// Öffnet den MCP-Dienst auf `127.0.0.1`. Er lebt nur, solange die Sitzung entsperrt ist.
+///
+/// Der Thread nimmt die Sitzungssperre je Anfrage kurz – dasselbe Muster wie beim
+/// Beobachter. Ist die Sitzung weg, endet der Dienst und gibt den Port frei.
+#[tauri::command]
+fn mcp_starten(app: tauri::AppHandle, state: State<AppState>, port: Option<u16>) -> R<McpStatus> {
+    use std::sync::atomic::Ordering;
+
+    let (token, gespeicherter_port) = mit(&state, mcp_zugang)?;
+    let port = port.unwrap_or(gespeicherter_port);
+    if port != gespeicherter_port {
+        mit(&state, |s| {
+            s.store.meta_set(META_MCP_PORT, &port.to_string())?;
+            Ok(())
+        })?;
+    }
+
+    // Anhalten und Ablegen unter einer Sperre, sonst lässt ein Doppelklick einen Dienst
+    // zurück, dessen Schalter niemand mehr hält.
+    let mut handle = sperre(&state.mcp);
+    if let Some(vorheriger) = handle.take() {
+        vorheriger.stop.store(true, Ordering::SeqCst);
+        // Warten, bis der Port wieder frei ist: sonst schlägt das Binden gleich fehl.
+        for _ in 0..30 {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    let lauscher = lotse_core::mcp::dienst::binden(port).map_err(fehler)?;
+    let adresse = lotse_core::mcp::dienst::adresse(&lauscher);
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop_thread = stop.clone();
+    let token_thread = token.clone();
+
+    std::thread::spawn(move || {
+        use lotse_core::mcp::dienst::Bescheid;
+        let zustand = app.state::<AppState>();
+        lotse_core::mcp::dienst::bedienen(&lauscher, &token_thread, &stop_thread, |nachricht| {
+            let mut guard = sperre(&zustand.sitzung);
+            match guard.as_mut() {
+                Some(s) => Bescheid::Antwort(Box::new(lotse_core::mcp::anfrage(
+                    &mut s.store,
+                    nachricht,
+                ))),
+                None => Bescheid::Gesperrt,
+            }
+        });
+        // Nur den eigenen Eintrag räumen: nach Anhalten und sofortigem Neustart gehört
+        // der Eintrag schon einem anderen Thread.
+        let mut g = sperre(&zustand.mcp);
+        let ist_meiner = g
+            .as_ref()
+            .is_some_and(|h| std::sync::Arc::ptr_eq(&h.stop, &stop_thread));
+        if ist_meiner {
+            *g = None;
+        }
+    });
+
+    *handle = Some(McpHandle {
+        stop,
+        adresse: adresse.clone(),
+    });
+    drop(handle);
+
+    Ok(mcp_antwort(true, adresse, token, port))
+}
+
+#[tauri::command]
+fn mcp_stoppen(state: State<AppState>) -> R<()> {
+    use std::sync::atomic::Ordering;
+    if let Some(h) = sperre(&state.mcp).take() {
+        h.stop.store(true, Ordering::SeqCst);
+    }
+    Ok(())
+}
+
+/// Erzeugt ein neues Token. Der Dienst wird dabei angehalten – ein Assistent mit dem
+/// alten Token soll nicht weiterreden dürfen.
+#[tauri::command]
+fn mcp_token_erneuern(state: State<AppState>) -> R<McpStatus> {
+    mcp_stoppen(state.clone())?;
+    let neu = lotse_core::mcp::dienst::token_erzeugen().map_err(fehler)?;
+    mit(&state, |s| {
+        s.store.meta_set(META_MCP_TOKEN, &neu)?;
+        Ok(())
+    })?;
+    mcp_status(state)
 }
 
 // ---------------------------------------------------------------------- KI
@@ -2017,6 +2178,10 @@ pub fn run() {
             beobachter_status,
             beobachter_starten,
             beobachter_stoppen,
+            mcp_status,
+            mcp_starten,
+            mcp_stoppen,
+            mcp_token_erneuern,
             ki_status,
             ki_ziel_setzen,
             ki_modelle,

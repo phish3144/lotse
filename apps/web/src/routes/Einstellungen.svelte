@@ -10,6 +10,7 @@
     ki,
     KI_ZIELE,
     konto,
+    mcp,
     sync,
     system,
     update,
@@ -17,6 +18,7 @@
     type ForgeStatus,
     type KiStatus,
     type KiVerbrauch,
+    type McpStatus,
     type GeraetInfo,
     type KontoStatus,
     type SyncErgebnis,
@@ -78,6 +80,52 @@
       beoStatus = await beobachter.status();
     } catch (e) {
       meldungen.fehler(e);
+    }
+  }
+
+  // --- MCP: Zugang für Assistenten -------------------------------------------
+  let mcpStatus: McpStatus | null = $state(null);
+  let mcpTokenSichtbar = $state(false);
+  let mcpPort = $state('');
+
+  async function mcpUmschalten() {
+    try {
+      if (mcpStatus?.laeuft) {
+        await mcp.stoppen();
+        mcpStatus = await mcp.status();
+        meldungen.zeigen('Zugang geschlossen.');
+        return;
+      }
+      const gewuenscht = mcpPort.trim() ? Number(mcpPort.trim()) : undefined;
+      if (gewuenscht !== undefined && (!Number.isInteger(gewuenscht) || gewuenscht < 1 || gewuenscht > 65535)) {
+        meldungen.zeigen('Port muss zwischen 1 und 65535 liegen.', 'fehler');
+        return;
+      }
+      mcpStatus = await mcp.starten(gewuenscht);
+      meldungen.zeigen('Zugang offen. Er schließt sich, sobald Lotse sperrt.');
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
+  async function mcpTokenErneuern() {
+    try {
+      mcpStatus = await mcp.tokenErneuern();
+      mcpTokenSichtbar = false;
+      meldungen.zeigen('Neues Token. Der Zugang ist geschlossen; bestehende Einträge im Assistenten gelten nicht mehr.');
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
+  async function mcpBefehlKopieren() {
+    if (!mcpStatus) return;
+    try {
+      await navigator.clipboard.writeText(mcpStatus.befehl);
+      meldungen.zeigen('Befehl in der Zwischenablage. Er enthält das Token – nicht weitergeben.');
+    } catch {
+      mcpTokenSichtbar = true;
+      meldungen.zeigen('Kopieren ging nicht. Der Befehl steht jetzt offen da.', 'fehler');
     }
   }
 
@@ -294,6 +342,8 @@
       kiModell = kiStatus.modell;
       kiEintrag = kiStatus.schluessel_eintrag ?? '';
       kiFeld = kiStatus.schluessel_feld ?? 'schluessel';
+      mcpStatus = await mcp.status();
+      mcpPort = String(mcpStatus.port);
     } catch (e) {
       meldungen.fehler(e);
     }
@@ -569,6 +619,71 @@
         </ul>
         <button type="button" onclick={kiVerbrauchLoeschen}>Zähler und Protokoll löschen</button>
       {/if}
+    {/if}
+  {/if}
+</section>
+
+<section aria-labelledby="mcp-titel">
+  <h2 id="mcp-titel">Zugang für Assistenten (MCP)</h2>
+  <p class="hinweis">
+    Öffnet einen Zugang, über den ein Assistent wie Claude Code deine Projekte lesen und ins Logbuch schreiben kann:
+    Kurs, offene Fäden, der Wo-war-ich-Brief, Suche und neue Einträge. Der Zugang hört nur auf
+    <code>127.0.0.1</code>, verlangt das Token unten und <strong>lebt nur, solange Lotse entsperrt ist</strong>.
+    Sperrst du, ist er zu – nach dem Entsperren öffnest du ihn hier wieder.
+  </p>
+  <p class="hinweis">
+    <strong>Der Tresor bleibt außen vor.</strong> Es gibt kein Werkzeug, das Tresor-Einträge auch nur auflistet –
+    das ist im Kern festgelegt und wird bei jedem Commit geprüft, nicht hier eingestellt.
+  </p>
+  {#if !echteDaten}
+    <p class="nur-desktop">Nur in der Desktop-App.</p>
+  {:else}
+    <div class="beobachter">
+      <div>
+        <strong>Zugang</strong>
+        <p class="hinweis">
+          {#if mcpStatus?.laeuft}
+            Offen auf <code>{mcpStatus.adresse}</code>.
+          {:else}
+            Geschlossen. Standardport {mcpStatus?.port ?? 7457}; ein anderer geht auch, falls der belegt ist.
+          {/if}
+        </p>
+      </div>
+      <input
+        bind:value={mcpPort}
+        type="text"
+        inputmode="numeric"
+        class="schmal"
+        aria-label="Port"
+        disabled={mcpStatus?.laeuft}
+      />
+      <button type="button" class:primaer={!mcpStatus?.laeuft} onclick={mcpUmschalten}>
+        {mcpStatus?.laeuft ? 'Schließen' : 'Öffnen'}
+      </button>
+    </div>
+
+    {#if mcpStatus}
+      <p class="hinweis klein">
+        Einmal im Assistenten eintragen – der Befehl enthält das Token, behandle ihn wie ein Passwort:
+      </p>
+      <div class="zeile">
+        <input
+          class="mono"
+          readonly
+          value={mcpTokenSichtbar ? mcpStatus.befehl : mcpStatus.befehl.replace(mcpStatus.token, '•'.repeat(16))}
+          aria-label="Befehl für den Assistenten"
+        />
+        <button type="button" onclick={() => (mcpTokenSichtbar = !mcpTokenSichtbar)}>
+          {mcpTokenSichtbar ? 'Verbergen' : 'Zeigen'}
+        </button>
+        <button type="button" onclick={mcpBefehlKopieren}>Kopieren</button>
+      </div>
+      <div class="zeile">
+        <button type="button" onclick={mcpTokenErneuern}>Token erneuern</button>
+        <span class="hinweis klein">
+          Schließt den Zugang und macht alle bisher eingetragenen Token ungültig.
+        </span>
+      </div>
     {/if}
   {/if}
 </section>
@@ -963,6 +1078,11 @@
     border-radius: 0.6rem;
     background: var(--karten-hintergrund);
   }
+  .beobachter .schmal {
+    width: 7ch;
+    text-align: center;
+  }
+
   .beobachter p {
     margin: 0.3rem 0 0;
     font-size: 0.9rem;
