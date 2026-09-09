@@ -140,8 +140,8 @@ KI-Funktionen sehen nur, was ihnen explizit übergeben wird, und zeigen es vor d
 ## 6a. Verbindungen nach außen
 
 Alle Abrufe (Sync-Dienst, GitHub, GitLab, Kalender, KI-Ziel) laufen über TLS mit dem
-Wurzelspeicher des Betriebssystems (`ureq` mit `native-certs`), nicht über eine im
-Programm mitgelieferte Liste. Das ist die Wahl, die Browser, `git` und `curl` auf
+Wurzelspeicher des Betriebssystems (`ureq` 3 mit `platform-verifier`, gebündelt in
+`crates/lotse-core/src/netz.rs`), nicht über eine im Programm mitgelieferte Liste. Das ist die Wahl, die Browser, `git` und `curl` auf
 demselben Rechner ebenfalls treffen: In Netzen mit TLS-Prüfung (Firmen-Proxy) hat der
 Betreiber ohnehin eine eigene CA im System, und eine mitgelieferte Liste würde Lotse dort
 schlicht ausfallen lassen, ohne etwas zu schützen. Wer diese CA kontrolliert, sieht die

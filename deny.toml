@@ -7,14 +7,6 @@ ignore = [
   # proc-macro-error2 ist unbetreut; kommt nur über age → i18n-embed-fl (Fehlermeldungs-Lokalisierung)
   # zur Compile-Zeit ins Spiel, keine Laufzeitwirkung. Beobachten, bis age umstellt.
   { id = "RUSTSEC-2026-0173", reason = "nur Build-Zeit über age/i18n-embed-fl, keine Alternative ohne age-Fork" },
-  # rustls-pemfile ist unbetreut (Meldung „unmaintained", keine Schwachstelle). Es kommt über
-  # ureq 2 → rustls-native-certs 0.7 herein, seit TLS gegen den Wurzelspeicher des Systems
-  # prüft (THREAT_MODEL.md 6a). Die Fassung 2.2.0 ist eine dünne Hülle um Code, der in
-  # rustls-pki-types weiterbetreut wird. Der richtige Ausweg ist ureq 3: dort erledigt
-  # rustls-platform-verifier dieselbe Aufgabe ohne diese Kette. Das ist eine eigene Änderung
-  # (Netzcode in ai, forge, kalender, update und im Sync-Client) und keine Beigabe zu einem
-  # Release. Bis dahin: bewusst geduldet, nicht übersehen.
-  { id = "RUSTSEC-2025-0134", reason = "unbetreut, keine Schwachstelle; entfällt mit dem Wechsel auf ureq 3" },
 ]
 
 [licenses]

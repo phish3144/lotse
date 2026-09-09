@@ -221,14 +221,18 @@ pub struct Stand {
 /// Logbuch sinnlos; dass es mehr sein können, sagt `Stand::mehr_prs`.
 const SEITE: usize = 100;
 
+/// Ein Agent für alle Abfragen dieses Moduls.
+///
+/// `http_status_as_error(false)`: Fehlerantworten kommen als gewöhnliche Antwort zurück,
+/// nicht als Fehlerwert. Nur so lassen sich ihre Kopfzeilen lesen – bei GitHub steckt im
+/// 403 der Unterschied zwischen „keine Berechtigung" und „Kontingent erschöpft".
+///
+/// TLS prüft gegen den Wurzelspeicher des Systems (`THREAT_MODEL.md` 6a).
 pub(crate) fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent(concat!("lotse/", env!("CARGO_PKG_VERSION")))
-        .build()
+    crate::netz::agent(std::time::Duration::from_secs(20))
 }
 
-/// Ein GET mit den Kopfzeilen des jeweiligen Hosters. `kopf` trägt den Token: GitHub
+/// Ein GET mit den Kopfzeilen des jeweiligen Hosters. `token` trägt die Anmeldung: GitHub
 /// nimmt `Authorization: Bearer`, GitLab `PRIVATE-TOKEN`.
 pub(crate) fn hole<T: serde::de::DeserializeOwned>(
     agent: &ureq::Agent,
@@ -236,49 +240,55 @@ pub(crate) fn hole<T: serde::de::DeserializeOwned>(
     anbieter: Anbieter,
     token: Option<&str>,
 ) -> Result<T> {
-    let mut r = agent.get(url).set("Accept", "application/json");
+    let mut r = agent.get(url).header("Accept", "application/json");
     if anbieter == Anbieter::GitHub {
         r = r
-            .set("Accept", "application/vnd.github+json")
-            .set("X-GitHub-Api-Version", "2022-11-28");
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28");
     }
     if let Some(t) = token {
         r = match anbieter {
-            Anbieter::GitHub => r.set("Authorization", &format!("Bearer {t}")),
-            Anbieter::GitLab => r.set("PRIVATE-TOKEN", t),
+            Anbieter::GitHub => r.header("Authorization", &format!("Bearer {t}")),
+            Anbieter::GitLab => r.header("PRIVATE-TOKEN", t),
         };
     }
     let name = anbieter.as_str();
-    match r.call() {
-        Ok(resp) => resp
-            .into_json::<T>()
+    let mut resp = r.call().map_err(|e| crate::netz::fehler(e, name))?;
+    let status = resp.status().as_u16();
+    if status == 403 {
+        // GitHub schickt 403 sowohl bei fehlenden Rechten als auch bei erschöpftem
+        // Kontingent. Der Unterschied steht im Header.
+        let rest = resp
+            .headers()
+            .get("x-ratelimit-remaining")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        return Err(if rest == "0" {
+            Error::Invalid(
+                "GitHub-Kontingent erschöpft. Mit Token sind es 5000 Anfragen pro \
+                 Stunde statt 60."
+                    .into(),
+            )
+        } else {
+            Error::Invalid("Keine Berechtigung für dieses Repo".into())
+        });
+    }
+    match status {
+        200..=299 => resp
+            .body_mut()
+            .read_json::<T>()
             .map_err(|e| Error::Other(e.to_string())),
-        Err(ureq::Error::Status(401, _)) => Err(Error::Invalid(
+        401 => Err(Error::Invalid(
             "Der Token wird abgelehnt (401). Ist er abgelaufen?".into(),
         )),
-        Err(ureq::Error::Status(403, resp)) => {
-            // GitHub schickt 403 sowohl bei fehlenden Rechten als auch bei erschöpftem
-            // Kontingent. Der Unterschied steht im Header.
-            let rest = resp.header("x-ratelimit-remaining").unwrap_or("");
-            if rest == "0" {
-                Err(Error::Invalid(
-                    "GitHub-Kontingent erschöpft. Mit Token sind es 5000 Anfragen pro \
-                     Stunde statt 60."
-                        .into(),
-                ))
-            } else {
-                Err(Error::Invalid("Keine Berechtigung für dieses Repo".into()))
-            }
-        }
         // GitLab drosselt mit 429 statt mit 403.
-        Err(ureq::Error::Status(429, _)) => Err(Error::Invalid(format!(
+        429 => Err(Error::Invalid(format!(
             "{name} drosselt gerade (429). Später noch einmal."
         ))),
-        Err(ureq::Error::Status(404, _)) => Err(Error::NotFound(
+        404 => Err(Error::NotFound(
             "Repo nicht gefunden. Bei privaten Repos braucht es einen Token.".into(),
         )),
-        Err(ureq::Error::Status(s, _)) => Err(Error::Netz(format!("{name} antwortete {s}"))),
-        Err(e) => Err(Error::Netz(e.to_string())),
+        s => Err(Error::Netz(format!("{name} antwortete {s}"))),
     }
 }
 

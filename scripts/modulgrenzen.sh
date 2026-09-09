@@ -9,7 +9,7 @@ set -euo pipefail
 wurzel="$(cd "$(dirname "$0")/.." && pwd)"
 kern="$wurzel/crates/lotse-core/src"
 
-module=(ai.rs detect.rs dokument.rs forge.rs git.rs kalender.rs mcp.rs update.rs watcher.rs export/spiegel.rs)
+module=(ai.rs detect.rs dokument.rs forge.rs git.rs kalender.rs mcp.rs netz.rs update.rs watcher.rs export/spiegel.rs)
 
 fehler=0
 for m in "${module[@]}"; do

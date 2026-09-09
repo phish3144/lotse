@@ -519,24 +519,23 @@ pub fn holen(ziel: &str) -> crate::Result<String> {
         Some(rest) => format!("https://{rest}"),
         None => z.to_string(),
     };
-    let agent = ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent(concat!("lotse/", env!("CARGO_PKG_VERSION")))
-        .build();
-    match agent.get(&url).call() {
-        Ok(r) => r
-            .into_string()
+    let agent = crate::netz::agent(std::time::Duration::from_secs(20));
+    let mut resp = agent
+        .get(url.as_str())
+        .call()
+        .map_err(|e| crate::netz::fehler(e, "Der Kalender"))?;
+    match resp.status().as_u16() {
+        200..=299 => resp
+            .body_mut()
+            .read_to_string()
             .map_err(|e| crate::Error::Netz(e.to_string())),
-        Err(ureq::Error::Status(401 | 403, _)) => Err(crate::Error::Invalid(
+        401 | 403 => Err(crate::Error::Invalid(
             "Der Kalender ist nicht öffentlich. Bei den meisten Diensten gibt es dafür \
              eine geheime Abonnement-Adresse."
                 .into(),
         )),
-        Err(ureq::Error::Status(404, _)) => {
-            Err(crate::Error::NotFound("Kalender nicht gefunden".into()))
-        }
-        Err(ureq::Error::Status(s, _)) => Err(crate::Error::Netz(format!("Antwort {s}"))),
-        Err(e) => Err(crate::Error::Netz(e.to_string())),
+        404 => Err(crate::Error::NotFound("Kalender nicht gefunden".into())),
+        s => Err(crate::Error::Netz(format!("Antwort {s}"))),
     }
 }
 

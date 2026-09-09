@@ -46,15 +46,20 @@ impl Ziel {
         format!("{}{pfad}", self.basis_url.trim_end_matches('/'))
     }
 
+    /// Läuft das Ziel auf diesem Rechner? Dann verlässt nichts das Gerät, und es
+    /// braucht keinen Schlüssel.
+    pub fn lokal(&self) -> bool {
+        self.basis_url.starts_with("http://localhost")
+            || self.basis_url.starts_with("http://127.0.0.1")
+    }
+
     /// Lokale Ziele brauchen keinen Schlüssel; entfernte schon. Das früh zu prüfen
     /// erspart eine Fehlermeldung des Anbieters, die niemand versteht.
     pub fn pruefen(&self) -> Result<()> {
         if self.modell.trim().is_empty() {
             return Err(Error::Invalid("Kein Modell gewählt".into()));
         }
-        let lokal = self.basis_url.starts_with("http://localhost")
-            || self.basis_url.starts_with("http://127.0.0.1");
-        if !lokal && self.schluessel.as_deref().unwrap_or("").trim().is_empty() {
+        if !self.lokal() && self.schluessel.as_deref().unwrap_or("").trim().is_empty() {
             return Err(Error::Invalid(
                 "Für dieses Ziel wird ein Schlüssel gebraucht".into(),
             ));
@@ -258,65 +263,68 @@ fn modelle_lesen(json: &str) -> Result<Vec<String>> {
 
 #[cfg(feature = "native")]
 fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        // Lokale Modelle brauchen auf schwacher Hardware Zeit.
-        .timeout(std::time::Duration::from_secs(120))
-        .user_agent(concat!("lotse/", env!("CARGO_PKG_VERSION")))
-        .build()
+    // Lokale Modelle brauchen auf schwacher Hardware Zeit.
+    crate::netz::agent(std::time::Duration::from_secs(120))
 }
 
+/// Deutet den Statuscode einer Antwort. `None`, wenn alles in Ordnung ist.
 #[cfg(feature = "native")]
-fn fehler_deuten(e: ureq::Error, ziel: &Ziel) -> Error {
-    match e {
-        ureq::Error::Status(401, _) | ureq::Error::Status(403, _) => {
-            Error::Invalid("Der Schlüssel wird abgelehnt.".into())
-        }
-        ureq::Error::Status(404, _) => {
-            Error::NotFound(format!("Modell »{}« kennt dieses Ziel nicht.", ziel.modell))
-        }
-        ureq::Error::Status(429, _) => Error::Invalid(
+fn status_deuten(status: u16, ziel: &Ziel) -> Option<Error> {
+    match status {
+        200..=299 => None,
+        401 | 403 => Some(Error::Invalid("Der Schlüssel wird abgelehnt.".into())),
+        404 => Some(Error::NotFound(format!(
+            "Modell »{}« kennt dieses Ziel nicht.",
+            ziel.modell
+        ))),
+        429 => Some(Error::Invalid(
             "Kontingent erschöpft. Bei den kostenlosen Zugängen ist das eine Grenze pro \
              Minute – kurz warten genügt meist."
                 .into(),
-        ),
-        ureq::Error::Status(s, _) => Error::Netz(format!("Das Ziel antwortete {s}")),
-        ureq::Error::Transport(t) => {
-            if ziel.basis_url.contains("localhost") || ziel.basis_url.contains("127.0.0.1") {
-                Error::Netz(
-                    "Keine Antwort von Ollama. Läuft es? Sonst starten und ein Modell \
-                     laden: `ollama pull llama3.2`."
-                        .into(),
-                )
-            } else {
-                Error::Netz(t.to_string())
-            }
-        }
+        )),
+        s => Some(Error::Netz(format!("Das Ziel antwortete {s}"))),
     }
+}
+
+/// Deutet einen Transportfehler. Bei einem lokalen Ziel ist die wahrscheinlichste
+/// Ursache eine andere als bei einem entfernten – das gehört in die Meldung.
+#[cfg(feature = "native")]
+fn fehler_deuten(e: ureq::Error, ziel: &Ziel) -> Error {
+    if ziel.lokal() {
+        return Error::Netz(
+            "Keine Antwort von Ollama. Läuft es? Sonst starten und ein Modell \
+             laden: `ollama pull llama3.2`."
+                .into(),
+        );
+    }
+    crate::netz::fehler(e, "Das KI-Ziel")
 }
 
 /// Kurzer Blick, ob unter der Adresse überhaupt etwas antwortet. Eigener, knapper
 /// Zeitrahmen: das hier läuft beim Öffnen der Einstellungen und darf nicht hängen.
 #[cfg(feature = "native")]
 pub fn erreichbar(basis_url: &str) -> bool {
-    let a = ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(2))
-        .build();
-    a.get(&format!("{}/models", basis_url.trim_end_matches('/')))
+    let a = crate::netz::agent(std::time::Duration::from_secs(2));
+    a.get(format!("{}/models", basis_url.trim_end_matches('/')).as_str())
         .call()
-        .is_ok()
+        .is_ok_and(|r| r.status().is_success())
 }
 
 /// Verfügbare Modelle des Ziels. Damit muss niemand einen Modellnamen abtippen.
 #[cfg(feature = "native")]
 pub fn modelle(ziel: &Ziel) -> Result<Vec<String>> {
     let a = agent();
-    let mut r = a.get(&ziel.url("/models"));
+    let mut r = a.get(ziel.url("/models").as_str());
     if let Some(k) = ziel.schluessel.as_deref().filter(|k| !k.trim().is_empty()) {
-        r = r.set("Authorization", &format!("Bearer {k}"));
+        r = r.header("Authorization", &format!("Bearer {k}"));
     }
-    let resp = r.call().map_err(|e| fehler_deuten(e, ziel))?;
+    let mut resp = r.call().map_err(|e| fehler_deuten(e, ziel))?;
+    if let Some(f) = status_deuten(resp.status().as_u16(), ziel) {
+        return Err(f);
+    }
     let text = resp
-        .into_string()
+        .body_mut()
+        .read_to_string()
         .map_err(|e| Error::Other(e.to_string()))?;
     modelle_lesen(&text)
 }
@@ -349,15 +357,17 @@ pub fn verdichten(ziel: &Ziel, zweck: Zweck, eingabe: &str) -> Result<Antwort> {
         temperature: 0.2,
         stream: false,
     };
-    let mut r = a.post(&ziel.url("/chat/completions"));
+    let mut r = a.post(ziel.url("/chat/completions").as_str());
     if let Some(k) = ziel.schluessel.as_deref().filter(|k| !k.trim().is_empty()) {
-        r = r.set("Authorization", &format!("Bearer {k}"));
+        r = r.header("Authorization", &format!("Bearer {k}"));
     }
-    let resp = r
-        .send_json(serde_json::to_value(&koerper)?)
-        .map_err(|e| fehler_deuten(e, ziel))?;
+    let mut resp = r.send_json(&koerper).map_err(|e| fehler_deuten(e, ziel))?;
+    if let Some(f) = status_deuten(resp.status().as_u16(), ziel) {
+        return Err(f);
+    }
     let text = resp
-        .into_string()
+        .body_mut()
+        .read_to_string()
         .map_err(|e| Error::Other(e.to_string()))?;
     antwort_lesen(&text)
 }

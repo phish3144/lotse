@@ -116,10 +116,7 @@ impl Client {
     pub fn new(base_url: &str) -> Client {
         Client {
             base: base_url.trim_end_matches('/').to_string(),
-            agent: ureq::AgentBuilder::new()
-                .timeout(std::time::Duration::from_secs(30))
-                .user_agent(concat!("lotse/", env!("CARGO_PKG_VERSION")))
-                .build(),
+            agent: crate::netz::agent(std::time::Duration::from_secs(30)),
             token: None,
         }
     }
@@ -137,33 +134,65 @@ impl Client {
         format!("{}/v1{}", self.base, pfad)
     }
 
-    fn request(&self, method: &str, pfad: &str) -> ureq::Request {
-        let mut r = self.agent.request(method, &self.url(pfad));
-        if let Some(t) = &self.token {
-            r = r.set("Authorization", &format!("Bearer {t}"));
-        }
-        r
+    /// Anfrage ohne Rumpf (GET, DELETE), mit Anmeldung.
+    fn ohne_rumpf(
+        &self,
+        method: &str,
+        pfad: &str,
+    ) -> ureq::RequestBuilder<ureq::typestate::WithoutBody> {
+        let url = self.url(pfad);
+        let r = if method == "DELETE" {
+            self.agent.delete(url.as_str())
+        } else {
+            self.agent.get(url.as_str())
+        };
+        self.anmelden(r)
     }
 
-    fn fehler(e: ureq::Error) -> Error {
-        match e {
-            ureq::Error::Status(status, resp) => {
-                let body: FehlerWire = resp.into_json().unwrap_or(FehlerWire {
-                    error: String::new(),
-                    message: String::new(),
-                });
-                Error::Sync {
-                    status,
-                    code: body.error,
-                    message: body.message,
-                }
-            }
-            ureq::Error::Transport(t) => Error::Netz(t.to_string()),
+    /// Anfrage mit Rumpf (POST), mit Anmeldung.
+    fn mit_rumpf(&self, pfad: &str) -> ureq::RequestBuilder<ureq::typestate::WithBody> {
+        let url = self.url(pfad);
+        self.anmelden(self.agent.post(url.as_str()))
+    }
+
+    fn anmelden<T>(&self, r: ureq::RequestBuilder<T>) -> ureq::RequestBuilder<T> {
+        match &self.token {
+            Some(t) => r.header("Authorization", &format!("Bearer {t}")),
+            None => r,
         }
     }
 
-    fn json<T: for<'de> Deserialize<'de>>(resp: ureq::Response) -> Result<T> {
-        resp.into_json::<T>()
+    fn netzfehler(e: ureq::Error) -> Error {
+        crate::netz::fehler(e, "Der Sync-Dienst")
+    }
+
+    /// Prüft den Status und macht aus einer Fehlerantwort einen `Error::Sync` mit Code
+    /// und Meldung des Dienstes – die Oberfläche zeigt sie wörtlich an.
+    ///
+    /// Der Agent meldet Statuscodes bewusst nicht selbst als Fehler
+    /// (`http_status_as_error(false)`), damit der Rumpf hier noch lesbar ist.
+    fn geprueft(
+        mut resp: ureq::http::Response<ureq::Body>,
+    ) -> Result<ureq::http::Response<ureq::Body>> {
+        let status = resp.status().as_u16();
+        if (200..300).contains(&status) {
+            return Ok(resp);
+        }
+        let body: FehlerWire = resp.body_mut().read_json().unwrap_or(FehlerWire {
+            error: String::new(),
+            message: String::new(),
+        });
+        Err(Error::Sync {
+            status,
+            code: body.error,
+            message: body.message,
+        })
+    }
+
+    fn json<T: for<'de> Deserialize<'de>>(resp: ureq::http::Response<ureq::Body>) -> Result<T> {
+        Self::geprueft(resp)?
+            .body_mut()
+            .read_json::<T>()
             .map_err(|e| Error::Netz(e.to_string()))
     }
 
@@ -171,10 +200,10 @@ impl Client {
 
     pub fn prelogin(&self, email: &str) -> Result<Prelogin> {
         let resp = self
-            .request("GET", "/auth/prelogin")
+            .ohne_rumpf("GET", "/auth/prelogin")
             .query("email", email)
             .call()
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         let w: PreloginWire = Self::json(resp)?;
         let salt = B64.decode(w.salt).map_err(|_| Error::Base64)?;
         let salt: [u8; crypto::SALT_LEN] = salt
@@ -212,9 +241,9 @@ impl Client {
             "device": geraet,
         });
         let resp = self
-            .request("POST", "/auth/register")
+            .mit_rumpf("/auth/register")
             .send_json(body)
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         let w: RegisterWire = Self::json(resp)?;
         Ok((w.account_id, w.session_token))
     }
@@ -228,9 +257,9 @@ impl Client {
             "device": geraet,
         });
         let resp = self
-            .request("POST", "/auth/login")
+            .mit_rumpf("/auth/login")
             .send_json(body)
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         let w: LoginWire = Self::json(resp)?;
         let header = KontoHeader {
             format_version: crate::FORMAT_VERSION,
@@ -247,9 +276,11 @@ impl Client {
     }
 
     pub fn logout(&self) -> Result<()> {
-        self.request("POST", "/auth/logout")
-            .send_string("")
-            .map_err(Self::fehler)?;
+        let resp = self
+            .mit_rumpf("/auth/logout")
+            .send_empty()
+            .map_err(Self::netzfehler)?;
+        Self::geprueft(resp)?;
         Ok(())
     }
 
@@ -280,9 +311,11 @@ impl Client {
             "new_recovery_auth_key": B64.encode(neuer_recovery_auth.as_bytes()),
             "wrapped_account_key_recovery": recovery.to_compact(),
         });
-        self.request("POST", "/auth/recover/complete")
+        let resp = self
+            .mit_rumpf("/auth/recover/complete")
             .send_json(body)
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
+        Self::geprueft(resp)?;
         Ok(())
     }
 
@@ -311,24 +344,28 @@ impl Client {
             "recovery_auth_key": B64.encode(neuer_recovery_auth_key.as_bytes()),
             "wrapped_account_key_recovery": recovery.to_compact(),
         });
-        self.request("POST", "/auth/password")
+        let resp = self
+            .mit_rumpf("/auth/password")
             .send_json(body)
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
+        Self::geprueft(resp)?;
         Ok(())
     }
 
     pub fn geraete(&self) -> Result<Vec<GeraetInfo>> {
         let resp = self
-            .request("GET", "/devices")
+            .ohne_rumpf("GET", "/devices")
             .call()
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         Self::json(resp)
     }
 
     pub fn geraet_widerrufen(&self, id: &str) -> Result<()> {
-        self.request("DELETE", &format!("/devices/{id}"))
+        let resp = self
+            .ohne_rumpf("DELETE", &format!("/devices/{id}"))
             .call()
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
+        Self::geprueft(resp)?;
         Ok(())
     }
 
@@ -336,27 +373,27 @@ impl Client {
 
     pub fn push(&self, req: &PushRequest) -> Result<PushResponse> {
         let resp = self
-            .request("POST", "/sync/push")
+            .mit_rumpf("/sync/push")
             .send_json(serde_json::to_value(req)?)
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         Self::json(resp)
     }
 
     pub fn pull(&self, since: u64, limit: usize) -> Result<PullResponse> {
         let resp = self
-            .request("GET", "/sync/pull")
-            .query("since", &since.to_string())
-            .query("limit", &limit.to_string())
+            .ohne_rumpf("GET", "/sync/pull")
+            .query("since", since.to_string())
+            .query("limit", limit.to_string())
             .call()
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         Self::json(resp)
     }
 
     pub fn status(&self) -> Result<StatusResponse> {
         let resp = self
-            .request("GET", "/sync/status")
+            .ohne_rumpf("GET", "/sync/status")
             .call()
-            .map_err(Self::fehler)?;
+            .map_err(Self::netzfehler)?;
         Self::json(resp)
     }
 }
