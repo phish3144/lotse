@@ -182,9 +182,13 @@ Der Grundsatz, an dem sich jede künftige KI-Fähigkeit messen lassen muss:
    ausdrücklich gegeben hat.
 
 Die Zusage »Dateiinhalte liest Lotse nicht« (`detect`, `watcher`, Landing Page) gilt für
-die automatische Erkennung und den Ordner-Beobachter und bleibt dort gültig. Eine spätere
-Funktion, die Dateien deutet, ist etwas anderes: ausdrücklich benannt, einzeln
-freigegeben, nie im Hintergrund.
+die automatische Erkennung und den Ordner-Beobachter und bleibt dort gültig. Das Modul
+`dokument` ist der andere Fall und hält sich an dieselbe Grenze: es öffnet genau eine
+Datei, die ein Mensch gewählt hat, gibt ihren Text zurück und speichert nichts. Die
+Ausschlussliste (`detect::NIE_LESEN`: `.env`, `*.pem`, `*.key`, `id_rsa*`, `*.kdbx`,
+`*.p12`) gilt auch dann, wenn jemand eine solche Datei ausdrücklich wählt. PDF wird in
+`catch_unwind` geparst: eine beschädigte Datei von außen ergibt einen Fehler, keinen
+Absturz.
 
 ## 7. Betrieb und Konto-Sicherheit
 

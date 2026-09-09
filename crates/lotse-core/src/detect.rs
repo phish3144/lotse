@@ -51,6 +51,20 @@ pub const NIE_LESEN: &[&str] = &[
     "*.p12",
 ];
 
+/// Steht die Datei auf der Ausschlussliste? Eine Stelle für alle, die es angeht:
+/// der Beobachter beim Indexieren und `dokument` beim ausdrücklichen Aufmachen.
+pub fn nie_lesen(name: &str) -> bool {
+    NIE_LESEN.iter().any(|muster| {
+        if let Some(ext) = muster.strip_prefix('*') {
+            name.ends_with(ext)
+        } else if let Some(anfang) = muster.strip_suffix('*') {
+            name.starts_with(anfang)
+        } else {
+            *muster == name
+        }
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct ScanOptionen {
     pub max_tiefe: usize,

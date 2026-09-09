@@ -609,7 +609,7 @@ footer a { color: var(--ink-2); }
         <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
         <h3>Das Logbuch führt sich selbst</h3>
         <p>Lotse beobachtet deine Projektordner und Git-Repos und schreibt pro Tag eine verdichtete Zeile: was sich geändert hat, welche Commits dazukamen.</p>
-        <div class="how">Nur Namen, Zeiten und Commit-Texte. Dateiinhalte liest Lotse nicht, Schlüssel und Konfigurationsdateien nie.</div>
+        <div class="how">Nur Namen, Zeiten und Commit-Texte. Der Beobachter liest keine Dateiinhalte, Schlüssel und Konfigurationsdateien nie.</div>
       </article>
       <article class="benefit reveal">
         <div class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
@@ -731,7 +731,7 @@ Zeit      6. September 2026, 21:14</pre></div>
     <div class="places">
       <div class="place reveal">
         <div class="h"><h3>Desktop-App</h3><span class="tag acc">Vorschau 0.3</span></div>
-        <p>Hafen, Brief, Logbuch, offene Fäden, Tresor mit beiden Stufen, Ordner-Beobachter, Stand von GitHub und GitLab, Termine aus deinem Kalender, Suche und Export. Sagt Bescheid, wenn eine neue Version da ist. Windows, macOS und Linux.</p>
+        <p>Hafen, Brief, Logbuch, offene Fäden, Tresor mit beiden Stufen, Ordner-Beobachter, Stand von GitHub und GitLab, Termine aus deinem Kalender, einzelne Dateien deuten lassen, Suche und Export. Sagt Bescheid, wenn eine neue Version da ist. Windows, macOS und Linux.</p>
         <div class="m">läuft komplett lokal · Daten in einer verschlüsselten Datei</div>
       </div>
       <div class="link" aria-hidden="true"><div class="env"></div></div>
@@ -811,7 +811,7 @@ export LOTSE_HOME=~/.lotse
     <div class="faq">
       <details class="q reveal"><summary>Kostet Lotse etwas?</summary><p>Nein. Desktop-App und Kommandozeile sind kostenlos. Der Sync-Dienst ist offen und läuft auf dem Gratisplan von Cloudflare, den du selbst anlegen kannst; ein gehosteter Dienst kommt später als bezahlte Bequemlichkeit, nie als Bedingung.</p></details>
       <details class="q reveal"><summary>Wo liegen meine Daten?</summary><p>In einer verschlüsselten Datenbank auf deinem Rechner. Der Abgleich zwischen Geräten ist freiwillig. Du kannst jederzeit alles als Markdown-Ordner oder als verschlüsselte Sicherung exportieren, die sich auch ohne Lotse öffnen lässt.</p></details>
-      <details class="q reveal"><summary>Liest Lotse meine Dateien?</summary><p>Nein. Der Ordner-Beobachter sieht nur, welche Datei sich wann geändert hat und welche Commits dazukamen. Inhalte werden nicht gelesen, und Dateien wie <code>.env</code>, Schlüssel oder Zertifikate stehen auf einer festen Ausschlussliste.</p></details>
+      <details class="q reveal"><summary>Liest Lotse meine Dateien?</summary><p>Von allein nie. Der Ordner-Beobachter sieht nur, welche Datei sich wann geändert hat und welche Commits dazukamen; Inhalte liest er nicht. Du kannst Lotse aber eine einzelne Datei ausdrücklich hinhalten – ein PDF, eine Notiz, eine Tabelle – und sie deuten lassen. Dann siehst du vorher den vollständigen Auszug, der das Gerät verlassen würde, und entscheidest. Dateien wie <code>.env</code>, Schlüssel oder Zertifikate stehen auf einer festen Ausschlussliste und werden auch dann nicht geöffnet.</p></details>
       <details class="q reveal"><summary>Was sieht der Sync-Dienst?</summary><p>Verschlüsselte Umschläge mit einer Kennung, einem Zeitstempel und der Art des Datensatzes. Keine Titel, keine Texte, keine Passwörter. Er kann Datensätze auch nicht unbemerkt vertauschen, weil jeder Umschlag an seine Kennung gebunden ist.</p></details>
       <details class="q reveal"><summary>Was passiert, wenn ich mein Passwort vergesse?</summary><p>Du nutzt den Wiederherstellungscode, den Lotse beim Einrichten einmal anzeigt. Bewahre ihn im Passwortmanager auf. Ohne Passwort und ohne Code kann niemand die Daten öffnen, auch wir nicht.</p></details>
       <details class="q reveal"><summary>Ersetzt Lotse meinen Passwortmanager?</summary><p>Nein, und das soll es auch nicht. Web-Logins gehören weiter in Proton Pass, Bitwarden oder 1Password. Lotse hält, was zu einem Projekt gehört und sonst in einer Textdatei landen würde: der Router vom Bauprojekt, der API-Schlüssel der Website, der Kundenzugang.</p></details>

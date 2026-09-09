@@ -298,6 +298,10 @@ Gezielt, in dieser Reihenfolge, immer ohne Tresor-Zugriff und ohne stillen Daten
    lokal (Ollama) oder per eigenem API-Key. Opt-in, pro Aufruf sichtbar, was gesendet wird.
 3. **Klassifizierung von Kandidaten**, wenn die Heuristik keine Vorlage erkennt.
 4. **Semantische Suche**, wenn der Bestand groß genug ist.
+5. **Eine einzelne Datei deuten** (PDF, Text, Markdown, CSV, JSON). Der Mensch wählt die
+   Datei, sieht den Auszug und entscheidet. Keine Sammlung, kein Index, keine Schleife
+   über Ordner — das bliebe sonst nicht von der Ingestion zu unterscheiden, die Abschnitt
+   1 ausschließt.
 
 Nicht: KI als Gedächtnis statt Log, Chat als Hauptoberfläche, automatisch erzeugte Aufgaben.
 
@@ -362,6 +366,9 @@ Monaten stabiler Nutzung.
 | Datum | Entscheidung | Begründung |
 |---|---|---|
 | 2026-09-07 | KI-Verdichtung gegen eine OpenAI-kompatible Schnittstelle statt gegen einen einzelnen Anbieter. | Ollama (lokal, ohne Schlüssel), Gemini, Groq, Mistral und OpenRouter sprechen dieselbe Schnittstelle. Ein Client, ein Formular, austauschbares Ziel – und der voreingestellte Fall bleibt der, bei dem die Daten den Rechner nicht verlassen. |
+| 2026-09-09 | Auto-Lock und das Leeren der Zwischenablage gebaut, statt sie weiter im Bedrohungsmodell zu behaupten. | Beide standen dort als Verteidigung gegen „Blick über die Schulter", ohne dass es sie gab. Ein Sicherheitsversprechen ohne Deckung ist schlimmer als keines: es beruhigt, ohne zu schützen. |
+| 2026-09-09 | Dateien deuten als ausdrücklicher Einzelvorgang, nicht als Inhalts-Index. | „Lotse zieht keine Inhalte nach innen" (Abschnitt 1) bleibt gültig, solange nichts gesammelt wird. Deshalb: eine Datei, vom Menschen gewählt, Auszug sichtbar, danach vergessen. Die Ausschlussliste des Beobachters gilt auch hier — wer `.env` wählt, bekommt eine Absage. |
+| 2026-09-09 | Für den PDF-Auszug `lopdf` direkt statt `pdf-extract`. | `pdf-extract` bringt über eine ältere lopdf-Fassung den unbetreuten `ttf-parser` mit; lopdf 0.45 nutzt dafür das gepflegte `skrifa`. Eine Abhängigkeit weniger, eine Sicherheitsmeldung weniger, dieselbe Fähigkeit. PDF-Parsen läuft zudem in `catch_unwind`: eine kaputte Datei von außen darf die Anwendung nicht mitreißen. |
 | 2026-09-07 | Zwei Wege zur KI, als getrennte Dienste: der eigene Schlüssel (lokal oder gehostet) bleibt kostenlos und vollwertig; ein später vom Betreiber bereitgestellter Zugang ist ein **eigener** Dienst, nie Teil des Sync-Dienstes. | Nur der zweite Weg lässt sich verkaufen, weil dort der Betreiber die Rechnung trägt. Getrennt gehalten bleibt »der Sync-Dienst sieht nur Umschläge« wahr, während ein zweiter, klar benannter Dienst Klartext verarbeitet, den ihm jemand ausdrücklich gegeben hat. Zusammengelegt wäre beides gleichzeitig unwahr und unverkäuflich. |
 | 2026-09-07 | Jede KI-Fähigkeit ist standardmäßig aus, wird einzeln freigegeben und zeigt vorher, was gesendet würde. Der gesendete Text wird nicht aufbewahrt; protokolliert wird nur, dass und wohin gesendet wurde. | Ein privates Logbuch kann besondere Kategorien personenbezogener Daten enthalten. Einzelfreigabe erledigt diesen Fall in der Bauart statt in den AGB, und ein Protokoll ohne Inhalt ist der Nachweis, den Rechenschaftspflicht verlangt, ohne selbst eine neue Sammlung zu sein. Ausgeführt in `THREAT_MODEL.md` 6b. |
 | 2026-09-07 | Verbrauch wird von Anfang an gezählt und angezeigt, auch ohne Grenze; ein Deckel je Anfrage ist von Anfang an eingebaut. | Die Token-Zahlen kommen in jeder Antwort ohnehin an. Ohne Zählung ab dem ersten Tag gäbe es später keine Grundlage für eine faire Grenze, und ein Limit, das niemand je gesehen hat, wirkt beim Einführen wie ein Rückzieher. |

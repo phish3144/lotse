@@ -1590,6 +1590,66 @@ fn update_automatisch_setzen(state: State<AppState>, an: bool) -> R<()> {
     })
 }
 
+// ------------------------------------------------------------ Datei deuten
+
+#[derive(Serialize)]
+struct DateiAuszug {
+    pfad: String,
+    name: String,
+    format: String,
+    format_anzeige: String,
+    /// Genau der Text, der gesendet würde. Die Oberfläche zeigt ihn, bevor etwas geht.
+    text: String,
+    zeichen_gesamt: usize,
+    gekuerzt: bool,
+    seiten: Option<usize>,
+}
+
+/// Macht eine einzelne, ausdrücklich gewählte Datei auf und gibt ihren Text zurück.
+///
+/// Gespeichert wird dabei nichts, gesendet erst recht nicht: das ist der Schritt, den
+/// der Mensch vor sich sieht, bevor er sich entscheidet.
+#[tauri::command]
+fn datei_auszug(pfad: String) -> R<DateiAuszug> {
+    let p = PathBuf::from(pfad.trim());
+    // Etwas Luft unter dem Deckel der KI-Anfrage: der Brief-Rahmen kommt noch dazu.
+    let max = lotse_core::ai::MAX_EINGABE_ZEICHEN.saturating_sub(2_000);
+    let a = lotse_core::dokument::lesen(&p, max).map_err(fehler)?;
+    Ok(DateiAuszug {
+        pfad: p.to_string_lossy().to_string(),
+        name: p
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        format: a.format.as_str().to_string(),
+        format_anzeige: a.format.anzeige().to_string(),
+        text: a.text,
+        zeichen_gesamt: a.zeichen_gesamt,
+        gekuerzt: a.gekuerzt,
+        seiten: a.seiten,
+    })
+}
+
+/// Dateien eines Projekts, die Lotse aufmachen kann: aus seinen Datei-Referenzen.
+/// Damit muss niemand suchen, was ohnehin schon am Projekt hängt.
+#[tauri::command]
+fn datei_referenzen(state: State<AppState>, projekt_id: String) -> R<Vec<String>> {
+    let id = ulid(&projekt_id)?;
+    mit(&state, |s| {
+        let geraet = s.store.device_id();
+        Ok(s.store
+            .referenzen(id)?
+            .into_iter()
+            .filter(|r| {
+                r.typ == ReferenzTyp::Datei
+                    && r.geraet_id.is_none_or(|g| g == geraet)
+                    && lotse_core::dokument::format_von(std::path::Path::new(&r.ziel)).is_some()
+            })
+            .map(|r| r.ziel)
+            .collect())
+    })
+}
+
 // ------------------------------------------------------------------ Kalender
 
 /// Wie lange ein geholter Kalender wiederverwendet wird, bevor er neu geladen wird.
@@ -1969,6 +2029,8 @@ pub fn run() {
             forge_auto_setzen,
             forge_projekt,
             forge_abfragen,
+            datei_auszug,
+            datei_referenzen,
             kalender_termine,
             update_pruefen,
             update_automatisch_setzen,

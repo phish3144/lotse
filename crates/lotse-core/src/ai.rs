@@ -73,12 +73,15 @@ impl Ziel {
 pub enum Zweck {
     /// Den „Wo war ich"-Brief auf wenige Sätze bringen.
     BriefVerdichten,
+    /// Eine einzelne, ausdrücklich hergegebene Datei deuten.
+    DateiDeuten,
 }
 
 impl Zweck {
     pub fn as_str(self) -> &'static str {
         match self {
             Zweck::BriefVerdichten => "brief_verdichten",
+            Zweck::DateiDeuten => "datei_deuten",
         }
     }
 
@@ -92,6 +95,7 @@ impl Zweck {
     pub fn anzeige(self) -> &'static str {
         match self {
             Zweck::BriefVerdichten => "Brief verdichten",
+            Zweck::DateiDeuten => "Datei deuten",
         }
     }
 
@@ -104,6 +108,13 @@ impl Zweck {
                  Projekt steht und was der nächste Schritt wäre. Nenne nur, was in der \
                  Eingabe steht; erfinde nichts dazu. Keine Anrede, keine Überschrift, keine \
                  Aufzählung."
+            }
+            Zweck::DateiDeuten => {
+                "Du liest ein Dokument für jemanden, der wenig Zeit hat. Schreibe auf \
+                 Deutsch: worum es geht, die wichtigsten Zahlen, Fristen und Namen, und \
+                 was daraus zu tun wäre. Höchstens zehn Sätze. Nenne nur, was im Text \
+                 steht; wenn etwas fehlt oder unklar ist, sage das, statt es zu ergänzen. \
+                 Keine Anrede, keine Überschrift."
             }
         }
     }

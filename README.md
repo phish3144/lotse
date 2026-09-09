@@ -24,6 +24,7 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | MCP-Server (`lotse mcp`) | läuft |
 | Remote-Git (GitHub und GitLab: offene PRs/MRs, Issue-Zahl, Prüflauf) | läuft im Kern, in der App und in der CLI (`lotse gegenseite`) |
 | KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App; standardmäßig aus, Verbrauch und Protokoll sichtbar |
+| Datei deuten (PDF, Text, Markdown, CSV, JSON) | läuft in der App: eine Datei, vom Menschen gewählt, Auszug vor dem Senden sichtbar |
 | Kalender lesend (iCalendar/.ics, auch `webcal://`) | läuft im Kern, in der App und in der CLI (`lotse termine`) |
 | Update-Hinweis (neue Version erkennen, Datei fürs System nennen) | läuft in der App und in der CLI (`lotse update`); lädt bewusst nichts herunter |
 | WebAssembly-Client für den Browser | offen |

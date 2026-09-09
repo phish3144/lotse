@@ -113,7 +113,7 @@ export interface DataProvider {
 }
 
 /** Wozu gefragt wird. Wächst mit den Fähigkeiten; die Anweisung dazu steht im Kern. */
-export type KiZweck = 'brief_verdichten';
+export type KiZweck = 'brief_verdichten' | 'datei_deuten';
 
 /** Notiz-Arten, die in der Oberfläche von Hand erfasst werden können. */
 export const ERFASSBARE_ARTEN: NotizArt[] = ['log', 'offen', 'entscheidung'];

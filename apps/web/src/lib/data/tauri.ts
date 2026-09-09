@@ -286,6 +286,31 @@ export const update = {
   automatischSetzen: (an: boolean) => invoke<void>('update_automatisch_setzen', { an }),
 };
 
+export interface DateiAuszug {
+  pfad: string;
+  name: string;
+  format: string;
+  format_anzeige: string;
+  /** Genau der Text, der gesendet würde. */
+  text: string;
+  zeichen_gesamt: number;
+  gekuerzt: boolean;
+  seiten?: number;
+}
+
+/**
+ * Datei deuten: eine einzelne, ausdrücklich gewählte Datei aufmachen und ihren Text
+ * zeigen. Gesendet wird erst, wenn der Mensch ihn gesehen hat und auf Senden drückt –
+ * über denselben Weg wie die Brief-Verdichtung (`provider.kiVerdichten`).
+ *
+ * Der Ordner-Beobachter liest weiterhin keine Inhalte; das hier ist der andere Fall.
+ */
+export const datei = {
+  auszug: (pfad: string) => invoke<DateiAuszug>('datei_auszug', { pfad }),
+  /** Aufmachbare Datei-Referenzen eines Projekts, als Vorschlag. */
+  referenzen: (projektId: string) => invoke<string[]>('datei_referenzen', { projektId }),
+};
+
 export interface Termin {
   titel: string;
   /** JJJJ-MM-TT */

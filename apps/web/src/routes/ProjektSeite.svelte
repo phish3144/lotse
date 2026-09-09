@@ -4,7 +4,7 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { forge, kalender, system, type ForgeProjekt, type Termin } from '../lib/data/tauri';
+  import { datei, forge, kalender, system, type DateiAuszug, type ForgeProjekt, type Termin } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -335,6 +335,89 @@
   function terminZeit(t: Termin): string {
     if (!t.uhrzeit) return 'ganztägig';
     return t.utc ? `${t.uhrzeit} UTC` : t.uhrzeit;
+  }
+
+  // --- Datei deuten ---------------------------------------------------------
+  // Derselbe Weg wie bei der Verdichtung: erst zeigen, was gesendet würde, dann senden,
+  // und ins Logbuch kommt es nur, wenn ein Mensch es übernimmt. Der Unterschied ist
+  // allein, woher der Text stammt – aus einer Datei, die jemand ausdrücklich hergibt.
+  let auszug: DateiAuszug | null = $state(null);
+  let auszugErgebnis: string | null = $state(null);
+  let auszugLaeuft = $state(false);
+  let dateiVorschlaege: string[] = $state([]);
+
+  $effect(() => {
+    const projektId = id;
+    dateiVorschlaege = [];
+    if (!echteDaten) return;
+    let gilt = true;
+    datei
+      .referenzen(projektId)
+      .then((p) => {
+        if (gilt) dateiVorschlaege = p;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  async function dateiOeffnen(pfad: string | null) {
+    if (!pfad) return;
+    auszugLaeuft = true;
+    auszugErgebnis = null;
+    try {
+      auszug = await datei.auszug(pfad);
+    } catch (e) {
+      melde(e);
+    } finally {
+      auszugLaeuft = false;
+    }
+  }
+
+  async function dateiWaehlen() {
+    try {
+      await dateiOeffnen(await system.dateiWaehlen('Datei zum Deuten'));
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  async function auszugSenden() {
+    if (!auszug) return;
+    auszugLaeuft = true;
+    try {
+      auszugErgebnis = await provider.kiVerdichten(
+        `Datei: ${auszug.name}\n\n${auszug.text}`,
+        'datei_deuten',
+      );
+    } catch (e) {
+      melde(e);
+    } finally {
+      auszugLaeuft = false;
+    }
+  }
+
+  async function auszugUebernehmen() {
+    if (!auszugErgebnis || !auszug) return;
+    try {
+      await provider.addNote(id, {
+        quelle: 'ki',
+        art: 'log',
+        text: `${auszug.name}: ${auszugErgebnis}`,
+      });
+      auszug = null;
+      auszugErgebnis = null;
+      datenVersion.bump();
+      meldungen.zeigen('Im Logbuch.');
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  function auszugVerwerfen() {
+    auszug = null;
+    auszugErgebnis = null;
   }
 
   // --- KI-Verdichtung -------------------------------------------------------
@@ -718,6 +801,63 @@
               </li>
             {/each}
           </ul>
+        {/if}
+      </section>
+    {/if}
+
+    {#if echteDaten}
+      <section aria-labelledby="deuten-titel">
+        <div class="abschnitt-kopf">
+          <h2 id="deuten-titel">Datei deuten</h2>
+          <button type="button" class="schlicht" onclick={dateiWaehlen} disabled={auszugLaeuft}>
+            {auszugLaeuft ? 'Moment …' : 'Datei wählen'}
+          </button>
+        </div>
+
+        {#if !auszug}
+          <p class="hinweis">
+            Eine einzelne Datei aufmachen und deuten lassen – PDF, Text, Markdown, CSV oder JSON. Du siehst den
+            vollständigen Auszug, bevor etwas gesendet wird. Der Ordner-Beobachter liest weiterhin keine Inhalte.
+          </p>
+          {#if dateiVorschlaege.length > 0}
+            <ul class="einfache-liste">
+              {#each dateiVorschlaege as p (p)}
+                <li>
+                  <button type="button" class="referenz-ziel oeffnen" onclick={() => dateiOeffnen(p)}>{p}</button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else}
+          <div class="ki">
+            <strong>
+              {auszug.name} · {auszug.format_anzeige}{#if auszug.seiten}, {auszug.seiten}
+                {auszug.seiten === 1 ? 'Seite' : 'Seiten'}{/if}
+            </strong>
+            {#if auszug.gekuerzt}
+              <p class="hinweis klein">
+                Gekürzt: die Datei hat {auszug.zeichen_gesamt.toLocaleString('de-DE')} Zeichen, gesendet wird der
+                Anfang.
+              </p>
+            {/if}
+            <strong>Das würde gesendet:</strong>
+            <pre class="ki-text">{auszug.text}</pre>
+            {#if auszugErgebnis}
+              <strong>Antwort:</strong>
+              <div class="ki-antwort"><NoteText text={auszugErgebnis} /></div>
+              <div class="ki-aktionen">
+                <button type="button" onclick={auszugVerwerfen}>Verwerfen</button>
+                <button type="button" class="primaer" onclick={auszugUebernehmen}>Ins Logbuch übernehmen</button>
+              </div>
+            {:else}
+              <div class="ki-aktionen">
+                <button type="button" onclick={auszugVerwerfen}>Abbrechen</button>
+                <button type="button" class="primaer" onclick={auszugSenden} disabled={auszugLaeuft}>
+                  {auszugLaeuft ? 'Frage …' : 'Senden'}
+                </button>
+              </div>
+            {/if}
+          </div>
         {/if}
       </section>
     {/if}

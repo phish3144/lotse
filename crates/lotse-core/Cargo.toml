@@ -12,7 +12,7 @@ publish = false
 default = ["native"]
 # native: SQLCipher-Speicher, Dateisystem, Beobachter. Ohne dieses Feature bleibt der Kern
 # WebAssembly-tauglich (Modell, Krypto, Sync-Umschläge).
-native = ["dep:rusqlite", "dep:walkdir", "dep:globset", "dep:notify", "dep:age", "dep:secrecy", "dep:ureq"]
+native = ["dep:rusqlite", "dep:walkdir", "dep:globset", "dep:notify", "dep:age", "dep:secrecy", "dep:ureq", "dep:lopdf"]
 # keychain: Desktop-Schlüssel im OS-Schlüsselbund (Keychain, Credential Manager, Secret Service über zbus).
 keychain = ["native", "dep:keyring"]
 
@@ -37,6 +37,10 @@ notify = { workspace = true, optional = true }
 age = { version = "0.11", optional = true }
 secrecy = { version = "0.10", optional = true }
 ureq = { workspace = true, optional = true }
+# Textauszug aus PDF, für „Datei deuten". Reines Rust, MIT. Ohne Standard-Features:
+# ohne rayon und chrono bleibt der Baum klein, und `pdf-extract` bringt über eine ältere
+# lopdf-Fassung den unbetreuten `ttf-parser` mit – lopdf 0.45 nutzt dafür `skrifa`.
+lopdf = { version = "0.45", optional = true, default-features = false }
 keyring = { version = "3", optional = true, default-features = false, features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
 
 # Im Browser liefert WebCrypto den Zufall. getrandom 0.2 (RustCrypto) braucht `js`,
