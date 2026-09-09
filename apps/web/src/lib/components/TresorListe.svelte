@@ -6,6 +6,7 @@
   import { datenVersion } from '../data/version.svelte';
   import { meldungen } from '../meldung.svelte';
   import { STUFE_LABEL } from '../format';
+  import { ablageLeeren as leeren } from '../zwischenablage';
   import type { Id, Projekt, TresorEintrag } from '../data/types';
 
   let {
@@ -16,13 +17,20 @@
 
   /** Sekunden, nach denen ein aufgedeckter Wert wieder verschwindet. */
   const VERDECKEN_NACH_S = 30;
+  /** Sekunden, nach denen ein kopierter Wert aus der Zwischenablage verschwindet. */
+  const ZWISCHENABLAGE_NACH_S = 20;
 
   let aufgedeckt: { schluessel: string; wert: string } | null = $state(null);
   let laeuft: string | null = $state(null);
   let fehler: string | null = $state(null);
   let kopiert = $state(false);
+  /** Läuft, solange der Wert noch in der Zwischenablage steht. */
+  let kopierRest = $state(0);
+  /** Was gerade in der Zwischenablage steht – unabhängig davon, ob es noch sichtbar ist. */
+  let inAblage: string | null = null;
   let loeschKandidat: Id | null = $state(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let ablageUhr: ReturnType<typeof setInterval> | undefined;
 
   function schluesselVon(id: Id, feld: string) {
     return `${id}|${feld}`;
@@ -55,11 +63,31 @@
     }
   }
 
+  /** Leert die Zwischenablage; das Wie steht in `lib/zwischenablage.ts`. */
+  async function ablageLeeren(wert: string) {
+    if (inAblage === wert) inAblage = null;
+    if (!navigator.clipboard) return;
+    await leeren(wert, navigator.clipboard);
+  }
+
   async function kopieren() {
     if (!aufgedeckt) return;
+    const wert = aufgedeckt.wert;
     try {
-      await navigator.clipboard.writeText(aufgedeckt.wert);
+      await navigator.clipboard.writeText(wert);
       kopiert = true;
+      inAblage = wert;
+      if (ablageUhr) clearInterval(ablageUhr);
+      kopierRest = ZWISCHENABLAGE_NACH_S;
+      ablageUhr = setInterval(() => {
+        kopierRest -= 1;
+        if (kopierRest <= 0) {
+          if (ablageUhr) clearInterval(ablageUhr);
+          ablageUhr = undefined;
+          kopiert = false;
+          void ablageLeeren(wert);
+        }
+      }, 1000);
     } catch {
       // Ohne Zwischenablage bleibt der Wert lesbar am Bildschirm stehen.
       fehler = 'Zwischenablage nicht verfügbar. Wert von Hand übernehmen.';
@@ -86,8 +114,15 @@
       .join(', ');
   }
 
+  // Beim Verlassen der Ansicht: Zähler abräumen und, falls noch etwas in der
+  // Zwischenablage steht, auch die leeren. Sonst überlebte das Passwort den Wechsel.
   $effect(() => () => {
     if (timer) clearTimeout(timer);
+    if (ablageUhr) {
+      clearInterval(ablageUhr);
+      ablageUhr = undefined;
+    }
+    if (inAblage) void ablageLeeren(inAblage);
   });
 </script>
 
@@ -129,7 +164,9 @@
                 {laeuft === schluessel ? '…' : offen ? 'Verbergen' : 'Zeigen'}
               </button>
               {#if offen}
-                <button type="button" onclick={kopieren}>{kopiert ? 'Kopiert' : 'Kopieren'}</button>
+                <button type="button" onclick={kopieren}>
+                  {kopiert ? `Kopiert – noch ${kopierRest} s` : 'Kopieren'}
+                </button>
                 <span class="hinweis auto">verdeckt sich von selbst</span>
               {/if}
             </li>

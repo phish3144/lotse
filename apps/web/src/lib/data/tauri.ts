@@ -101,6 +101,9 @@ export const konto = {
   entsperren: (passwort: string, desktopSchluessel?: string) =>
     invoke<void>('entsperren', { passwort, desktopSchluessel: desktopSchluessel ?? null }),
   sperren: () => invoke<void>('sperren'),
+  /** Minuten bis zum selbsttätigen Sperren; 0 heißt nie. */
+  autoLock: () => invoke<number>('auto_lock'),
+  autoLockSetzen: (minuten: number) => invoke<void>('auto_lock_setzen', { minuten }),
   syncLogin: (url: string, email: string, passwort: string, geraet: string) =>
     invoke<void>('sync_login', { url, email, passwort, geraet }),
   /** Vergessenes Passwort: mit dem Wiederherstellungscode öffnen und neu setzen. */

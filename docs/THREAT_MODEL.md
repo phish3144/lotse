@@ -25,7 +25,7 @@ erhöht `FORMAT_VERSION` und wird hier protokolliert.
 | **Passives Mitlesen im Netz** | TLS überall; zusätzlich ist der Inhalt bereits verschlüsselt. |
 | **Server versucht, Ciphertext zu manipulieren** | AEAD (XChaCha20-Poly1305) mit `id`, `kind`, `format_version` als Additional Authenticated Data; ein vertauschter oder veränderter Datensatz wird beim Entschlüsseln erkannt. |
 | **Angreifer kennt das Master-Passwort, aber sitzt an einem fremden Rechner** | `nur_desktop`-Einträge brauchen zusätzlich den Desktop-Schlüssel, der nie den Server oder Browser erreicht. |
-| **Blick über die Schulter** | Werte verdeckt bis Klick, Auto-Lock, Zwischenablage nach 20 s geleert. |
+| **Blick über die Schulter** | Werte sind verdeckt und werden erst auf Klick entschlüsselt, danach nach 30 s wieder verdeckt. Ein kopierter Wert wird nach 20 s aus der Zwischenablage entfernt – nur, wenn dort noch derselbe Wert steht; wer inzwischen etwas anderes kopiert hat, behält es. Die Oberfläche sperrt nach Untätigkeit von selbst (Standard 15 Minuten, einstellbar, 30 Sekunden Vorwarnung). |
 | **Vergessenes Master-Passwort** | Wiederherstellungscode, beim Setup einmal angezeigt, mit Pflicht zur kalten Wiedereingabe vor Abschluss des Setups. |
 | **Geräteverlust bei aktiver Sitzung** | Gerät im Konto widerrufen; Sitzungstoken verfallen; Passwortwechsel wrappt den Account-Schlüssel neu. |
 | **Alte Backups/Sync-Snapshots eines gelöschten Tresor-Eintrags** | Envelope-Encryption pro Eintrag; Löschen vernichtet den Eintragsschlüssel (Crypto-Shredding). |
@@ -111,7 +111,10 @@ innerhalb des Ciphertexts.)
   ist): keine Persistenz in IndexedDB/localStorage, Schlüssel nur im Tab-Speicher, Auto-Lock
   nach 5 Minuten Inaktivität und beim Verlassen des Tabs, `nur_desktop`-Einträge sind gar
   nicht erst sichtbar.
-- **Auto-Lock** überall: Inaktivität (Desktop 15 min, Web 5 min), OS-Sperre, Tab-Verlust.
+- **Auto-Lock** bei Untätigkeit: Desktop 15 Minuten (einstellbar 5/15/30/60 oder aus), mit
+  30 Sekunden Vorwarnung; jede Tasten- oder Mausbewegung stellt den Zähler zurück. Sperren
+  beendet auch den Ordner-Beobachter, denn der Schlüssel verlässt dabei den Speicher.
+  Noch nicht angebunden: Sperren bei OS-Sperre und bei Tab-Verlust im Browser.
 - **Zwischenablage:** nach 20 s leeren, nur wenn der Inhalt seither unverändert ist.
 
 ## 5. Web-Client-Härtung

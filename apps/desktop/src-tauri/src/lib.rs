@@ -379,6 +379,30 @@ fn sperren(state: State<AppState>) -> R<()> {
     Ok(())
 }
 
+/// Nach so vielen Minuten Untätigkeit sperrt die Oberfläche von selbst. `0` heißt: nie.
+/// Der Wert liegt im Speicher, nicht in der Oberfläche, damit er das Gerät überlebt.
+const META_AUTO_LOCK: &str = "auto_lock_minuten";
+const AUTO_LOCK_STANDARD: u32 = 15;
+
+/// Minuten bis zum selbsttätigen Sperren.
+#[tauri::command]
+fn auto_lock(state: State<AppState>) -> R<u32> {
+    mit(&state, |s| {
+        Ok(s.store
+            .meta_get(META_AUTO_LOCK)?
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(AUTO_LOCK_STANDARD))
+    })
+}
+
+#[tauri::command]
+fn auto_lock_setzen(state: State<AppState>, minuten: u32) -> R<()> {
+    mit(&state, |s| {
+        s.store.meta_set(META_AUTO_LOCK, &minuten.to_string())?;
+        Ok(())
+    })
+}
+
 #[tauri::command]
 fn kann_nur_desktop(state: State<AppState>) -> R<bool> {
     mit(&state, |s| Ok(s.vault.kann_nur_desktop()))
@@ -1898,6 +1922,8 @@ pub fn run() {
             wiederherstellungscode_pruefen,
             entsperren,
             sperren,
+            auto_lock,
+            auto_lock_setzen,
             konto_wiederherstellen,
             passwort_aendern,
             kann_nur_desktop,

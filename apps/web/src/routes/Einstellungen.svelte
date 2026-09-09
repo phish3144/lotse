@@ -183,6 +183,7 @@
     try {
       await ki.verbrauchLoeschen();
       kiVerbrauch = await ki.verbrauch();
+      autoLockMinuten = await konto.autoLock();
       meldungen.zeigen('Zähler und Protokoll gelöscht.');
     } catch (e) {
       meldungen.fehler(e);
@@ -372,6 +373,18 @@
       meldungen.fehler(e2);
     } finally {
       pwLaeuft = false;
+    }
+  }
+
+  let autoLockMinuten = $state(15);
+
+  async function autoLockSetzen(minuten: number) {
+    try {
+      await konto.autoLockSetzen(minuten);
+      autoLockMinuten = minuten;
+      meldungen.zeigen(minuten === 0 ? 'Lotse sperrt nicht mehr von selbst.' : `Sperrt nach ${minuten} Minuten Ruhe.`);
+    } catch (e) {
+      meldungen.fehler(e);
     }
   }
 
@@ -839,7 +852,21 @@
         <dd><code>{kontoStatus.home}</code></dd>
       </dl>
     {/if}
-    <button type="button" onclick={sperren}>Sperren</button>
+    <label class="zeile">
+      <span>Von selbst sperren nach</span>
+      <select value={autoLockMinuten} onchange={(e) => autoLockSetzen(Number(e.currentTarget.value))}>
+        <option value={5}>5 Minuten</option>
+        <option value={15}>15 Minuten</option>
+        <option value={30}>30 Minuten</option>
+        <option value={60}>60 Minuten</option>
+        <option value={0}>nie</option>
+      </select>
+    </label>
+    <p class="hinweis klein">
+      Dreißig Sekunden vorher meldet sich Lotse; jede Tasten- oder Mausbewegung stellt den Zähler zurück. Sperren
+      beendet auch den Ordner-Beobachter – gesperrt heißt gesperrt, der Schlüssel verlässt den Speicher.
+    </p>
+    <button type="button" onclick={sperren}>Jetzt sperren</button>
   </section>
 {/if}
 

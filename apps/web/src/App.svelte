@@ -4,7 +4,7 @@
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
   import Sprung from './lib/components/Sprung.svelte';
   import { echteDaten } from './lib/data/store';
-  import { update, type BeobachterBilanz } from './lib/data/tauri';
+  import { konto, update, type BeobachterBilanz } from './lib/data/tauri';
   import { datenVersion } from './lib/data/version.svelte';
   import { erfassung } from './lib/erfassung.svelte';
   import { meldungen } from './lib/meldung.svelte';
@@ -67,6 +67,63 @@
     };
   });
 
+  // Auto-Lock: nach Untätigkeit schließt sich der Tresor von selbst. Das Bedrohungsmodell
+  // führt das unter „Blick über die Schulter" auf – ohne diesen Zähler stand die Zusage
+  // ohne Deckung da.
+  //
+  // Gezählt wird im Vordergrund, nicht in der Hülle: nur hier ist zu sehen, ob jemand
+  // tippt. Gesperrt wird dann über dasselbe Kommando wie der Knopf in den Einstellungen,
+  // und damit endet auch der Ordner-Beobachter – gesperrt heißt gesperrt.
+  const WARNUNG_S = 30;
+  let autoLockMinuten = $state(0);
+  let warnungLaeuft = $state(0);
+  let letzteRegung = $state(0);
+
+  function regung() {
+    letzteRegung = performance.now();
+    if (warnungLaeuft > 0) warnungLaeuft = 0;
+  }
+
+  $effect(() => {
+    if (!echteDaten || !entsperrt) return;
+    let gilt = true;
+    konto
+      .autoLock()
+      .then((m) => {
+        if (gilt) autoLockMinuten = m;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  $effect(() => {
+    if (!echteDaten || !entsperrt || autoLockMinuten <= 0) return;
+    letzteRegung = performance.now();
+    warnungLaeuft = 0;
+    const grenzeMs = autoLockMinuten * 60_000;
+
+    const uhr = setInterval(() => {
+      const ruhtSeit = performance.now() - letzteRegung;
+      const restS = Math.ceil((grenzeMs - ruhtSeit) / 1000);
+      if (restS <= 0) {
+        clearInterval(uhr);
+        warnungLaeuft = 0;
+        void konto
+          .sperren()
+          .then(() => {
+            entsperrt = false;
+          })
+          .catch(() => {});
+      } else if (restS <= WARNUNG_S) {
+        warnungLaeuft = restS;
+      }
+    }, 1000);
+
+    return () => clearInterval(uhr);
+  });
+
   function aufTaste(e: KeyboardEvent) {
     // Strg/Cmd+P springt zum Projekt. Das Drucken-Kürzel hat in dieser App keinen Sinn.
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
@@ -89,7 +146,14 @@
   }
 </script>
 
-<svelte:window onkeydown={aufTaste} onmouseup={aufMaus} />
+<svelte:window
+  onkeydown={aufTaste}
+  onmouseup={aufMaus}
+  onmousemove={regung}
+  onkeypress={regung}
+  onwheel={regung}
+  onpointerdown={regung}
+/>
 
 {#if !entsperrt}
   <Entsperren fertig={() => (entsperrt = true)} />
@@ -118,6 +182,12 @@
         </button>
       </div>
     </header>
+    {#if warnungLaeuft > 0}
+      <div class="update-band sperr-band" role="status">
+        <span>Lotse sperrt in {warnungLaeuft} Sekunden.</span>
+        <button type="button" class="schlicht" onclick={regung}>Wach bleiben</button>
+      </div>
+    {/if}
     {#if neueVersion}
       <div class="update-band">
         <span>Version {neueVersion.version} ist da.</span>
@@ -171,6 +241,9 @@
   }
   .update-band button {
     margin-left: auto;
+  }
+  .sperr-band {
+    border-color: var(--warnung, var(--rahmen));
   }
   .kopfzeile {
     display: flex;
