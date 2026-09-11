@@ -1,0 +1,62 @@
+name: Wiki
+
+# Spiegelt docs/wiki/ ins GitHub-Wiki. Das Wiki ist ein eigenes Git-Repository
+# (lotse.wiki.git) und lässt sich nicht in einem Pull Request prüfen – deshalb steht
+# der Inhalt hier im Repo und wird von hier aus geschrieben, nicht im Browser bearbeitet.
+#
+# Voraussetzung: Das Wiki muss einmal von Hand angelegt worden sein (Tab „Wiki“ →
+# „Create the first page“ → speichern). Vorher gibt es das Wiki-Repository nicht, und
+# der Push unten scheitert mit einer entsprechenden Meldung.
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/wiki/**", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  spiegeln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wiki holen
+        id: holen
+        run: |
+          if git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki 2>/dev/null; then
+            echo "da=ja" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Das Wiki-Repository gibt es noch nicht."
+            echo "Einmalig anlegen: Tab „Wiki“ im Repository → „Create the first page“ → speichern."
+            echo "Danach diesen Workflow erneut ausfuehren; der Inhalt wird dann vollstaendig ersetzt."
+            exit 1
+          fi
+
+      - name: Inhalt ersetzen
+        run: |
+          set -euo pipefail
+          # Alles außer .git weg, dann neu befüllen: so verschwinden auch gelöschte Seiten.
+          find wiki -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+          cp docs/wiki/*.md wiki/
+          ls -1 wiki/*.md | sed 's|wiki/||' | sed 's|^|  |'
+
+      - name: Schreiben
+        run: |
+          set -euo pipefail
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet && git diff --cached --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "Unveraendert, nichts zu tun."
+            exit 0
+          fi
+          git add -A
+          git commit -m "Wiki aus docs/wiki@${GITHUB_SHA::7}"
+          git push origin HEAD

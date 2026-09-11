@@ -202,6 +202,13 @@ jobs:
           # Die Datei, in der der Updater nachsieht. Jeder Bau-Job trägt seine Plattform
           # nach; die Aktion liest die vorhandene und führt zusammen.
           uploadUpdaterJson: true
+          # Windows soll auf den NSIS-Installer zeigen, nicht auf die MSI: nur der
+          # tauscht eine laufende Installation ohne Rückfrage aus.
+          updaterJsonPreferNsis: true
+          prerelease: true
+          # Ohne das baut auf macOS beide Male derselbe Bogen (aarch64) und der zweite
+          # Job überschreibt die Artefakte des ersten - Intel-Macs bekaemen nie ein Update.
+          args: ${{ matrix.args }}
 
   # Die fertige `latest.json` auf die Landing Page spiegeln. Nötig, weil die Releases
   # Vorabversionen sind und GitHub die aus `/releases/latest` heraushält – die App
@@ -238,25 +245,56 @@ jobs:
           fi
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
             -o site/latest.json "$url"
-          # Lieber hier merken als beim Nutzer: eine kaputte Datei wäre ein stiller Ausfall.
-          python3 -c "
-          import json,sys
+      # Lieber hier merken als beim Nutzer. Die Datei entsteht dadurch, dass vier Jobs
+      # nacheinander ihre Plattform in dasselbe Release-Asset nachtragen - geht dabei
+      # etwas verloren, faellt es niemandem auf, bis ein Rechner kein Update mehr
+      # findet. 0.6.0 ist genau so ausgeliefert worden: `darwin-x86_64` fehlte.
+      - name: Alle vier Plattformen nachzaehlen
+        run: |
+          python3 - <<'PRUEFEN'
+          import json, sys
+          erwartet = {
+              'darwin-aarch64': 'Macs mit Apple-Chip',
+              'darwin-x86_64':  'Macs mit Intel-Chip',
+              'linux-x86_64':   'Linux',
+              'windows-x86_64': 'Windows',
+          }
           d = json.load(open('site/latest.json'))
-          if not d.get('platforms'):
-              sys.exit('latest.json enthält keine Plattformen')
-          print('Plattformen:', ', '.join(sorted(d['platforms'])))
-          "
+          p = d.get('platforms') or {}
+          fehler = []
+          for schluessel, wer in erwartet.items():
+              e = p.get(schluessel)
+              if not e:
+                  fehler.append(f'{schluessel} fehlt ganz - dann bekommt {wer} nie ein Update.')
+              elif not e.get('signature'):
+                  fehler.append(f'{schluessel} hat keine Signatur - die App wuerde sie abweisen.')
+              elif not e.get('url'):
+                  fehler.append(f'{schluessel} hat keine Adresse.')
+          if not d.get('version'):
+              fehler.append('Die Datei nennt keine Fassung.')
+          print('Gefunden:', ', '.join(sorted(p)) or '(nichts)')
+          for f in fehler:
+              print(f'::error::{f}')
+          if fehler:
+              sys.exit('latest.json ist unvollstaendig, das Release bleibt liegen.')
+          for schluessel in erwartet:
+              print(f"{schluessel}: {p[schluessel]['url'].rsplit('/', 1)[-1]}")
+          PRUEFEN
 
       - name: Einchecken
         run: |
           set -euo pipefail
-          if git diff --quiet -- site/latest.json; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Erst vormerken, dann vergleichen. `git diff` allein sieht eine noch gar
+          # nicht verfolgte Datei nicht und meldete »unveraendert« - so blieb die
+          # Spiegelung von 0.6.0 aus, und die Adresse, die die App zuerst fragt,
+          # lieferte 404.
+          git add site/latest.json
+          if git diff --cached --quiet -- site/latest.json; then
             echo "Unverändert, nichts zu tun."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add site/latest.json
           git commit -m "latest.json für ${RELEASE_TAG}"
           # Zwischen Prüfen und Schieben kann jemand anders gepusht haben.
           for versuch in 1 2 3 4 5; do
@@ -267,5 +305,3 @@ jobs:
           done
           echo "::error::latest.json ließ sich nicht nach main schieben."
           exit 1
-          prerelease: true
-          args: ${{ matrix.args }}
