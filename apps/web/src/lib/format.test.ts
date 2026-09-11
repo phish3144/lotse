@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { datumText, nachTagen, tagesMarke, uhrzeitText } from "./format";
+import {
+  datumText,
+  ersteZeile,
+  hervorheben,
+  nachTagen,
+  tagesMarke,
+  uhrzeitText,
+  zeileMitTreffer,
+} from './format';
 
 describe("datumText", () => {
   it("zeigt ein reines Datum als denselben Kalendertag", () => {
@@ -84,5 +92,81 @@ describe("uhrzeitText", () => {
     expect(uhrzeitText(new Date(2026, 8, 11, 9, 5).toISOString())).toBe(
       "09:05",
     );
+  });
+});
+
+describe('hervorheben', () => {
+  it('markiert jeden Treffer, auch mehrfach', () => {
+    expect(hervorheben('Beton und Beton', 'beton')).toEqual([
+      { t: 'Beton', treffer: true },
+      { t: ' und ', treffer: false },
+      { t: 'Beton', treffer: true },
+    ]);
+  });
+
+  it('lässt den Text ganz, wenn nichts passt', () => {
+    expect(hervorheben('Schalung geprüft', 'beton')).toEqual([{ t: 'Schalung geprüft', treffer: false }]);
+    expect(hervorheben('Schalung', '  ')).toEqual([{ t: 'Schalung', treffer: false }]);
+  });
+
+  it('behandelt Sonderzeichen als Zeichen, nicht als Muster', () => {
+    // Mit einem regulären Ausdruck wäre „.“ jedes Zeichen und „(“ ein Syntaxfehler.
+    expect(hervorheben('a.b', '.')).toEqual([
+      { t: 'a', treffer: false },
+      { t: '.', treffer: true },
+      { t: 'b', treffer: false },
+    ]);
+    expect(() => hervorheben('f(x)', '(')).not.toThrow();
+    expect(hervorheben('abc', '.')).toEqual([{ t: 'abc', treffer: false }]);
+  });
+
+  it('findet unabhängig von Groß- und Kleinschreibung', () => {
+    expect(hervorheben('Bewehrung', 'BEWEH')).toEqual([
+      { t: 'Beweh', treffer: true },
+      { t: 'rung', treffer: false },
+    ]);
+  });
+
+  it('schneidet nicht falsch, wenn Kleinschreiben die Länge ändert', () => {
+    // „İ“ (türkisches I mit Punkt) wird zu zwei Zeichen – dann stimmen die Positionen
+    // im Original nicht mehr, und lieber gar nicht hervorheben als daneben.
+    const text = 'İstanbul';
+    expect(hervorheben(text, 'stan')).toEqual([{ t: text, treffer: false }]);
+  });
+
+  it('markiert einen Treffer am Anfang ohne leeres Vorstück', () => {
+    expect(hervorheben('Betonmischer', 'beton')).toEqual([
+      { t: 'Beton', treffer: true },
+      { t: 'mischer', treffer: false },
+    ]);
+  });
+});
+
+describe('ersteZeile', () => {
+  it('nimmt nur die erste Zeile', () => {
+    expect(ersteZeile('Kontext: dies\nEntschieden: das')).toBe('Kontext: dies');
+    expect(ersteZeile('einzeilig')).toBe('einzeilig');
+  });
+});
+
+describe('zeileMitTreffer', () => {
+  const eintrag = [
+    'Kontext: Zahlungen bisher nur manuell abgeglichen.',
+    'Entschieden: Stripe für Kartenzahlungen anbinden.',
+    'Verworfen weil: eigene Abwicklung wäre Overkill.',
+  ].join('\n');
+
+  it('nimmt die Zeile mit dem Begriff, nicht die erste', () => {
+    expect(zeileMitTreffer(eintrag, 'stripe')).toBe('Entschieden: Stripe für Kartenzahlungen anbinden.');
+    expect(zeileMitTreffer(eintrag, 'overkill')).toBe('Verworfen weil: eigene Abwicklung wäre Overkill.');
+  });
+
+  it('fällt auf die erste Zeile zurück', () => {
+    expect(zeileMitTreffer(eintrag, 'gibtsnicht')).toBe('Kontext: Zahlungen bisher nur manuell abgeglichen.');
+    expect(zeileMitTreffer(eintrag, '')).toBe('Kontext: Zahlungen bisher nur manuell abgeglichen.');
+  });
+
+  it('nimmt die erste passende Zeile, wenn mehrere passen', () => {
+    expect(zeileMitTreffer('a zahl\nb zahl', 'zahl')).toBe('a zahl');
   });
 });

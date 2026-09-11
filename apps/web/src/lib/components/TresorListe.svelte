@@ -135,12 +135,12 @@
 {:else}
   <ul class="tresor-liste">
     {#each eintraege as eintrag (eintrag.id)}
-      <li>
+      <li class:nur-desktop={eintrag.stufe === 'nur_desktop'}>
         <div class="kopf">
           <strong>{eintrag.titel}</strong>
           <span class="badge badge--stufe-{eintrag.stufe}">{STUFE_LABEL[eintrag.stufe]}</span>
           {#if zeigeProjekte && eintrag.projekt_ids.length > 0}
-            <span class="hinweis projekte">{projektNamen(eintrag.projekt_ids)}</span>
+            <span class="projekt-chip">{projektNamen(eintrag.projekt_ids)}</span>
           {/if}
           {#if loeschKandidat === eintrag.id}
             <span class="loesch-frage">
@@ -178,25 +178,49 @@
 {/if}
 
 <style>
+  /* Ein Raster statt einer Spalte: Zugänge sind kurz und nebeneinander schneller zu
+     überfliegen. Auf der Projektseite steht nur einer je Projekt – dort bleibt es
+     eine Spalte, weil die Nebenspalte schmal ist. */
   .tresor-liste {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: 0.7rem;
   }
   .tresor-liste > li {
     border: 1px solid var(--rahmen);
-    border-radius: 0.5rem;
+    border-radius: 0.7rem;
     background: var(--karten-hintergrund);
-    padding: 0.7rem 0.9rem;
+    padding: 0.75rem 0.9rem;
+    box-shadow: var(--schatten);
+    min-width: 0;
+  }
+  /* „nur Desktop“ ist keine Beschriftung, sondern eine Eigenschaft des Eintrags –
+     deshalb auch an der Kante ablesbar, ohne zu lesen. */
+  .tresor-liste > li.nur-desktop {
+    border-left: 3px solid var(--akzent);
   }
   .kopf {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    min-width: 0;
+  }
+  .kopf strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .projekt-chip {
+    font-size: 0.7rem;
+    background: var(--flaeche-still);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    color: var(--text-gedaempft);
   }
   .kopf .loeschen,
   .loesch-frage {
@@ -204,22 +228,27 @@
   }
   .felder {
     list-style: none;
-    margin: 0.5rem 0 0;
+    margin: 0.6rem 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
   }
   .feld {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+    border-top: 1px solid var(--rahmen-still);
+  }
+  .feld:first-child {
+    border-top: none;
   }
   .feld-name {
     color: var(--text-gedaempft);
-    min-width: 7rem;
+    min-width: 6rem;
+    font-size: 0.8rem;
   }
   .wert {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -260,13 +289,16 @@
     border: 1px solid var(--rahmen);
     white-space: nowrap;
   }
+  /* Umgedreht: „überall“ ist der Normalfall und bleibt still; die Einschränkung
+     „nur Desktop“ trägt die Farbe – dieselbe wie die linke Kante der Karte, damit
+     Etikett und Kante dasselbe sagen. */
   .badge--stufe-ueberall {
-    color: var(--akzent);
-    border-color: var(--akzent);
+    color: var(--text-gedaempft);
+    border-color: var(--rahmen);
   }
   .badge--stufe-nur_desktop {
-    color: var(--farbe-auffaellig);
-    border-color: var(--farbe-auffaellig);
+    color: var(--akzent);
+    border-color: var(--akzent);
   }
   .hinweis {
     color: var(--text-gedaempft);

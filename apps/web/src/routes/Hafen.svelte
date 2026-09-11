@@ -120,14 +120,68 @@
     {/if}
 
     {#if eintraege.length === 0 && kandidaten.length === 0}
-        <section class="leer">
-        <h2>Noch nichts an Bord</h2>
-        <p class="hinweis">
-          Lege ein Projekt von Hand an, oder lass Lotse deine Ordner durchsuchen: unter
-          <a href="#/einstellungen">Einstellungen</a> einen Wurzelordner angeben, dann erscheinen die Funde hier in der
-          Hafeneinfahrt.
+        <!-- Ein leerer Hafen ist der erste Eindruck, kein Fehlerzustand: statt „keine
+           Daten“ steht hier, wofür das Ganze gut ist und wie man hineinkommt. -->
+      <section class="leer">
+        <svg class="leer-bild" viewBox="0 0 240 120" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.5">
+            <path d="M-10 84 C 40 72, 72 96, 120 84 S 200 70, 250 88" />
+            <path d="M-10 100 C 40 88, 72 112, 120 100 S 200 86, 250 104" />
+          </g>
+          <g fill="none" stroke="currentColor" stroke-width="1.8" opacity="0.85">
+            <path d="M120 24 v52" />
+            <path d="M120 30 l34 16 -34 16 z" fill="currentColor" opacity="0.14" />
+            <path d="M120 76 h-22 a8 8 0 0 0 0 8 h44 a8 8 0 0 0 0-8 z" opacity="0.5" />
+          </g>
+        </svg>
+
+        <h2 class="serife">Noch nichts an Bord.</h2>
+        <p class="leer-text">
+          Lotse merkt sich, was du getan hast und was als Nächstes dran ist – für alles, was länger dauert als ein
+          Nachmittag. Drei Wege hinein:
         </p>
-        <p class="hinweis">Ein Gedanke ohne Projekt geht jederzeit mit <kbd>Strg</kbd>+<kbd>K</kbd> in den Postkorb.</p>
+
+        <ol class="wege">
+          <li>
+            <span class="weg-zahl">1</span>
+            <div>
+              <strong>Ordner durchsuchen lassen.</strong>
+              <span>
+                Lotse sucht nach Marken wie <code>.git</code>, <code>Cargo.toml</code> oder einer README und schlägt
+                vor, was es findet. Übernommen wird nichts von allein, und Dateiinhalte liest es dabei nicht.
+              </span>
+              <a class="weg-knopf" href="#/einstellungen/ordner">Ordner wählen …</a>
+            </div>
+          </li>
+          <li>
+            <span class="weg-zahl">2</span>
+            <div>
+              <strong>Ein Vorhaben von Hand anlegen.</strong>
+              <span>
+                Titel und ein Satz dazu, worum es geht. Das ist der Kurs – die eine Zeile, die dir in drei Monaten
+                sagt, was du eigentlich wolltest.
+              </span>
+              <button class="weg-knopf" type="button" onclick={() => (neuesProjektOffen = true)}>
+                Neues Projekt …
+              </button>
+            </div>
+          </li>
+          <li>
+            <span class="weg-zahl">3</span>
+            <div>
+              <strong>Einfach anfangen zu schreiben.</strong>
+              <span>
+                <kbd>Strg</kbd>+<kbd>K</kbd> von überall. Ohne Zuordnung landet der Gedanke im Postkorb und wartet
+                dort, bis du weißt, wohin er gehört.
+              </span>
+            </div>
+          </li>
+        </ol>
+
+        <p class="leer-fuss">
+          Alles bleibt auf diesem Rechner, bis du den Abgleich einrichtest. Und wenn Lotse morgen weg ist, kommst du
+          trotzdem an alles: ein Befehl legt jedes Vorhaben als Markdown ab.
+        </p>
       </section>
     {/if}
 
@@ -242,15 +296,96 @@
     flex: none;
   }
   .leer {
-    border: 1px dashed var(--rahmen);
-    border-radius: 0.6rem;
-    padding: 1.2rem 1.3rem;
+    max-width: 40rem;
+    margin: 1rem auto 0;
+    text-align: center;
+  }
+  .leer-bild {
+    width: 15rem;
+    height: 7.5rem;
+    color: var(--akzent);
+    opacity: 0.7;
   }
   .leer h2 {
-    margin-top: 0;
+    margin: 0.5rem 0 0.6rem;
+    font-size: 1.6rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: -0.015em;
+    color: var(--fg);
   }
-  .leer p + p {
-    margin-top: 0.5rem;
+  .leer-text {
+    margin: 0 auto 1.5rem;
+    max-width: 32rem;
+    line-height: 1.6;
+    color: var(--text-gedaempft);
+  }
+  .wege {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .wege li {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    background: var(--karten-hintergrund);
+    border: 1px solid var(--rahmen);
+    border-radius: 0.7rem;
+    padding: 0.85rem 1rem;
+    box-shadow: var(--schatten);
+  }
+  .wege li > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    align-items: flex-start;
+  }
+  .weg-zahl {
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--flaeche-still);
+    color: var(--text-gedaempft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .wege strong {
+    font-size: 0.95rem;
+  }
+  .wege span {
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--text-gedaempft);
+  }
+  .weg-knopf {
+    margin-top: 0.35rem;
+    display: inline-block;
+    border: 1px solid var(--rahmen);
+    background: var(--hintergrund);
+    color: inherit;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+  }
+  .weg-knopf:hover {
+    border-color: var(--akzent);
+  }
+  .leer-fuss {
+    margin: 1.5rem auto 0;
+    max-width: 34rem;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text-gedaempft);
   }
   kbd {
     font-family: inherit;

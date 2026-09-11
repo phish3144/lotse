@@ -95,6 +95,58 @@ export function nachTagen<T extends { ts: string }>(
   return gruppen;
 }
 
+/**
+ * Zerlegt einen Text in Stücke und markiert, welche den Suchbegriff treffen.
+ *
+ * Bewusst ohne regulären Ausdruck: der Begriff kommt von der Nutzerin, und `.*` oder
+ * `(` darin wären entweder ein Fehler oder – schlimmer – ein Muster, das plötzlich
+ * etwas anderes bedeutet. Verglichen wird case-insensitiv über `toLocaleLowerCase`,
+ * damit auch „STRASSE“ auf „Straße“ nicht zufällig passt oder verfehlt wird.
+ *
+ * Das Ergebnis wird als Liste gerendert, nicht als HTML: `{@html}` für Nutzertext ist
+ * in diesem Projekt ausgeschlossen (CLAUDE.md).
+ */
+export function hervorheben(text: string, begriff: string): { t: string; treffer: boolean }[] {
+  const nadel = begriff.trim().toLocaleLowerCase('de');
+  if (!nadel) return [{ t: text, treffer: false }];
+  const heu = text.toLocaleLowerCase('de');
+  // Nur wenn sich die Länge durch das Kleinschreiben nicht verschiebt, stimmen die
+  // Positionen im Original noch. Sonst lieber nichts hervorheben als falsch schneiden.
+  if (heu.length !== text.length) return [{ t: text, treffer: false }];
+
+  const teile: { t: string; treffer: boolean }[] = [];
+  let von = 0;
+  for (;;) {
+    const i = heu.indexOf(nadel, von);
+    if (i === -1) break;
+    if (i > von) teile.push({ t: text.slice(von, i), treffer: false });
+    teile.push({ t: text.slice(i, i + nadel.length), treffer: true });
+    von = i + nadel.length;
+  }
+  if (von === 0) return [{ t: text, treffer: false }];
+  if (von < text.length) teile.push({ t: text.slice(von), treffer: false });
+  return teile;
+}
+
+/** Erste Zeile eines mehrzeiligen Textes, für Listen. */
+export function ersteZeile(text: string): string {
+  return text.split('\n')[0];
+}
+
+/**
+ * Die Zeile, in der der Suchbegriff steht – sonst die erste.
+ *
+ * Ein Logbuch-Eintrag hat oft vier Zeilen („Kontext / Entschieden / Verworfen weil /
+ * Neu bewerten wenn“). Zeigt der Treffer stur die erste, steht in der Ergebnisliste
+ * ein Satz ohne das gesuchte Wort – und es sieht nach einem falschen Treffer aus.
+ */
+export function zeileMitTreffer(text: string, begriff: string): string {
+  const zeilen = text.split('\n');
+  const nadel = begriff.trim().toLocaleLowerCase('de');
+  if (!nadel) return zeilen[0];
+  return zeilen.find((z) => z.toLocaleLowerCase('de').includes(nadel)) ?? zeilen[0];
+}
+
 export const STATUS_LABEL: Record<ProjektStatus, string> = {
   idee: "Idee",
   aktiv: "Aktiv",

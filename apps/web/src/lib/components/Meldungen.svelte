@@ -28,23 +28,30 @@
   .meldung {
     pointer-events: auto;
     font: inherit;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     text-align: left;
     max-width: min(30rem, 92vw);
     padding: 0.55rem 0.95rem;
-    border-radius: 0.5rem;
+    border-radius: 0.6rem;
     border: 1px solid var(--rahmen);
     background: var(--karten-hintergrund);
     color: var(--fg);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 10px 30px rgba(11, 27, 43, 0.3);
     animation: auftauchen 180ms ease-out;
   }
+  /* Der Zustand steht an der linken Kante, nicht als Rahmen ringsum: ein grün
+     umrandeter Kasten liest sich als Warnung, eine Kante als Vermerk. */
   .meldung.gut {
-    border-color: var(--farbe-ruhig);
+    border-left: 3px solid var(--farbe-ruhig);
   }
   .meldung.fehler {
-    border-color: var(--farbe-ueberfaellig);
+    border-left: 3px solid var(--farbe-ueberfaellig);
     color: var(--farbe-ueberfaellig);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .meldung {
+      animation: none;
+    }
   }
   @keyframes auftauchen {
     from {

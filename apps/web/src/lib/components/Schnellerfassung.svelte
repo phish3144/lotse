@@ -139,7 +139,9 @@
     height: 100%;
     border: none;
     padding: 0;
-    background: rgba(0, 0, 0, 0.35);
+    /* Marine statt Schwarz: ein neutraler Schleier über Pergament wird grau und
+       nimmt der Seite die Wärme. */
+    background: rgba(11, 27, 43, 0.5);
     cursor: default;
   }
   .dialog {
@@ -147,8 +149,8 @@
     z-index: 1;
     background: var(--karten-hintergrund);
     border: 1px solid var(--rahmen);
-    border-radius: 0.7rem;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    border-radius: 0.85rem;
+    box-shadow: 0 22px 60px rgba(11, 27, 43, 0.45);
     padding: 0.9rem 1rem;
     width: min(34rem, 92vw);
   }
