@@ -23,6 +23,7 @@
     type KontoStatus,
     type SyncErgebnis,
     type SyncStatus,
+    type UpdateFortschritt,
     type UpdateStand,
   } from '../lib/data/tauri';
   import { router } from '../lib/router.svelte';
@@ -294,6 +295,43 @@
 
   // --- Version und Updates --------------------------------------------------
   let updateStand: UpdateStand | null = $state(null);
+  let austauschLaeuft = $state(false);
+  let geladen = $state(0);
+  let gesamt: number | null = $state(null);
+
+  const fortschrittBreite = $derived(
+    gesamt && gesamt > 0 ? `width: ${Math.min(100, Math.round((geladen / gesamt) * 100))}%` : 'width: 100%',
+  );
+  const fortschrittText = $derived.by(() => {
+    if (!gesamt) return 'Lade …';
+    const mb = (n: number) => (n / 1_000_000).toFixed(1);
+    return `${mb(geladen)} von ${mb(gesamt)} MB`;
+  });
+
+  /**
+   * Startet den Austausch. Kehrt im Erfolgsfall nicht zurück – die App startet neu.
+   * Deshalb wird `austauschLaeuft` nur im Fehlerfall zurückgesetzt.
+   */
+  async function updateJetzt() {
+    if (austauschLaeuft) return;
+    austauschLaeuft = true;
+    geladen = 0;
+    gesamt = null;
+    // Dynamisch geladen wie im App-Gerüst: im Browser gibt es das Event-API nicht.
+    const { listen } = await import('@tauri-apps/api/event');
+    const ab = await listen<UpdateFortschritt>('update-fortschritt', (e) => {
+      geladen = e.payload.geladen;
+      gesamt = e.payload.gesamt ?? null;
+    });
+    try {
+      await update.installieren();
+    } catch (e) {
+      austauschLaeuft = false;
+      meldungen.fehler(e);
+    } finally {
+      ab();
+    }
+  }
   let updateLaeuft = $state(false);
 
   // Ohne eigenes Fangen bliebe eine abgelehnte Zusage unbeachtet: der Klick täte
@@ -1052,16 +1090,36 @@
           Für dieses System: <code>{updateStand.datei}</code>.
         {/if}
       </p>
-      <div class="zeile">
-        {#if updateStand.datei_url}
-          <button type="button" class="primaer" onclick={() => oeffnen(updateStand!.datei_url!)}>
-            Herunterladen
-          </button>
+      {#if austauschLaeuft}
+        <div class="fortschritt" role="status" aria-live="polite">
+          <div class="balken">
+            <div class="balken-fuellung" style={fortschrittBreite}></div>
+          </div>
+          <span class="hinweis klein">{fortschrittText}</span>
+        </div>
+      {:else}
+        <div class="zeile">
+          {#if updateStand.selbst_moeglich}
+            <button type="button" class="primaer" onclick={updateJetzt}>Jetzt aktualisieren</button>
+          {:else if updateStand.datei_url}
+            <button type="button" class="primaer" onclick={() => oeffnen(updateStand!.datei_url!)}>
+              Herunterladen
+            </button>
+          {/if}
+          {#if updateStand.seite}
+            <button type="button" onclick={() => oeffnen(updateStand!.seite!)}>Was ist neu</button>
+          {/if}
+        </div>
+        {#if updateStand.selbst_moeglich}
+          <p class="hinweis klein">
+            Lotse lädt die Fassung, prüft ihre Signatur gegen den eingebauten öffentlichen Schlüssel, tauscht sich aus
+            und startet neu. <strong>Vorher wird gesperrt</strong> – der Schlüssel liegt im Speicher dieses Prozesses
+            und überlebt den Neustart nicht.
+          </p>
+        {:else if updateStand.selbst_grund}
+          <p class="hinweis klein">{updateStand.selbst_grund}</p>
         {/if}
-        {#if updateStand.seite}
-          <button type="button" onclick={() => oeffnen(updateStand!.seite!)}>Was ist neu</button>
-        {/if}
-      </div>
+      {/if}
     {:else}
       <p class="hinweis">Keine neuere Version bekannt.</p>
     {/if}
@@ -1075,8 +1133,9 @@
     </label>
     <p class="hinweis klein">
       Nachsehen heißt: eine Anfrage an die Veröffentlichungen dieses Projekts auf GitHub. GitHub sieht dabei die
-      IP-Adresse, sonst nichts – kein Konto, keine Kennung, keine Nutzungsdaten. Heruntergeladen und installiert wird
-      nichts von allein: die Installer sind unsigniert, deshalb bleibt der letzte Schritt bewusst deiner.
+      IP-Adresse, sonst nichts – kein Konto, keine Kennung, keine Nutzungsdaten. Von allein wird nie etwas
+      ausgetauscht: der Austausch beginnt erst auf Klick, und nur mit einer Fassung, deren Signatur zum eingebauten
+      öffentlichen Schlüssel passt.
     </p>
     <button type="button" onclick={updatePruefen} disabled={updateLaeuft}>
       {updateLaeuft ? 'Sehe nach …' : 'Jetzt nachsehen'}
@@ -1261,6 +1320,25 @@
     border-radius: 0.6rem;
     background: var(--karten-hintergrund);
   }
+  .fortschritt {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+  }
+  .balken {
+    flex: 1;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--flaeche-still);
+    overflow: hidden;
+  }
+  .balken-fuellung {
+    height: 100%;
+    background: var(--feuer);
+    transition: width 0.2s ease;
+  }
+
   .verbindung {
     display: flex;
     align-items: center;

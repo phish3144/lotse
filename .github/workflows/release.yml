@@ -1,8 +1,17 @@
 name: Release
 
 # Baut bei einem Tag `v*` die Desktop-Installer (Tauri) und die Kommandozeile für Windows,
-# macOS und Linux und hängt sie an ein GitHub-Release. Builds sind unsigniert; Signierung
-# und Notarisierung kommen mit der Verteilung an Dritte (docs/BUSINESS.md, Abschnitt 4).
+# macOS und Linux und hängt sie an ein GitHub-Release.
+#
+# Die Desktop-Bauten werden mit dem Update-Schlüssel signiert (minisign – nicht zu
+# verwechseln mit Code-Signierung: Windows SmartScreen und macOS Gatekeeper warnen
+# weiterhin). Diese Signatur ist die Bedingung dafür, dass die App sich selbst
+# austauschen darf – ohne sie wäre der Updater ein bequemer Weg für jeden, der die
+# Verbindung oder das Konto kontrolliert.
+#
+# Die Releases sind bewusst KEINE Vorabversionen mehr: GitHub lässt Vorabversionen aus
+# `/releases/latest` heraus, und genau dort sucht der Updater seine `latest.json`. Wer
+# wieder Vorabversionen will, braucht einen anderen Endpunkt.
 #
 # Auslösen: git tag v0.1.0 && git push origin v0.1.0
 # oder von Hand unter Actions mit dem gewünschten Tag; das Release legt den Tag dann an.
@@ -25,7 +34,47 @@ env:
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
+  schluessel:
+    name: Update-Schlüssel vorhanden?
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Nachsehen
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Das Geheimnis TAURI_SIGNING_PRIVATE_KEY fehlt."
+            echo "Ohne Update-Schlüssel entstehen Bauten ohne Signatur, und der Updater"
+            echo "weist sie ab - ein Release davon waere eine Sackgasse."
+            echo ""
+            echo "Einmalig anlegen:"
+            echo "  npm exec -- @tauri-apps/cli signer generate -w lotse-updater.key"
+            echo "Dann unter Settings > Secrets and variables > Actions hinterlegen:"
+            echo "  TAURI_SIGNING_PRIVATE_KEY          = Inhalt von lotse-updater.key"
+            echo "  TAURI_SIGNING_PRIVATE_KEY_PASSWORD = das dabei vergebene Passwort"
+            echo "Und den oeffentlichen Schluessel (lotse-updater.key.pub) in"
+            echo "apps/desktop/src-tauri/tauri.conf.json unter plugins.updater.pubkey eintragen."
+            exit 1
+          fi
+          echo "Privater Schluessel liegt vor."
+
+      - uses: actions/checkout@v4
+      - name: Oeffentlichen Schluessel nachsehen
+        run: |
+          # Ein Platzhalter hier wuerde nicht den Bau brechen, sondern still einen
+          # Updater ausliefern, der jede Fassung abweist. Also hier abfangen.
+          PUB=$(python3 -c "import json;print(json.load(open('apps/desktop/src-tauri/tauri.conf.json'))['plugins']['updater']['pubkey'])")
+          case "$PUB" in
+            ""|SIGNIERSCHLUESSEL_FEHLT_NOCH)
+              echo "::error::In tauri.conf.json steht noch kein oeffentlicher Update-Schluessel."
+              echo "Inhalt von lotse-updater.key.pub dort unter plugins.updater.pubkey eintragen."
+              exit 1
+              ;;
+          esac
+          echo "Oeffentlicher Schluessel eingetragen."
+
   cli:
+    needs: schluessel
     name: CLI ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -79,7 +128,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Lotse ${{ env.RELEASE_TAG }}"
-          prerelease: true
+          prerelease: false
           files: |
             dist/*.tar.gz
             dist/*.zip
@@ -128,14 +177,29 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signiert die Update-Artefakte. Der zugehörige öffentliche Schlüssel steht
+          # in tauri.conf.json; nur was dazu passt, tauscht die App gegen sich selbst.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: "Lotse ${{ env.RELEASE_TAG }}"
           releaseBody: |
-            Unsignierte Vorab-Builds. Windows SmartScreen und macOS Gatekeeper warnen.
-            Prüfsummen liegen als `.sha256`-Dateien bei. Der Wiederherstellungscode und der
-            Desktop-Schlüssel werden beim Einrichten genau einmal angezeigt.
+            Frühe Fassung. Die Installer sind **nicht code-signiert**: Windows SmartScreen
+            und macOS Gatekeeper warnen beim ersten Start. Prüfsummen liegen als
+            `.sha256`-Dateien bei.
+
+            Ab dieser Fassung aktualisiert sich Lotse selbst: es lädt die neue Fassung,
+            prüft ihre Signatur gegen den eingebauten öffentlichen Schlüssel und tauscht
+            sich aus. Aus einem `.deb` oder `.rpm` heraus nicht – dort aktualisiert die
+            Paketverwaltung.
+
+            Der Wiederherstellungscode und der Desktop-Schlüssel werden beim Einrichten
+            genau einmal angezeigt.
           releaseDraft: false
-          prerelease: true
+          # Die Datei, in der der Updater nachsieht. Jeder Bau-Job trägt seine Plattform
+          # nach; die Aktion liest die vorhandene und führt zusammen.
+          uploadUpdaterJson: true
+          prerelease: false
           args: ${{ matrix.args }}

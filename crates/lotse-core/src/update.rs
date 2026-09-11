@@ -1,15 +1,20 @@
-//! Nachsehen, ob es eine neuere Version gibt – mehr nicht.
+//! Nachsehen, ob es eine neuere Version gibt.
 //!
-//! Lotse lädt nichts herunter und führt nichts aus. Es fragt die
-//! Veröffentlichungen auf GitHub ab, vergleicht die Versionsnummer mit der
-//! laufenden und nennt die passende Datei. Herunterladen und installieren tut der
-//! Mensch, im Browser.
+//! Dieses Modul fragt die Veröffentlichungen auf GitHub ab, vergleicht die
+//! Versionsnummer mit der laufenden und nennt die passende Datei. Es lädt selbst
+//! nichts herunter und führt nichts aus – das ist auch weiterhin nicht sein Auftrag.
 //!
-//! Der Grund steht in `THREAT_MODEL.md`: die Installer sind bislang unsigniert. Ein
-//! Programm, das sich selbst mit unsignierten Binärdaten überschreibt, wäre ein
-//! bequemer Weg für jeden, der die Verbindung oder das Konto kontrolliert. Sobald es
-//! signierte Bauten gibt, kann daraus ein echter Updater werden; bis dahin ist der
-//! ehrliche Umfang: Bescheid sagen.
+//! **Den Austausch macht seit v0.6.0 die Hülle**, über das Updater-Plugin von Tauri:
+//! es lädt die neue Fassung, prüft ihre Signatur gegen den öffentlichen Schlüssel in
+//! `tauri.conf.json` und tauscht sich aus. Erst diese Prüfung macht das vertretbar –
+//! ein Programm, das sich mit ungeprüften Binärdaten überschreibt, wäre ein bequemer
+//! Weg für jeden, der die Verbindung oder das Konto kontrolliert (`THREAT_MODEL.md`,
+//! Abschnitt 6d).
+//!
+//! Bleibt hier, weil es zwei Dinge kann, die das Plugin nicht kann: es läuft auch in
+//! der Kommandozeile, und es kennt die Seite mit dem Änderungstext und den Namen der
+//! Datei für dieses System – nützlich überall dort, wo der Austausch nicht geht
+//! (`.deb`, `.rpm`).
 
 use serde::Deserialize;
 

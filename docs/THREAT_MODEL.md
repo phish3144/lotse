@@ -228,10 +228,43 @@ auch nur auflistet; die Volltextsuche wirft Treffer der Art `tresor` weg, bevor 
 antwortet. `crates/lotse-core/tests/mcp_http.rs` legt einen echten Eintrag mit Passwort an
 und sucht über den echten Socket danach.
 
+## 6d. Der Updater: warum er sich selbst austauschen darf
+
+Bis v0.5.0 hat Lotse nur Bescheid gesagt und den Browser geöffnet. Das war kein
+Versäumnis, sondern die richtige Antwort auf unsignierte Bauten: ein Programm, das sich
+mit ungeprüften Binärdaten überschreibt, ist ein bequemer Weg für jeden, der die
+Verbindung oder das Konto kontrolliert.
+
+Seit v0.6.0 werden die Desktop-Bauten signiert (minisign, über `tauri-plugin-updater`).
+Damit kehrt sich die Rechnung um, und der Austausch findet in der App statt:
+
+| Maßnahme | Wogegen |
+|---|---|
+| Die geladene Fassung muss zum öffentlichen Schlüssel in `tauri.conf.json` passen, sonst wird sie verworfen | ausgetauschte Dateien auf dem Weg, ein übernommenes GitHub-Konto, ein untergeschobener Spiegel |
+| Der private Schlüssel liegt ausschließlich als GitHub-Geheimnis, nie im Repo und nie auf einem Entwicklerrechner im Klartext | Diebstahl aus dem Quelltext oder aus einem Backup |
+| Der Austausch beginnt nur auf Klick; nichts wird im Hintergrund installiert | stille Änderungen an einem Programm, das den Tresor öffnet |
+| Vor dem Austausch wird gesperrt | der Schlüssel liegt im Speicher dieses Prozesses und soll den Neustart nicht überleben |
+| Aus `.deb` und `.rpm` heraus wird gar nicht erst versucht (erkannt an fehlendem `APPIMAGE`) | zerrissene Buchführung der Paketverwaltung |
+
+Was das **nicht** ist: Code-Signierung. Windows SmartScreen und macOS Gatekeeper warnen
+weiterhin beim ersten Start, weil dafür kostenpflichtige Zertifikate nötig sind. Die
+Update-Signatur schützt den Weg von einer Fassung zur nächsten, nicht den ersten
+Download.
+
+Was der Schlüssel **nicht** kann: er beweist, dass eine Fassung mit diesem Schlüssel
+signiert wurde – nicht, dass sie gutartig ist. Wer den privaten Schlüssel hat, kann jedem
+Lotse eine eigene Fassung unterschieben. Deshalb ist er ein Geheimnis wie das
+Master-Passwort, und deshalb steht der Umgang damit unten in Abschnitt 7.
+
 ## 7. Betrieb und Konto-Sicherheit
 
 - Cloudflare- und GitHub-Konto mit Passkey oder TOTP (in Proton Pass).
-- Signaturschlüssel für Updates nie im Repo; öffentlicher Schlüssel im Tauri-Config.
+- Signaturschlüssel für Updates nie im Repo; öffentlicher Schlüssel im Tauri-Config
+  (`plugins.updater.pubkey`), privater ausschließlich als GitHub-Geheimnis
+  `TAURI_SIGNING_PRIVATE_KEY` samt Passwort. Geht er verloren, kann keine Fassung mehr
+  ausgeliefert werden, die laufende Installationen annehmen – dann bleibt nur ein neuer
+  Schlüssel und ein Download von Hand. Geht er *weg*, ist er das größte Einzelrisiko des
+  Projekts: er erlaubt, jedem Lotse eine eigene Fassung unterzuschieben.
 - Wiederherstellungscode und Desktop-Schlüssel gehören in Proton Pass. Das Setup sagt das
   ausdrücklich und verlangt die kalte Wiedereingabe des Wiederherstellungscodes.
 - Backup ist der E2E-verschlüsselte Bestand auf dem Sync-Dienst plus optionaler

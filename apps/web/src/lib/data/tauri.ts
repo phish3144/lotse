@@ -280,6 +280,15 @@ export interface UpdateStand {
   vorab: boolean;
   automatisch: boolean;
   zuletzt?: number;
+  /** Kann Lotse sich hier selbst austauschen? Bei .deb und .rpm nicht. */
+  selbst_moeglich: boolean;
+  /** Warum nicht, in einem Satz. Fehlt, wenn es geht. */
+  selbst_grund?: string;
+}
+
+export interface UpdateFortschritt {
+  geladen: number;
+  gesamt?: number;
 }
 
 /**
@@ -289,6 +298,11 @@ export interface UpdateStand {
  */
 export const update = {
   pruefen: (erzwingen?: boolean) => invoke<UpdateStand>('update_pruefen', { erzwingen: erzwingen ?? null }),
+  /**
+   * Holt die signierte Fassung, tauscht sie aus und startet neu. Kehrt im Erfolgsfall
+   * nicht zurück – die App ist dann weg.
+   */
+  installieren: () => invoke<void>('update_installieren'),
   automatischSetzen: (an: boolean) => invoke<void>('update_automatisch_setzen', { an }),
 };
 

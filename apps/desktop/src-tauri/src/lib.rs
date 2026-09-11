@@ -17,6 +17,7 @@ use lotse_core::vault::{TresorEintrag, VaultKeys};
 use lotse_core::{now_ms, Error};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
+use tauri_plugin_updater as tauri_updater;
 use ulid::Ulid;
 use zeroize::Zeroizing;
 
@@ -1772,6 +1773,10 @@ struct UpdateStand {
     /// Wird beim Start nachgesehen?
     automatisch: bool,
     zuletzt: Option<i64>,
+    /// Kann Lotse sich hier selbst austauschen? Siehe `selbst_austauschbar`.
+    selbst_moeglich: bool,
+    /// Warum nicht, in einem Satz. `None`, wenn es geht.
+    selbst_grund: Option<String>,
 }
 
 fn app_version() -> String {
@@ -1792,6 +1797,7 @@ fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateSt
         ))
     })?;
     let laufend = app_version();
+    let (selbst_moeglich, selbst_grund) = selbst_austauschbar();
     let leer = UpdateStand {
         laufend: laufend.clone(),
         neu: None,
@@ -1802,6 +1808,8 @@ fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateSt
         vorab: false,
         automatisch,
         zuletzt,
+        selbst_moeglich,
+        selbst_grund: selbst_grund.clone(),
     };
 
     let erzwingen = erzwingen.unwrap_or(false);
@@ -1837,7 +1845,89 @@ fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateSt
         vorab: v.vorab,
         automatisch,
         zuletzt: Some(jetzt),
+        selbst_moeglich,
+        selbst_grund,
     })
+}
+
+/// Darf sich diese Installation selbst austauschen?
+///
+/// Nicht überall geht das, und wo es nicht geht, soll Lotse es sagen statt es zu
+/// versuchen:
+///
+/// - **Linux**: nur als AppImage. Ein `.deb` oder `.rpm` gehört der Paketverwaltung;
+///   sich dort selbst zu überschreiben würde deren Buchführung zerreißen. Das AppImage
+///   erkennt man daran, dass der Starter `APPIMAGE` in die Umgebung schreibt.
+/// - **macOS und Windows**: geht, solange der Ordner beschreibbar ist. Ob er das ist,
+///   weiß man erst beim Versuch – das meldet dann der Fehler, keine Vorhersage hier.
+fn selbst_austauschbar() -> (bool, Option<String>) {
+    if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_none() {
+        return (
+            false,
+            Some(
+                "Diese Installation kommt aus einem Paket (.deb oder .rpm). Dort aktualisiert \
+                 die Paketverwaltung, nicht Lotse – sich selbst zu überschreiben würde deren \
+                 Buchführung zerreißen."
+                    .to_string(),
+            ),
+        );
+    }
+    (true, None)
+}
+
+#[derive(Clone, Serialize)]
+struct UpdateFortschritt {
+    geladen: u64,
+    gesamt: Option<u64>,
+}
+
+/// Holt die neue Fassung, prüft ihre Signatur, tauscht sich aus und startet neu.
+///
+/// Die Signaturprüfung macht das Updater-Plugin gegen den öffentlichen Schlüssel aus
+/// `tauri.conf.json`. Sie ist der ganze Grund, warum das hier stehen darf: ohne sie
+/// wäre ein Programm, das sich selbst mit Heruntergeladenem überschreibt, ein bequemer
+/// Weg für jeden, der die Verbindung oder das Konto kontrolliert.
+///
+/// Vor dem Austausch wird gesperrt. Der Schlüssel liegt im Speicher dieses Prozesses;
+/// ihn über einen Neustart hinweg halten zu wollen, wäre der falsche Ehrgeiz.
+#[tauri::command]
+async fn update_installieren(app: tauri::AppHandle, state: State<'_, AppState>) -> R<()> {
+    use tauri::Emitter;
+    use tauri_updater::UpdaterExt;
+
+    let (moeglich, grund) = selbst_austauschbar();
+    if !moeglich {
+        return Err(grund.unwrap_or_else(|| "Hier nicht möglich.".into()));
+    }
+
+    let updater = app.updater().map_err(|e| format!("Updater: {e}"))?;
+    let gefunden = updater
+        .check()
+        .await
+        .map_err(|e| format!("Nachsehen fehlgeschlagen: {e}"))?;
+    let Some(update) = gefunden else {
+        return Err("Diese Version ist die neueste.".into());
+    };
+
+    // Erst sperren, dann tauschen: der Schlüssel überlebt den Neustart nicht.
+    sperren(state)?;
+
+    let mut geladen: u64 = 0;
+    update
+        .download_and_install(
+            |zuwachs, gesamt| {
+                geladen += zuwachs as u64;
+                let _ = app.emit("update-fortschritt", UpdateFortschritt { geladen, gesamt });
+            },
+            || {
+                let _ = app.emit("update-fortschritt", UpdateFortschritt { geladen: 0, gesamt: None });
+            },
+        )
+        .await
+        .map_err(|e| format!("Austausch fehlgeschlagen: {e}"))?;
+
+    // Windows beendet die App schon im Installer; überall sonst startet sie hier neu.
+    app.restart();
 }
 
 /// Schaltet das Nachsehen beim Start ein oder aus.
@@ -2227,6 +2317,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .setup(|app| {
             let fallback = app.path().app_data_dir().ok();
@@ -2298,6 +2389,7 @@ pub fn run() {
             datei_referenzen,
             kalender_termine,
             update_pruefen,
+            update_installieren,
             update_automatisch_setzen,
             oeffnen,
             tresor_liste,
