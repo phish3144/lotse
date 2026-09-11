@@ -158,3 +158,19 @@ letzten Besuch getan hat, nach Quellen aufgeschlüsselt.
 
 Er wird **gerechnet, nicht gespeichert** – und ohne KI. Die optionale Verdichtung
 (**[[KI]]**) macht daraus auf Wunsch einen Fließtext, aber die Zahlen stehen auch ohne.
+
+---
+
+## Weiter
+
+| Begriff | Ausführlich |
+|---|---|
+| Vorhaben, Status, Kurs, Auffälligkeit | [[Vorhaben]] |
+| Logbuch, Arten, Quellen | [[Logbuch]] |
+| Referenz | [[Referenzen]] |
+| Offener Faden | [[Offene Punkte|Offene-Punkte]] |
+| Wo-war-ich-Brief | [[Wo-war-ich-Brief]] |
+| Zugang, Stufen | [[Tresor]] |
+| Hafeneinfahrt, Kandidat, Marke | [[Erkennungsregeln]] |
+
+Jedes Feld mit Typ und Bedeutung: [[Datenmodell]].

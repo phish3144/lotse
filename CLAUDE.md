@@ -20,6 +20,7 @@ Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept 
 
 ```
 scripts/modulgrenzen.sh   # kein Tresor-Zugriff aus den Modulen, die ihn nicht haben dürfen
+scripts/wiki_pruefen.sh   # docs/wiki/ deckt noch jedes Kommando, Feld und Schalter ab
 cargo deny check          # Sicherheitsmeldungen und Lizenzen der Abhängigkeiten
 cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check   # dasselbe für die Hülle
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace

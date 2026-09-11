@@ -1,5 +1,8 @@
 # Kommandozeile
 
+> Diese Seite zeigt, was man täglich braucht. **Jedes** Kommando mit **jeder** Option,
+> mit echten Beispielausgaben, steht in **[[Kommandozeile-Referenz]]**.
+
 `lotse` kann alles, was die App kann: erfassen, suchen, Tresor, Ordner durchsuchen,
 exportieren, abgleichen. Beide arbeiten auf demselben Datenordner.
 

@@ -68,6 +68,7 @@ Das ist die verbindliche Liste aus `CLAUDE.md`:
 
 ```bash
 scripts/modulgrenzen.sh
+scripts/wiki_pruefen.sh
 cargo deny check
 cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
@@ -123,11 +124,20 @@ ausliefert. Siehe **[[Updates]]**.
 
 ## Das Wiki ändern
 
-Dieses Wiki entsteht aus `docs/wiki/` im Hauptrepository. Änderungen **im Browser werden
-beim nächsten Abgleich überschrieben**.
+Der Text liegt in `docs/wiki/` im Hauptrepository, eine Markdown-Datei je Seite.
+`.github/workflows/wiki.yml` schreibt sie ins GitHub-Wiki, sobald auf `main` etwas darunter
+geändert wird. Änderungen im Browser werden dabei überschrieben.
 
-Der richtige Weg: Datei in `docs/wiki/` ändern, nach `main` – der Workflow `wiki.yml`
-schreibt es fort. So ist der Inhalt reviewbar und kann nicht vom Code abdriften.
+```
+scripts/wiki_pruefen.sh
+```
+
+liest die tatsächliche Oberfläche aus dem Quelltext – Kommandobaum, Tauri-Kommandos,
+MCP-Werkzeuge, Modellfelder, Fehlertexte, Einstellungsschlüssel, `LOTSE_*`-Variablen,
+Sync-Endpunkte, Erkennungsmarken – und verlangt, dass jedes Stück davon im Wiki vorkommt.
+Sie läuft in CI. Wer ein Feld hinzufügt und das Wiki nicht anfasst, bekommt eine rote CI.
+
+Vollständig: [[Wiki pflegen|Wiki-pflegen]].
 
 ## Beitragen
 

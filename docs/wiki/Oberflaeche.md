@@ -124,3 +124,22 @@ abzubrechen.
 
 Sperren heißt: der Schlüssel verlässt den Speicher. Der Ordner-Beobachter und der
 MCP-Zugang enden mit.
+
+---
+
+## Tiefer
+
+Diese Seite ist der Überblick. Im Einzelnen:
+
+| Ansicht | Seite |
+|---|---|
+| Hafen, Auffälligkeit, vor Anker | [[Vorhaben]] |
+| Zeitachse, Arten, Quellen | [[Logbuch]] |
+| Rechte Spalte der Projektseite | [[Referenzen]], [[Kalender]], [[Gegenseite]] |
+| Die Überlagerung beim Öffnen | [[Wo-war-ich-Brief]] |
+| Offene Punkte | [[Offene Punkte|Offene-Punkte]] |
+| Tresor-Ansicht | [[Tresor]] |
+| Einstellungen, alle sieben Reiter | [[Einstellungen]] |
+| Schnellerfassung, Springen, Esc | [[Tastenkürzel|Tastenkuerzel]] |
+
+Was die Oberfläche im Kern aufrufen kann, steht in [[App-Schnittstelle]].

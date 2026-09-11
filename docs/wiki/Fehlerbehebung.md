@@ -1,5 +1,8 @@
 # Fehlerbehebung
 
+> Diese Seite ist nach Symptomen geordnet. Wenn du einen **Meldungstext** hast, ist
+> **[[Fehlermeldungen]]** schneller – dort steht jede Meldung des Kerns mit Ursache und Abhilfe.
+
 ## Beim Start
 
 **„Der Computer wurde durch Windows geschützt“ / „Entwickler nicht verifiziert“**

@@ -21,6 +21,11 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
       - name: Modulgrenzen (kein Tresor-Zugriff aus ai/detect/forge/git/kalender/mcp/update/watcher)
         run: scripts/modulgrenzen.sh
+      # Liest die tatsaechliche Oberflaeche aus dem Quelltext und verlangt, dass jedes
+      # Kommando, Feld, Fehlertext und Schalter im Wiki vorkommt. »Wird bei jedem Update
+      # mitgezogen« ist als Vorsatz wertlos; so wird es rot, wenn es nicht stimmt.
+      - name: Wiki deckt die Oberflaeche ab
+        run: scripts/wiki_pruefen.sh
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
