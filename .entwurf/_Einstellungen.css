@@ -1,0 +1,75 @@
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .seitenkopf { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 14px; flex: none; }
+    .seiten-titel { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-aktionen { margin-left: auto; align-self: center; }
+
+    .einst-flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: 176px minmax(0, 1fr); gap: 28px;
+      padding-bottom: 24px; overflow: hidden;
+    }
+    .reiter { display: flex; flex-direction: column; gap: 2px; }
+    .reiter a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 7px 11px; border-radius: 8px;
+    }
+    .reiter a:hover { background: var(--flaeche-still); color: var(--fg); }
+    .reiter a.aktiv { background: var(--flaeche-still); color: var(--fg); font-weight: 600; }
+
+    .einst-inhalt {
+      min-width: 0; max-width: 720px;
+      display: flex; flex-direction: column; gap: 16px; overflow: hidden;
+    }
+    .block-karte { padding-bottom: 14px; }
+    .erklaerung {
+      margin: 8px 16px 14px; font-size: 13px; color: var(--gedaempft);
+      line-height: 1.5; max-width: 62ch;
+    }
+
+    .verbindung {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px; flex-wrap: wrap;
+    }
+    .v-marke {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-weight: 600; font-size: 14px; min-width: 108px;
+    }
+    .v-lage {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12.5px; font-weight: 600;
+    }
+    .v-lage.verbunden { color: var(--ruhig); }
+    .v-hinweis { font-size: 12.5px; color: var(--gedaempft); }
+    .verbindung .knopf:last-child { margin-left: auto; }
+    .v-feld {
+      flex: 1 1 220px; border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 0 11px; height: 34px; font-family: inherit; font-size: 13.5px;
+      background: var(--grund); color: inherit;
+    }
+    .v-feld::placeholder { color: var(--gedaempft); }
+    .v-fuss { margin: 0 16px 8px; font-size: 12px; color: var(--gedaempft); line-height: 1.45; }
+    .v-code {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px;
+      background: var(--flaeche-still); border-radius: 6px; padding: 5px 9px;
+    }
+    .trenner { height: 1px; background: var(--rahmen-still); margin: 10px 16px 4px; }
+
+    .repo-liste { list-style: none; margin: 8px 0 14px; padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .repo { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .repo-projekt { font-weight: 600; min-width: 108px; }
+    .repo-ziel { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; color: var(--gedaempft); }
+    .repo-ci { margin-left: auto; font-size: 11.5px; color: var(--gedaempft); font-weight: 600; }
+    .repo-ci.gruen { color: var(--ruhig); }
+
+    .schalter { display: flex; align-items: center; gap: 10px; padding: 4px 16px 0; font-size: 13.5px; }
+    .schiene {
+      width: 34px; height: 20px; border-radius: 999px; flex: none;
+      background: var(--rahmen); position: relative; transition: background 0.15s;
+    }
+    .schiene.an { background: var(--feuer); }
+    .knauf {
+      position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(20,48,74,0.25);
+    }
+    .schiene.an .knauf { left: 16px; }
+    .lage.klein-lage { font-size: 11px; padding: 2px 8px; }

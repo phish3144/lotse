@@ -1,0 +1,32 @@
+    .pal-wurzel { height: 980px; }
+    .pal-bahn { flex: 1; min-height: 0; padding: 28px 30px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; }
+    .pal-kopf { display: flex; align-items: center; gap: 14px; flex: none; }
+    .pal-titel { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+    .pal-unter { margin: 2px 0 0; font-size: 13px; color: var(--gedaempft); }
+
+    .pal-spalten { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+    .pal-block {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; padding: 16px 18px; box-shadow: var(--schatten);
+      overflow: hidden;
+    }
+    .dunkel-block { background: #0b1b2b; border-color: #24405a; color: #e8e1d1; }
+
+    .swatches { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+    .sw { display: grid; grid-template-columns: 26px 86px 74px 1fr; align-items: center; gap: 9px; font-size: 12px; }
+    .feld { width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(20,48,74,0.12); }
+    .sw b { font-weight: 600; }
+    .sw code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; color: var(--gedaempft); }
+    .sw em { font-style: normal; font-size: 11.5px; color: var(--gedaempft); }
+    .sw.d code, .sw.d em { color: #93a7b8; }
+    .pal-notiz { margin: 14px 0 0; font-size: 12px; color: #93a7b8; line-height: 1.5; }
+
+    .probe { padding: 12px 0; border-bottom: 1px solid var(--rahmen-still); }
+    .probe:last-child { border-bottom: none; }
+    .probe-marke { font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--gedaempft); }
+    .probe-reihe { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; align-items: center; }
+    .probe-notiz { margin: 7px 0 0; font-size: 11.5px; color: var(--gedaempft); line-height: 1.45; }
+    .probe-notiz code, .masse code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; }
+    .probe-serife { margin: 9px 0 0; font-size: 19px; }
+    .probe-ui { margin: 9px 0 0; font-size: 14.5px; }
+    .masse { margin: 9px 0 0; padding-left: 16px; font-size: 12px; color: var(--gedaempft); line-height: 1.7; }

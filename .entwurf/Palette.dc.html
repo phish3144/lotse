@@ -1,0 +1,267 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Palette aus dem Logo: Marine #14304a, Bernstein #f2b544, Pergament,
+       Stahlblau #2e5f7a (die Wellen). Keine Fremd-Fonts – CLAUDE.md verbietet
+       CDNs in apps/web; die Serife fürs Logbuch ist eine System-Serife. */
+    .wurzel {
+      --grund: #f4efe4;
+      --flaeche: #fffdf7;
+      --flaeche-still: #efe9db;
+      --fg: #14304a;
+      --gedaempft: #5b6b78;
+      --rahmen: #e0d7c4;
+      --rahmen-still: #ece5d6;
+      --akzent: #2e5f7a;
+      --feuer: #f2b544;
+      --feuer-tief: #8a6212;
+      --ruhig: #3f7d5c;
+      --auffaellig: #c8873a;
+      --ueberfaellig: #b0392f;
+      --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
+    }
+    .wurzel.dunkel {
+      --grund: #0b1b2b;
+      --flaeche: #14263a;
+      --flaeche-still: #102032;
+      --fg: #e8e1d1;
+      --gedaempft: #93a7b8;
+      --rahmen: #24405a;
+      --rahmen-still: #1b3349;
+      --akzent: #7fb4d4;
+      --feuer: #f2b544;
+      --feuer-tief: #f2b544;
+      --ruhig: #7bc28c;
+      --auffaellig: #d9a441;
+      --ueberfaellig: #e0685c;
+      --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    body { margin: 0; }
+    a { color: var(--akzent); }
+    a:hover { color: var(--fg); }
+    .wurzel {
+      width: 1440px; height: 900px; overflow: hidden;
+      background: var(--grund); color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px; line-height: 1.45;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serife { font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+
+    /* ---- Kopfleiste ---- */
+    .leiste {
+      display: flex; align-items: center; gap: 28px;
+      padding: 0 28px; height: 56px; flex: none;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .marke { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .navi { display: flex; gap: 4px; }
+    .navi a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 6px 11px; border-radius: 7px;
+    }
+    .navi a:hover { color: var(--fg); background: var(--flaeche-still); }
+    .navi a.aktiv { color: var(--fg); font-weight: 600; background: var(--flaeche-still); }
+    .leiste-rechts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .suchfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 6px 10px; width: 210px; color: var(--gedaempft);
+      font-size: 13px; background: var(--grund);
+    }
+    .taste {
+      font-size: 10.5px; border: 1px solid var(--rahmen); border-radius: 4px;
+      padding: 1px 4px; margin-left: auto; color: var(--gedaempft);
+    }
+
+    /* ---- Knöpfe ---- */
+    .knopf {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--rahmen); background: var(--flaeche);
+      color: var(--fg); border-radius: 8px; padding: 0 12px; height: 34px;
+      font-size: 13.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .knopf:hover { border-color: var(--akzent); }
+    .knopf.leuchte {
+      background: var(--feuer); border-color: var(--feuer);
+      color: #14304a; font-weight: 600;
+    }
+    .knopf.still { border-color: transparent; background: transparent; color: var(--gedaempft); }
+    .knopf.still:hover { background: var(--flaeche-still); color: var(--fg); }
+    .knopf.klein { height: 28px; font-size: 12.5px; padding: 0 9px; border-radius: 7px; }
+
+    /* ---- Karten ---- */
+    .karte {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; box-shadow: var(--schatten);
+    }
+    .karten-kopf {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px 0;
+    }
+    .karten-titel {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .zahl {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      background: var(--flaeche-still); border-radius: 999px; padding: 1px 7px;
+    }
+
+    /* ---- Marken und Punkte ---- */
+    .punkt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .lage {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; border-radius: 999px;
+      padding: 3px 10px 3px 8px; border: 1px solid var(--rahmen);
+      background: var(--flaeche-still);
+    }
+    .quelle {
+      font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--gedaempft); font-weight: 600;
+    }
+    .pal-wurzel { height: 980px; }
+    .pal-bahn { flex: 1; min-height: 0; padding: 28px 30px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; }
+    .pal-kopf { display: flex; align-items: center; gap: 14px; flex: none; }
+    .pal-titel { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+    .pal-unter { margin: 2px 0 0; font-size: 13px; color: var(--gedaempft); }
+
+    .pal-spalten { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+    .pal-block {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; padding: 16px 18px; box-shadow: var(--schatten);
+      overflow: hidden;
+    }
+    .dunkel-block { background: #0b1b2b; border-color: #24405a; color: #e8e1d1; }
+
+    .swatches { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+    .sw { display: grid; grid-template-columns: 26px 86px 74px 1fr; align-items: center; gap: 9px; font-size: 12px; }
+    .feld { width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(20,48,74,0.12); }
+    .sw b { font-weight: 600; }
+    .sw code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; color: var(--gedaempft); }
+    .sw em { font-style: normal; font-size: 11.5px; color: var(--gedaempft); }
+    .sw.d code, .sw.d em { color: #93a7b8; }
+    .pal-notiz { margin: 14px 0 0; font-size: 12px; color: #93a7b8; line-height: 1.5; }
+
+    .probe { padding: 12px 0; border-bottom: 1px solid var(--rahmen-still); }
+    .probe:last-child { border-bottom: none; }
+    .probe-marke { font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--gedaempft); }
+    .probe-reihe { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; align-items: center; }
+    .probe-notiz { margin: 7px 0 0; font-size: 11.5px; color: var(--gedaempft); line-height: 1.45; }
+    .probe-notiz code, .masse code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; }
+    .probe-serife { margin: 9px 0 0; font-size: 19px; }
+    .probe-ui { margin: 9px 0 0; font-size: 14.5px; }
+    .masse { margin: 9px 0 0; padding-left: 16px; font-size: 12px; color: var(--gedaempft); line-height: 1.7; }
+  </style>
+</helmet>
+<div class="wurzel pal-wurzel">
+  <div class="pal-bahn">
+
+    <div class="pal-kopf">
+      <svg width="40" height="40" viewBox="0 0 256 256" aria-hidden="true" style="border-radius: 9px">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14304a"/><stop offset="1" stop-color="#0b1b2b"/></linearGradient></defs>
+        <rect width="256" height="256" rx="56" fill="url(#lg)"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="8" opacity="0.7">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      <div>
+        <h1 class="serife pal-titel">Farben und Bausteine</h1>
+        <p class="pal-unter">Jeder Wert stammt aus dem Logo. Keine neue Farbe erfunden.</p>
+      </div>
+    </div>
+
+    <div class="pal-spalten">
+
+      <section class="pal-block">
+        <h2 class="karten-titel">Hell — Pergament</h2>
+        <div class="swatches">
+          <div class="sw"><span class="feld" style="background:#f4efe4; border-color:#ddd4c2"></span><b>Grund</b><code>#f4efe4</code><em>Pergament</em></div>
+          <div class="sw"><span class="feld" style="background:#fffdf7; border-color:#e0d7c4"></span><b>Fläche</b><code>#fffdf7</code><em>Karten</em></div>
+          <div class="sw"><span class="feld" style="background:#14304a"></span><b>Text</b><code>#14304a</code><em>Logo-Marine</em></div>
+          <div class="sw"><span class="feld" style="background:#5b6b78"></span><b>Gedämpft</b><code>#5b6b78</code><em>Stahl</em></div>
+          <div class="sw"><span class="feld" style="background:#2e5f7a"></span><b>Akzent</b><code>#2e5f7a</code><em>Logo-Wellen</em></div>
+          <div class="sw"><span class="feld" style="background:#f2b544"></span><b>Leuchtfeuer</b><code>#f2b544</code><em>Logo-L · sparsam</em></div>
+          <div class="sw"><span class="feld" style="background:#e0d7c4"></span><b>Rahmen</b><code>#e0d7c4</code><em></em></div>
+        </div>
+        <h2 class="karten-titel" style="margin-top: 18px">Zustände</h2>
+        <div class="swatches">
+          <div class="sw"><span class="feld" style="background:#3f7d5c"></span><b>Ruhig</b><code>#3f7d5c</code><em>alles gut</em></div>
+          <div class="sw"><span class="feld" style="background:#c8873a"></span><b>Auffällig</b><code>#c8873a</code><em>lange nichts</em></div>
+          <div class="sw"><span class="feld" style="background:#b0392f"></span><b>Überfällig</b><code>#b0392f</code><em>zu lange</em></div>
+        </div>
+      </section>
+
+      <section class="pal-block dunkel-block">
+        <h2 class="karten-titel" style="color:#93a7b8">Dunkel — Logo-Verlauf</h2>
+        <div class="swatches">
+          <div class="sw d"><span class="feld" style="background:#0b1b2b; border-color:#24405a"></span><b>Grund</b><code>#0b1b2b</code><em>Verlauf unten</em></div>
+          <div class="sw d"><span class="feld" style="background:#14263a; border-color:#24405a"></span><b>Fläche</b><code>#14263a</code><em></em></div>
+          <div class="sw d"><span class="feld" style="background:#e8e1d1"></span><b>Text</b><code>#e8e1d1</code><em>Logo-Kreis</em></div>
+          <div class="sw d"><span class="feld" style="background:#93a7b8"></span><b>Gedämpft</b><code>#93a7b8</code><em></em></div>
+          <div class="sw d"><span class="feld" style="background:#7fb4d4"></span><b>Akzent</b><code>#7fb4d4</code><em></em></div>
+          <div class="sw d"><span class="feld" style="background:#f2b544"></span><b>Leuchtfeuer</b><code>#f2b544</code><em>unverändert</em></div>
+          <div class="sw d"><span class="feld" style="background:#24405a"></span><b>Rahmen</b><code>#24405a</code><em></em></div>
+        </div>
+        <p class="pal-notiz">Das Bernstein bleibt in beiden Themen gleich — es ist das Leuchtfeuer, nicht Dekoration.</p>
+      </section>
+
+      <section class="pal-block">
+        <h2 class="karten-titel">Bausteine</h2>
+
+        <div class="probe">
+          <span class="probe-marke">Knöpfe</span>
+          <div class="probe-reihe">
+            <button class="knopf leuchte" type="button">Ins Logbuch</button>
+            <button class="knopf" type="button">Bearbeiten</button>
+            <button class="knopf still" type="button">Verwerfen</button>
+            <button class="knopf klein" type="button">Klein</button>
+          </div>
+          <p class="probe-notiz">Nur eine Handlung je Ansicht trägt Bernstein.</p>
+        </div>
+
+        <div class="probe">
+          <span class="probe-marke">Zustand</span>
+          <div class="probe-reihe">
+            <span class="lage"><span class="punkt" style="background:#3f7d5c"></span>Aktiv</span>
+            <span class="lage"><span class="punkt" style="background:#c8873a"></span>Wartet</span>
+            <span class="lage"><span class="punkt" style="background:#5b6b78"></span>Vor Anker</span>
+            <span class="lage"><span class="punkt" style="background:#b0392f"></span>Überfällig</span>
+          </div>
+        </div>
+
+        <div class="probe">
+          <span class="probe-marke">Schrift</span>
+          <p class="serife probe-serife">Fundament bis Oktober.</p>
+          <p class="probe-notiz">System-Serife für Kurs und Titel — <code>ui-serif, Georgia</code>.</p>
+          <p class="probe-ui">Schalung geprüft, zwei Bretter ersetzt.</p>
+          <p class="probe-notiz">System-UI für alles andere. Keine Fremd-Font: <code>CLAUDE.md</code> verbietet CDNs in <code>apps/web</code>.</p>
+        </div>
+
+        <div class="probe">
+          <span class="probe-marke">Maße</span>
+          <ul class="masse">
+            <li><code>12px</code> Karten-Radius · <code>8px</code> Knöpfe und Felder</li>
+            <li><code>34px</code> Knopfhöhe · <code>56px</code> Kopfleiste</li>
+            <li><code>366px</code> Nebenspalte · <code>24px</code> Spaltenabstand</li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

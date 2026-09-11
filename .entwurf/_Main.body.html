@@ -1,0 +1,211 @@
+<div class="wurzel {{theme}}">
+
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" class="aktiv">Hafen</a>
+      <a href="#">Offene Punkte</a>
+      <a href="#">Tresor</a>
+      <a href="#">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn">
+
+    <div class="projektkopf">
+      <button class="knopf still klein" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+        Hafen
+      </button>
+      <h1 class="serife projekt-titel">Gartenhaus</h1>
+      <span class="lage"><span class="punkt" style="background: var(--ruhig)"></span>Aktiv</span>
+      <span class="kopf-meta">Zuletzt berührt heute · angelegt 14. Mai</span>
+      <div class="kopf-aktionen">
+        <button class="knopf klein" type="button">Bearbeiten</button>
+        <button class="knopf klein" type="button">Status ändern</button>
+      </div>
+    </div>
+
+    <div class="flaeche">
+
+      <main class="spalte-haupt">
+
+        <div class="erfassung">
+          <div class="erfassung-feld">Was ist passiert? Was ist der nächste Schritt?</div>
+          <div class="erfassung-fuss">
+            <div class="art-wahl">
+              <button class="art gewaehlt" type="button">Notiz</button>
+              <button class="art" type="button">Offener Faden</button>
+              <button class="art" type="button">Entscheidung</button>
+              <button class="art" type="button">Übergabe</button>
+            </div>
+            <button class="knopf leuchte klein" type="button">Ins Logbuch</button>
+          </div>
+        </div>
+
+        <div class="logbuch-leiste">
+          <span class="karten-titel">Logbuch</span>
+          <span class="zahl">142</span>
+          <div class="filter">
+            <button class="filter-chip gewaehlt" type="button">Alle</button>
+            <button class="filter-chip" type="button">Mensch</button>
+            <button class="filter-chip" type="button">Datei</button>
+            <button class="filter-chip" type="button">Git</button>
+            <button class="filter-chip" type="button">MCP</button>
+          </div>
+        </div>
+
+        <div class="strom">
+
+          <div class="tagmarke"><span>Heute</span></div>
+
+          <article class="eintrag">
+            <span class="eintrag-punkt" style="background: var(--feuer)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">Schalung geprüft, zwei Bretter ersetzt. Nächster Schritt: Beton bestellen, sobald der Wetterbericht drei trockene Tage zeigt.</p>
+              <div class="eintrag-fuss"><span class="quelle">Mensch</span><span class="zeit">14:20</span></div>
+            </div>
+          </article>
+
+          <article class="eintrag">
+            <span class="eintrag-punkt" style="background: var(--akzent)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">3 Commits: Fundamentplan korrigiert · Maße nachgetragen · Materialliste ergänzt</p>
+              <div class="eintrag-fuss"><span class="quelle">Git</span><span class="zeit">11:05</span></div>
+            </div>
+          </article>
+
+          <article class="eintrag">
+            <span class="eintrag-punkt" style="background: var(--akzent)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">Claude Code hat den Kontext gelesen und eingetragen: Statik-Nachweis abgelegt, offener Faden „Bewehrung" bleibt.</p>
+              <div class="eintrag-fuss"><span class="quelle">MCP</span><span class="zeit">09:48</span></div>
+            </div>
+          </article>
+
+          <div class="tagmarke"><span>Gestern</span></div>
+
+          <article class="eintrag">
+            <span class="eintrag-punkt" style="background: var(--gedaempft)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">Geändert: <span class="datei">statik-nachweis.pdf</span>, <span class="datei">fundament-v3.dwg</span></p>
+              <div class="eintrag-fuss"><span class="quelle">Datei</span><span class="zeit">17:32</span></div>
+            </div>
+          </article>
+
+          <article class="eintrag">
+            <span class="eintrag-punkt" style="background: var(--feuer)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">Beton bei Kuhlmann angefragt: C25/30, 4,2 m³, Lieferung frühestens KW 41.</p>
+              <div class="eintrag-fuss"><span class="quelle">Mensch</span><span class="zeit">10:12</span></div>
+            </div>
+          </article>
+
+          <div class="tagmarke"><span>8. September</span></div>
+
+          <article class="eintrag verblassend">
+            <span class="eintrag-punkt" style="background: var(--gedaempft)"></span>
+            <div class="eintrag-leib">
+              <p class="eintrag-text">Entscheidung: Streifenfundament statt Platte. Günstiger, und der Boden trägt.</p>
+              <div class="eintrag-fuss"><span class="quelle">Mensch</span><span class="zeit">16:40</span></div>
+            </div>
+          </article>
+
+        </div>
+      </main>
+
+      <aside class="spalte-neben">
+
+        <section class="karte kurs-karte">
+          <div class="karten-kopf"><span class="karten-titel">Kurs</span></div>
+          <p class="kurs-text serife">Fundament bis Oktober. Danach Winterpause, Aufbau im Frühjahr.</p>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf">
+            <span class="karten-titel">Offene Fäden</span><span class="zahl">2</span>
+            <button class="knopf still klein" type="button" style="margin-left: auto">＋</button>
+          </div>
+          <ul class="faden-liste">
+            <li class="faden">
+              <span class="haken"></span>
+              <span>Bewehrung: Q188 oder Q257? Statiker fragen.</span>
+            </li>
+            <li class="faden">
+              <span class="haken"></span>
+              <span>Beton bestellen, sobald drei trockene Tage kommen.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Was ansteht</span></div>
+          <ul class="termin-liste">
+            <li class="termin"><span class="termin-tag">Do 18.</span><span>Statiker ruft zurück</span></li>
+            <li class="termin"><span class="termin-tag">KW 41</span><span>Betonlieferung frühestens</span></li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf">
+            <span class="karten-titel">Referenzen</span><span class="zahl">2</span>
+            <button class="knopf still klein" type="button" style="margin-left: auto">＋</button>
+          </div>
+          <ul class="ref-liste">
+            <li class="ref">
+              <svg class="ref-zeichen" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18c-4 1.5-4-2-6-2.5"/><path d="M15 21v-3.3a3 3 0 0 0-.8-2.3c2.6-.3 5.3-1.3 5.3-5.8a4.5 4.5 0 0 0-1.3-3.1 4.2 4.2 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.1 3 5.1 3.3 5.1 3.3a4.2 4.2 0 0 0-.1 3.2A4.5 4.5 0 0 0 3.7 9.6c0 4.5 2.7 5.5 5.3 5.8a3 3 0 0 0-.8 2.2V21"/></svg>
+              <span class="ref-ziel">github.com/phish3144/lotse</span>
+              <span class="ref-lage gut">erreichbar</span>
+            </li>
+            <li class="ref">
+              <svg class="ref-zeichen" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              <span class="ref-ziel">~/Bau/gartenhaus</span>
+              <span class="ref-lage gut">erreichbar</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf">
+            <span class="karten-titel">Zugänge</span><span class="zahl">1</span>
+            <button class="knopf still klein" type="button" style="margin-left: auto">＋</button>
+          </div>
+          <ul class="ref-liste">
+            <li class="ref">
+              <svg class="ref-zeichen" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              <span class="ref-ziel">Fritzbox Gartenhaus</span>
+              <span class="ref-lage still">••••••</span>
+            </li>
+          </ul>
+        </section>
+
+        <button class="knopf klein deuten" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg>
+          Datei deuten …
+        </button>
+
+      </aside>
+    </div>
+  </div>
+</div>

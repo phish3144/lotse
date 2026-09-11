@@ -29,3 +29,8 @@ Thumbs.db
 # Tauri
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/target
+
+# Entwurf: die zusammengesetzte Design-Leinwand ist 2,5 MB Werkzeug, kein Quelltext.
+# Die Quellen daneben (_*.css, _*.body.html, *.dc.html, canvas.json) bleiben im Repo,
+# damit ein neuer Rechner den Entwurf wieder zusammensetzen kann: .entwurf/_bau.sh
+.entwurf/lotse-oberflaeche.html

@@ -1,0 +1,102 @@
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .projektkopf {
+      display: flex; align-items: center; gap: 12px;
+      padding: 18px 0 14px; flex: none;
+    }
+    .projekt-titel { margin: 0; font-size: 27px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-meta { font-size: 12.5px; color: var(--gedaempft); }
+    .kopf-aktionen { margin-left: auto; display: flex; gap: 6px; }
+
+    .flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: minmax(0, 1fr) 366px; gap: 24px;
+      padding-bottom: 24px;
+    }
+    .spalte-haupt { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+    .spalte-neben { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+    /* Erfassung */
+    .erfassung {
+      border: 1px solid var(--rahmen); border-radius: 12px;
+      background: var(--flaeche); box-shadow: var(--schatten); flex: none;
+    }
+    .erfassung-feld { padding: 13px 15px 11px; color: var(--gedaempft); font-size: 14px; }
+    .erfassung-fuss {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 11px; border-top: 1px solid var(--rahmen-still);
+    }
+    .art-wahl { display: flex; gap: 4px; }
+    .art {
+      border: 1px solid transparent; background: transparent; color: var(--gedaempft);
+      border-radius: 7px; padding: 4px 9px; font-size: 12.5px;
+      font-family: inherit; cursor: pointer;
+    }
+    .art:hover { background: var(--flaeche-still); color: var(--fg); }
+    .art.gewaehlt { background: var(--flaeche-still); color: var(--fg); font-weight: 600; }
+    .erfassung-fuss .knopf { margin-left: auto; }
+
+    /* Logbuch-Leiste */
+    .logbuch-leiste { display: flex; align-items: center; gap: 8px; flex: none; padding: 2px 2px 0; }
+    .filter { margin-left: auto; display: flex; gap: 3px; }
+    .filter-chip {
+      border: none; background: transparent; color: var(--gedaempft);
+      border-radius: 999px; padding: 3px 10px; font-size: 12px;
+      font-family: inherit; cursor: pointer;
+    }
+    .filter-chip:hover { background: var(--flaeche-still); color: var(--fg); }
+    .filter-chip.gewaehlt { background: var(--fg); color: var(--flaeche); font-weight: 600; }
+
+    /* Strom */
+    .strom { flex: 1; min-height: 0; overflow: hidden; padding-left: 3px; position: relative; }
+    .strom::before {
+      content: ''; position: absolute; left: 7px; top: 12px; bottom: 0;
+      width: 1px; background: var(--rahmen);
+    }
+    .tagmarke {
+      display: flex; align-items: center; gap: 10px;
+      margin: 16px 0 8px; position: relative;
+    }
+    .tagmarke:first-child { margin-top: 4px; }
+    .tagmarke span {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+      background: var(--grund); padding-right: 10px; padding-left: 26px;
+    }
+    .eintrag { display: flex; gap: 14px; padding: 7px 0 7px 0; position: relative; }
+    .eintrag-punkt {
+      width: 9px; height: 9px; border-radius: 50%; flex: none;
+      margin: 6px 0 0 3px; outline: 3px solid var(--grund);
+    }
+    .eintrag-leib { min-width: 0; }
+    .eintrag-text { margin: 0; font-size: 14.5px; line-height: 1.5; }
+    .eintrag-fuss { display: flex; align-items: baseline; gap: 9px; margin-top: 3px; }
+    .zeit { font-size: 11.5px; color: var(--gedaempft); font-variant-numeric: tabular-nums; }
+    .datei {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px;
+      background: var(--flaeche-still); border-radius: 4px; padding: 1px 5px;
+    }
+    .verblassend { opacity: 0.55; }
+
+    /* Nebenspalte */
+    .kurs-karte { border-left: 3px solid var(--feuer); }
+    .kurs-text { margin: 7px 14px 14px; font-size: 15.5px; line-height: 1.45; }
+
+    .faden-liste, .ref-liste, .termin-liste { list-style: none; margin: 8px 0 12px; padding: 0 14px; display: flex; flex-direction: column; gap: 9px; }
+    .faden { display: flex; gap: 10px; font-size: 13.5px; line-height: 1.4; align-items: flex-start; }
+    .haken {
+      width: 15px; height: 15px; border: 1.5px solid var(--rahmen);
+      border-radius: 5px; flex: none; margin-top: 2px;
+    }
+    .termin { display: flex; gap: 10px; font-size: 13.5px; align-items: baseline; }
+    .termin-tag { font-weight: 600; color: var(--gedaempft); font-size: 12px; min-width: 44px; }
+
+    .ref { display: flex; align-items: center; gap: 9px; font-size: 13px; min-width: 0; }
+    .ref-zeichen { color: var(--gedaempft); flex: none; }
+    .ref-ziel {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px;
+    }
+    .ref-lage { margin-left: auto; font-size: 11px; font-weight: 600; flex: none; }
+    .ref-lage.gut { color: var(--ruhig); }
+    .ref-lage.still { color: var(--gedaempft); letter-spacing: 0.1em; }
+    .deuten { justify-content: center; color: var(--gedaempft); border-style: dashed; }

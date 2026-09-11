@@ -1,0 +1,61 @@
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .seitenkopf { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 16px; flex: none; }
+    .seiten-titel { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-meta { font-size: 12.5px; color: var(--gedaempft); }
+    .kopf-aktionen { margin-left: auto; display: flex; gap: 6px; align-self: center; }
+
+    .hafen-flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: minmax(0, 1fr) 366px; gap: 24px; padding-bottom: 24px;
+      overflow: hidden;
+    }
+    .hafen-haupt { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+    .hafen-neben { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+    .block-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .block-hinweis { font-size: 12.5px; color: var(--gedaempft); margin-left: 4px; }
+    .zuklappbar { color: var(--gedaempft); cursor: pointer; }
+    .raster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+    .projektkarte {
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 12px;
+      padding: 13px 14px 11px; text-decoration: none; color: inherit;
+      box-shadow: var(--schatten); min-width: 0;
+    }
+    .projektkarte:hover { border-color: var(--akzent); }
+    .projektkarte.dringend { border-left: 3px solid var(--ueberfaellig); }
+    .pk-kopf { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .pk-titel {
+      font-weight: 600; font-size: 15px; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pk-alter { margin-left: auto; font-size: 11.5px; color: var(--gedaempft); flex: none; }
+    .pk-kurs { margin: 0; font-size: 13px; color: var(--gedaempft); line-height: 1.4; }
+    .pk-notiz {
+      margin: 2px 0 0; font-size: 13px; line-height: 1.4;
+      padding-top: 8px; border-top: 1px solid var(--rahmen-still);
+    }
+    .pk-fuss { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .faden-zahl { font-size: 11.5px; color: var(--gedaempft); font-weight: 600; }
+    .lage.klein-lage { margin-left: auto; font-size: 11px; padding: 2px 8px; }
+
+    .einfahrt { border-left: 3px solid var(--feuer); }
+    .einfahrt-text { margin: 6px 14px 10px; font-size: 12.5px; color: var(--gedaempft); line-height: 1.4; }
+    .kandidaten { list-style: none; margin: 0 0 12px; padding: 0 14px; display: flex; flex-direction: column; gap: 10px; }
+    .kandidat { display: flex; flex-direction: column; gap: 7px; }
+    .kandidat-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .kandidat-name { font-weight: 600; font-size: 13.5px; }
+    .kandidat-pfad {
+      font-size: 11.5px; color: var(--gedaempft);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .kandidat-knoepfe { display: flex; gap: 5px; }
+    .ref-liste { list-style: none; margin: 8px 0 12px; padding: 0 14px; display: flex; flex-direction: column; gap: 8px; }
+    .post { font-size: 13.5px; padding-left: 14px; position: relative; line-height: 1.4; }
+    .post::before {
+      content: ''; position: absolute; left: 0; top: 8px;
+      width: 5px; height: 5px; border-radius: 50%; background: var(--rahmen);
+    }
+    .ideen { opacity: 0.75; }

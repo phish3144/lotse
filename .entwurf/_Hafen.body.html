@@ -1,0 +1,172 @@
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" class="aktiv">Hafen</a>
+      <a href="#">Offene Punkte</a>
+      <a href="#">Tresor</a>
+      <a href="#">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn hafen-bahn">
+
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Hafen</h1>
+      <span class="kopf-meta">6 Vorhaben · 4 offene Fäden</span>
+      <div class="kopf-aktionen">
+        <button class="knopf klein" type="button">Ordner durchsuchen</button>
+        <button class="knopf leuchte klein" type="button">＋ Neues Projekt</button>
+      </div>
+    </div>
+
+    <div class="hafen-flaeche">
+      <div class="hafen-haupt">
+
+        <section class="block">
+          <div class="block-kopf">
+            <span class="karten-titel">Heute wichtig</span>
+            <span class="zahl">2</span>
+          </div>
+          <div class="raster">
+            <a class="projektkarte dringend" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ueberfaellig)"></span>
+                <span class="pk-titel">Website Krause</span>
+                <span class="pk-alter">19 T</span>
+              </div>
+              <p class="pk-kurs">Entwurf abgestimmt, dann Umsetzung bis Ende Oktober.</p>
+              <p class="pk-notiz">Entwurf geschickt, warte auf Rückmeldung</p>
+              <div class="pk-fuss"><span class="faden-zahl">0 offen</span><span class="lage klein-lage">Wartet</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--auffaellig)"></span>
+                <span class="pk-titel">Gartenhaus</span>
+                <span class="pk-alter">heute</span>
+              </div>
+              <p class="pk-kurs">Fundament bis Oktober. Danach Winterpause.</p>
+              <p class="pk-notiz">Schalung geprüft, zwei Bretter ersetzt</p>
+              <div class="pk-fuss"><span class="faden-zahl">2 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-kopf">
+            <span class="karten-titel">Auf See</span>
+            <span class="zahl">3</span>
+          </div>
+          <div class="raster">
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ruhig)"></span>
+                <span class="pk-titel">Lotse</span>
+                <span class="pk-alter">heute</span>
+              </div>
+              <p class="pk-kurs">v0.4 draußen. Als Nächstes die Oberfläche.</p>
+              <p class="pk-notiz">3 Commits · MCP-Zugang gebaut</p>
+              <div class="pk-fuss"><span class="faden-zahl">1 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ruhig)"></span>
+                <span class="pk-titel">Lampe ESP32</span>
+                <span class="pk-alter">2 T</span>
+              </div>
+              <p class="pk-kurs">Dimmen über Taster, dann Gehäuse drucken.</p>
+              <p class="pk-notiz">Taster hängt jetzt an GPIO 4</p>
+              <div class="pk-fuss"><span class="faden-zahl">1 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--gedaempft)"></span>
+                <span class="pk-titel">Steuer 2026</span>
+                <span class="pk-alter">9 T</span>
+              </div>
+              <p class="pk-kurs">Belege sortieren, dann Abgabe im Mai.</p>
+              <p class="pk-notiz">Handwerkerrechnungen abgelegt</p>
+              <div class="pk-fuss"><span class="faden-zahl">0 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-kopf zuklappbar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="karten-titel">Vor Anker</span>
+            <span class="zahl">2</span>
+            <span class="block-hinweis">Getränkekasse · Balkonkraftwerk</span>
+          </div>
+        </section>
+
+      </div>
+
+      <aside class="hafen-neben">
+        <section class="karte einfahrt">
+          <div class="karten-kopf">
+            <span class="karten-titel">Hafeneinfahrt</span><span class="zahl">2</span>
+          </div>
+          <p class="einfahrt-text">Beim Beobachten gefunden. Nichts davon ist übernommen.</p>
+          <ul class="kandidaten">
+            <li class="kandidat">
+              <div class="kandidat-text">
+                <span class="kandidat-name">wetterstation</span>
+                <span class="kandidat-pfad">~/code/wetterstation · .git, Cargo.toml</span>
+              </div>
+              <div class="kandidat-knoepfe">
+                <button class="knopf still klein" type="button">Verwerfen</button>
+                <button class="knopf klein" type="button">Übernehmen</button>
+              </div>
+            </li>
+            <li class="kandidat">
+              <div class="kandidat-text">
+                <span class="kandidat-name">Hochbeet</span>
+                <span class="kandidat-pfad">~/Bau/hochbeet · README.md</span>
+              </div>
+              <div class="kandidat-knoepfe">
+                <button class="knopf still klein" type="button">Verwerfen</button>
+                <button class="knopf klein" type="button">Übernehmen</button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Postkorb</span><span class="zahl">3</span></div>
+          <ul class="ref-liste postkorb">
+            <li class="post">Schrauben M6 nachkaufen</li>
+            <li class="post">Nachbarn wegen Zaun fragen</li>
+            <li class="post">Kabeltrommel zurückgeben</li>
+          </ul>
+        </section>
+
+        <section class="karte ideen">
+          <div class="karten-kopf"><span class="karten-titel">Ideen</span><span class="zahl">4</span></div>
+          <p class="einfahrt-text">Noch kein Kurs gesetzt. Liegen still, bis du sie anfasst.</p>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>

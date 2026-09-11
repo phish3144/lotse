@@ -1,0 +1,368 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Palette aus dem Logo: Marine #14304a, Bernstein #f2b544, Pergament,
+       Stahlblau #2e5f7a (die Wellen). Keine Fremd-Fonts – CLAUDE.md verbietet
+       CDNs in apps/web; die Serife fürs Logbuch ist eine System-Serife. */
+    .wurzel {
+      --grund: #f4efe4;
+      --flaeche: #fffdf7;
+      --flaeche-still: #efe9db;
+      --fg: #14304a;
+      --gedaempft: #5b6b78;
+      --rahmen: #e0d7c4;
+      --rahmen-still: #ece5d6;
+      --akzent: #2e5f7a;
+      --feuer: #f2b544;
+      --feuer-tief: #8a6212;
+      --ruhig: #3f7d5c;
+      --auffaellig: #c8873a;
+      --ueberfaellig: #b0392f;
+      --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
+    }
+    .wurzel.dunkel {
+      --grund: #0b1b2b;
+      --flaeche: #14263a;
+      --flaeche-still: #102032;
+      --fg: #e8e1d1;
+      --gedaempft: #93a7b8;
+      --rahmen: #24405a;
+      --rahmen-still: #1b3349;
+      --akzent: #7fb4d4;
+      --feuer: #f2b544;
+      --feuer-tief: #f2b544;
+      --ruhig: #7bc28c;
+      --auffaellig: #d9a441;
+      --ueberfaellig: #e0685c;
+      --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    body { margin: 0; }
+    a { color: var(--akzent); }
+    a:hover { color: var(--fg); }
+    .wurzel {
+      width: 1440px; height: 900px; overflow: hidden;
+      background: var(--grund); color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px; line-height: 1.45;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serife { font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+
+    /* ---- Kopfleiste ---- */
+    .leiste {
+      display: flex; align-items: center; gap: 28px;
+      padding: 0 28px; height: 56px; flex: none;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .marke { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .navi { display: flex; gap: 4px; }
+    .navi a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 6px 11px; border-radius: 7px;
+    }
+    .navi a:hover { color: var(--fg); background: var(--flaeche-still); }
+    .navi a.aktiv { color: var(--fg); font-weight: 600; background: var(--flaeche-still); }
+    .leiste-rechts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .suchfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 6px 10px; width: 210px; color: var(--gedaempft);
+      font-size: 13px; background: var(--grund);
+    }
+    .taste {
+      font-size: 10.5px; border: 1px solid var(--rahmen); border-radius: 4px;
+      padding: 1px 4px; margin-left: auto; color: var(--gedaempft);
+    }
+
+    /* ---- Knöpfe ---- */
+    .knopf {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--rahmen); background: var(--flaeche);
+      color: var(--fg); border-radius: 8px; padding: 0 12px; height: 34px;
+      font-size: 13.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .knopf:hover { border-color: var(--akzent); }
+    .knopf.leuchte {
+      background: var(--feuer); border-color: var(--feuer);
+      color: #14304a; font-weight: 600;
+    }
+    .knopf.still { border-color: transparent; background: transparent; color: var(--gedaempft); }
+    .knopf.still:hover { background: var(--flaeche-still); color: var(--fg); }
+    .knopf.klein { height: 28px; font-size: 12.5px; padding: 0 9px; border-radius: 7px; }
+
+    /* ---- Karten ---- */
+    .karte {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; box-shadow: var(--schatten);
+    }
+    .karten-kopf {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px 0;
+    }
+    .karten-titel {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .zahl {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      background: var(--flaeche-still); border-radius: 999px; padding: 1px 7px;
+    }
+
+    /* ---- Marken und Punkte ---- */
+    .punkt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .lage {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; border-radius: 999px;
+      padding: 3px 10px 3px 8px; border: 1px solid var(--rahmen);
+      background: var(--flaeche-still);
+    }
+    .quelle {
+      font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--gedaempft); font-weight: 600;
+    }
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .seitenkopf { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 16px; flex: none; }
+    .seiten-titel { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-meta { font-size: 12.5px; color: var(--gedaempft); }
+    .kopf-aktionen { margin-left: auto; display: flex; gap: 6px; align-self: center; }
+
+    .hafen-flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: minmax(0, 1fr) 366px; gap: 24px; padding-bottom: 24px;
+      overflow: hidden;
+    }
+    .hafen-haupt { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+    .hafen-neben { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+    .block-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .block-hinweis { font-size: 12.5px; color: var(--gedaempft); margin-left: 4px; }
+    .zuklappbar { color: var(--gedaempft); cursor: pointer; }
+    .raster { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+    .projektkarte {
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--flaeche); border: 1px solid var(--rahmen); border-radius: 12px;
+      padding: 13px 14px 11px; text-decoration: none; color: inherit;
+      box-shadow: var(--schatten); min-width: 0;
+    }
+    .projektkarte:hover { border-color: var(--akzent); }
+    .projektkarte.dringend { border-left: 3px solid var(--ueberfaellig); }
+    .pk-kopf { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .pk-titel {
+      font-weight: 600; font-size: 15px; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pk-alter { margin-left: auto; font-size: 11.5px; color: var(--gedaempft); flex: none; }
+    .pk-kurs { margin: 0; font-size: 13px; color: var(--gedaempft); line-height: 1.4; }
+    .pk-notiz {
+      margin: 2px 0 0; font-size: 13px; line-height: 1.4;
+      padding-top: 8px; border-top: 1px solid var(--rahmen-still);
+    }
+    .pk-fuss { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .faden-zahl { font-size: 11.5px; color: var(--gedaempft); font-weight: 600; }
+    .lage.klein-lage { margin-left: auto; font-size: 11px; padding: 2px 8px; }
+
+    .einfahrt { border-left: 3px solid var(--feuer); }
+    .einfahrt-text { margin: 6px 14px 10px; font-size: 12.5px; color: var(--gedaempft); line-height: 1.4; }
+    .kandidaten { list-style: none; margin: 0 0 12px; padding: 0 14px; display: flex; flex-direction: column; gap: 10px; }
+    .kandidat { display: flex; flex-direction: column; gap: 7px; }
+    .kandidat-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .kandidat-name { font-weight: 600; font-size: 13.5px; }
+    .kandidat-pfad {
+      font-size: 11.5px; color: var(--gedaempft);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .kandidat-knoepfe { display: flex; gap: 5px; }
+    .ref-liste { list-style: none; margin: 8px 0 12px; padding: 0 14px; display: flex; flex-direction: column; gap: 8px; }
+    .post { font-size: 13.5px; padding-left: 14px; position: relative; line-height: 1.4; }
+    .post::before {
+      content: ''; position: absolute; left: 0; top: 8px;
+      width: 5px; height: 5px; border-radius: 50%; background: var(--rahmen);
+    }
+    .ideen { opacity: 0.75; }
+  </style>
+</helmet>
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" class="aktiv">Hafen</a>
+      <a href="#">Offene Punkte</a>
+      <a href="#">Tresor</a>
+      <a href="#">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn hafen-bahn">
+
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Hafen</h1>
+      <span class="kopf-meta">6 Vorhaben · 4 offene Fäden</span>
+      <div class="kopf-aktionen">
+        <button class="knopf klein" type="button">Ordner durchsuchen</button>
+        <button class="knopf leuchte klein" type="button">＋ Neues Projekt</button>
+      </div>
+    </div>
+
+    <div class="hafen-flaeche">
+      <div class="hafen-haupt">
+
+        <section class="block">
+          <div class="block-kopf">
+            <span class="karten-titel">Heute wichtig</span>
+            <span class="zahl">2</span>
+          </div>
+          <div class="raster">
+            <a class="projektkarte dringend" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ueberfaellig)"></span>
+                <span class="pk-titel">Website Krause</span>
+                <span class="pk-alter">19 T</span>
+              </div>
+              <p class="pk-kurs">Entwurf abgestimmt, dann Umsetzung bis Ende Oktober.</p>
+              <p class="pk-notiz">Entwurf geschickt, warte auf Rückmeldung</p>
+              <div class="pk-fuss"><span class="faden-zahl">0 offen</span><span class="lage klein-lage">Wartet</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--auffaellig)"></span>
+                <span class="pk-titel">Gartenhaus</span>
+                <span class="pk-alter">heute</span>
+              </div>
+              <p class="pk-kurs">Fundament bis Oktober. Danach Winterpause.</p>
+              <p class="pk-notiz">Schalung geprüft, zwei Bretter ersetzt</p>
+              <div class="pk-fuss"><span class="faden-zahl">2 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-kopf">
+            <span class="karten-titel">Auf See</span>
+            <span class="zahl">3</span>
+          </div>
+          <div class="raster">
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ruhig)"></span>
+                <span class="pk-titel">Lotse</span>
+                <span class="pk-alter">heute</span>
+              </div>
+              <p class="pk-kurs">v0.4 draußen. Als Nächstes die Oberfläche.</p>
+              <p class="pk-notiz">3 Commits · MCP-Zugang gebaut</p>
+              <div class="pk-fuss"><span class="faden-zahl">1 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--ruhig)"></span>
+                <span class="pk-titel">Lampe ESP32</span>
+                <span class="pk-alter">2 T</span>
+              </div>
+              <p class="pk-kurs">Dimmen über Taster, dann Gehäuse drucken.</p>
+              <p class="pk-notiz">Taster hängt jetzt an GPIO 4</p>
+              <div class="pk-fuss"><span class="faden-zahl">1 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+            <a class="projektkarte" href="#">
+              <div class="pk-kopf">
+                <span class="punkt" style="background: var(--gedaempft)"></span>
+                <span class="pk-titel">Steuer 2026</span>
+                <span class="pk-alter">9 T</span>
+              </div>
+              <p class="pk-kurs">Belege sortieren, dann Abgabe im Mai.</p>
+              <p class="pk-notiz">Handwerkerrechnungen abgelegt</p>
+              <div class="pk-fuss"><span class="faden-zahl">0 offen</span><span class="lage klein-lage">Aktiv</span></div>
+            </a>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block-kopf zuklappbar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="karten-titel">Vor Anker</span>
+            <span class="zahl">2</span>
+            <span class="block-hinweis">Getränkekasse · Balkonkraftwerk</span>
+          </div>
+        </section>
+
+      </div>
+
+      <aside class="hafen-neben">
+        <section class="karte einfahrt">
+          <div class="karten-kopf">
+            <span class="karten-titel">Hafeneinfahrt</span><span class="zahl">2</span>
+          </div>
+          <p class="einfahrt-text">Beim Beobachten gefunden. Nichts davon ist übernommen.</p>
+          <ul class="kandidaten">
+            <li class="kandidat">
+              <div class="kandidat-text">
+                <span class="kandidat-name">wetterstation</span>
+                <span class="kandidat-pfad">~/code/wetterstation · .git, Cargo.toml</span>
+              </div>
+              <div class="kandidat-knoepfe">
+                <button class="knopf still klein" type="button">Verwerfen</button>
+                <button class="knopf klein" type="button">Übernehmen</button>
+              </div>
+            </li>
+            <li class="kandidat">
+              <div class="kandidat-text">
+                <span class="kandidat-name">Hochbeet</span>
+                <span class="kandidat-pfad">~/Bau/hochbeet · README.md</span>
+              </div>
+              <div class="kandidat-knoepfe">
+                <button class="knopf still klein" type="button">Verwerfen</button>
+                <button class="knopf klein" type="button">Übernehmen</button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Postkorb</span><span class="zahl">3</span></div>
+          <ul class="ref-liste postkorb">
+            <li class="post">Schrauben M6 nachkaufen</li>
+            <li class="post">Nachbarn wegen Zaun fragen</li>
+            <li class="post">Kabeltrommel zurückgeben</li>
+          </ul>
+        </section>
+
+        <section class="karte ideen">
+          <div class="karten-kopf"><span class="karten-titel">Ideen</span><span class="zahl">4</span></div>
+          <p class="einfahrt-text">Noch kein Kurs gesetzt. Liegen still, bis du sie anfasst.</p>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

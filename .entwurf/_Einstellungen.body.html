@@ -1,0 +1,131 @@
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" class="aktiv">Hafen</a>
+      <a href="#">Offene Punkte</a>
+      <a href="#">Tresor</a>
+      <a href="#">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn">
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Einstellungen</h1>
+      <div class="kopf-aktionen">
+        <button class="knopf still klein" type="button">Sperren</button>
+      </div>
+    </div>
+
+    <div class="einst-flaeche">
+      <nav class="reiter">
+        <a href="#">Ordner</a>
+        <a href="#" class="aktiv">Verbindungen</a>
+        <a href="#">Abgleich</a>
+        <a href="#">KI</a>
+        <a href="#">Export</a>
+        <a href="#">Sicherheit</a>
+        <a href="#">Version</a>
+      </nav>
+
+      <div class="einst-inhalt">
+
+        <section class="karte block-karte">
+          <div class="karten-kopf"><span class="karten-titel">GitHub und GitLab</span></div>
+          <p class="erklaerung">
+            Holt zu Projekten mit einem Repo auf der Gegenseite, was der lokale Git-Log nicht
+            weiß: offene Pull Requests, die Zahl offener Issues und ob der Prüflauf rot ist.
+            Eine verdichtete Zeile im Logbuch – Issues werden nie zu offenen Fäden.
+          </p>
+
+          <div class="verbindung">
+            <span class="v-marke">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18c-4 1.5-4-2-6-2.5"/><path d="M15 21v-3.3a3 3 0 0 0-.8-2.3c2.6-.3 5.3-1.3 5.3-5.8a4.5 4.5 0 0 0-1.3-3.1 4.2 4.2 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.1 3 5.1 3.3 5.1 3.3a4.2 4.2 0 0 0-.1 3.2A4.5 4.5 0 0 0 3.7 9.6c0 4.5 2.7 5.5 5.3 5.8a3 3 0 0 0-.8 2.2V21"/></svg>
+              GitHub
+            </span>
+            <span class="v-lage verbunden">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+              Verbunden
+            </span>
+            <span class="v-hinweis">Token liegt im Tresor. Private Repos sind erreichbar.</span>
+            <button class="knopf klein" type="button">Trennen</button>
+          </div>
+
+          <div class="verbindung">
+            <span class="v-marke">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 21 3.2 14.6a.9.9 0 0 1-.3-1L4.4 9 6.3 3.4a.5.5 0 0 1 .9 0L9.1 9h5.8l1.9-5.6a.5.5 0 0 1 .9 0L19.6 9l1.5 4.6a.9.9 0 0 1-.3 1z"/></svg>
+              GitLab
+            </span>
+            <input class="v-feld" type="password" placeholder="Token einfügen" value="" />
+            <button class="knopf leuchte klein" type="button">Verbinden</button>
+            <button class="knopf still klein" type="button">Token erstellen …</button>
+          </div>
+          <p class="v-fuss">Bereich „read_api" genügt. Ohne Token gehen nur öffentliche Repos, und nur wenige Abfragen pro Stunde.</p>
+
+          <div class="trenner"></div>
+
+          <div class="karten-kopf" style="padding-top: 0">
+            <span class="karten-titel">Verbundene Projekte</span><span class="zahl">2</span>
+          </div>
+          <ul class="repo-liste">
+            <li class="repo">
+              <span class="repo-projekt">Lotse</span>
+              <span class="repo-ziel">github.com/phish3144/lotse</span>
+              <span class="repo-ci gruen">Prüflauf grün</span>
+            </li>
+            <li class="repo">
+              <span class="repo-projekt">Lampe ESP32</span>
+              <span class="repo-ziel">github.com/phish3144/esp-lampe</span>
+              <span class="repo-ci">aus dem Ordner erkannt</span>
+            </li>
+          </ul>
+
+          <label class="schalter">
+            <span class="schiene an"><span class="knauf"></span></span>
+            Mit dem Ordner-Beobachter mitlaufen lassen
+          </label>
+          <p class="v-fuss">Höchstens alle 30 Minuten, damit das Kontingent reicht. Zuletzt: heute 09:48.</p>
+        </section>
+
+        <section class="karte block-karte">
+          <div class="karten-kopf">
+            <span class="karten-titel">Zugang für Assistenten</span>
+            <span class="lage klein-lage" style="margin-left: auto"><span class="punkt" style="background: var(--ruhig)"></span>Offen</span>
+          </div>
+          <p class="erklaerung">
+            Ein Assistent liest Projektkontext und schreibt ins Logbuch. Hört nur auf diesem
+            Rechner und schließt sich, sobald Lotse sperrt. Der Tresor bleibt außen vor.
+          </p>
+          <div class="verbindung">
+            <span class="v-marke">Adresse</span>
+            <code class="v-code">http://127.0.0.1:7457/mcp</code>
+            <button class="knopf klein" type="button">Befehl kopieren</button>
+            <button class="knopf klein" type="button">Schließen</button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>

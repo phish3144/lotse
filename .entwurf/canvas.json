@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Projektseite — Arbeitsfläche" },
+    { "file": "Hafen.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Hafen" },
+    { "file": "Einstellungen.dc.html", "x": 0, "y": 1060, "w": 1440, "h": 900, "title": "Einstellungen — Verbindungen" },
+    { "file": "Palette.dc.html", "x": 1560, "y": 1060, "w": 1440, "h": 980, "title": "Farben und Bausteine" }
+  ],
+  "annotations": [
+    { "id": "warum-zwei", "x": 0, "y": -150, "w": 460, "text": "Das Logbuch ist die Seite. Kurs, Fäden, Referenzen und Zugänge stehen daneben statt darunter — man sieht alles auf einmal, ohne zu scrollen.\n\nDie Erklärtexte sind raus: „Datei deuten\" ist jetzt ein Knopf, kein Absatz." },
+    { "id": "warum-farben", "x": 1560, "y": -150, "w": 460, "text": "Bernstein #f2b544 trägt genau eine Handlung je Ansicht (hier „Neues Projekt\") und die Statuspunkte. Sonst nichts — sonst ist es kein Leuchtfeuer mehr.\n\nDer Punkt links an der Karte ersetzt den alten Auffälligkeits-Punkt." },
+    { "id": "warum-connector", "x": 0, "y": 2000, "w": 460, "text": "Der neue Connector, wie er seit heute im Code steht: ein Feld, ein Knopf. Den Tresor-Eintrag legt Lotse selbst an.\n\nDie Einstellungen sind in Reiter zerlegt — vorher waren es 1234 Zeilen auf einer Seite." },
+    { "id": "warum-palette", "x": 1560, "y": 2080, "w": 460, "text": "Jeder Wert stammt aus icon.svg. Keine Fremd-Font: CLAUDE.md verbietet CDNs in apps/web, deshalb System-Serife fürs Logbuch und system-ui für den Rest." }
+  ],
+  "launch": { "view": "canvas" }
+}
