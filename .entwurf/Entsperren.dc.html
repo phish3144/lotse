@@ -1,0 +1,242 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Palette aus dem Logo: Marine #14304a, Bernstein #f2b544, Pergament,
+       Stahlblau #2e5f7a (die Wellen). Keine Fremd-Fonts – CLAUDE.md verbietet
+       CDNs in apps/web; die Serife fürs Logbuch ist eine System-Serife. */
+    .wurzel {
+      --grund: #f4efe4;
+      --flaeche: #fffdf7;
+      --flaeche-still: #efe9db;
+      --fg: #14304a;
+      --gedaempft: #5b6b78;
+      --rahmen: #e0d7c4;
+      --rahmen-still: #ece5d6;
+      --akzent: #2e5f7a;
+      --feuer: #f2b544;
+      --feuer-tief: #8a6212;
+      --ruhig: #3f7d5c;
+      --auffaellig: #c8873a;
+      --ueberfaellig: #b0392f;
+      --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
+    }
+    .wurzel.dunkel {
+      --grund: #0b1b2b;
+      --flaeche: #14263a;
+      --flaeche-still: #102032;
+      --fg: #e8e1d1;
+      --gedaempft: #93a7b8;
+      --rahmen: #24405a;
+      --rahmen-still: #1b3349;
+      --akzent: #7fb4d4;
+      --feuer: #f2b544;
+      --feuer-tief: #f2b544;
+      --ruhig: #7bc28c;
+      --auffaellig: #d9a441;
+      --ueberfaellig: #e0685c;
+      --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    body { margin: 0; }
+    a { color: var(--akzent); }
+    a:hover { color: var(--fg); }
+    .wurzel {
+      width: 1440px; height: 900px; overflow: hidden;
+      background: var(--grund); color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px; line-height: 1.45;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serife { font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+
+    /* ---- Kopfleiste ---- */
+    .leiste {
+      display: flex; align-items: center; gap: 28px;
+      padding: 0 28px; height: 56px; flex: none;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .marke { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .navi { display: flex; gap: 4px; }
+    .navi a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 6px 11px; border-radius: 7px;
+    }
+    .navi a:hover { color: var(--fg); background: var(--flaeche-still); }
+    .navi a.aktiv { color: var(--fg); font-weight: 600; background: var(--flaeche-still); }
+    .leiste-rechts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .suchfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 6px 10px; width: 210px; color: var(--gedaempft);
+      font-size: 13px; background: var(--grund);
+    }
+    .taste {
+      font-size: 10.5px; border: 1px solid var(--rahmen); border-radius: 4px;
+      padding: 1px 4px; margin-left: auto; color: var(--gedaempft);
+    }
+
+    /* ---- Knöpfe ---- */
+    .knopf {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--rahmen); background: var(--flaeche);
+      color: var(--fg); border-radius: 8px; padding: 0 12px; height: 34px;
+      font-size: 13.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .knopf:hover { border-color: var(--akzent); }
+    .knopf.leuchte {
+      background: var(--feuer); border-color: var(--feuer);
+      color: #14304a; font-weight: 600;
+    }
+    .knopf.still { border-color: transparent; background: transparent; color: var(--gedaempft); }
+    .knopf.still:hover { background: var(--flaeche-still); color: var(--fg); }
+    .knopf.klein { height: 28px; font-size: 12.5px; padding: 0 9px; border-radius: 7px; }
+
+    /* ---- Karten ---- */
+    .karte {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; box-shadow: var(--schatten);
+    }
+    .karten-kopf {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px 0;
+    }
+    .karten-titel {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .zahl {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      background: var(--flaeche-still); border-radius: 999px; padding: 1px 7px;
+    }
+
+    /* ---- Marken und Punkte ---- */
+    .punkt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .lage {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; border-radius: 999px;
+      padding: 3px 10px 3px 8px; border: 1px solid var(--rahmen);
+      background: var(--flaeche-still);
+    }
+    .quelle {
+      font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--gedaempft); font-weight: 600;
+    }
+    /* Die Tür ist der eine Ort, an dem das Marineblau die Fläche ist – auch im hellen
+       Thema. Draußen ist es Nacht, drinnen brennt das Licht; und niemand liest hier
+       lange Texte, also kostet der dunkle Grund nichts. */
+    .tuer {
+      background: linear-gradient(175deg, #14304a 0%, #0b1b2b 62%, #081521 100%);
+      color: #e8e1d1;
+      position: relative;
+      align-items: center;
+      justify-content: center;
+    }
+    .hafenbild { position: absolute; inset: 0; pointer-events: none; }
+    .hafenbild svg { width: 100%; height: 100%; display: block; }
+
+    .tuer-inhalt {
+      position: relative;
+      width: 420px;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+      margin-top: -40px;
+    }
+    .marke-gross { border-radius: 16px; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.42); }
+    .tuer-titel { margin: 22px 0 4px; font-size: 30px; font-weight: 600; letter-spacing: -0.015em; }
+    .tuer-unter { margin: 0 0 30px; font-size: 13.5px; color: #8fa8bd; }
+
+    .tuer-formular { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .tuer-feld { display: flex; flex-direction: column; gap: 7px; text-align: left; }
+    .tuer-feld > span { font-size: 12px; color: #8fa8bd; letter-spacing: 0.03em; }
+    .tuer-eingabe {
+      display: flex; align-items: center;
+      height: 46px; padding: 0 15px;
+      border: 1px solid #2c4b68; border-radius: 10px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+    .tuer-eingabe .punkte {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      letter-spacing: 0.22em; font-size: 15px;
+    }
+    .karett { width: 2px; height: 20px; background: #f2b544; margin-left: 3px; }
+
+    .knopf.gross { height: 46px; font-size: 15px; justify-content: center; border-radius: 10px; }
+    .knopf.leise {
+      border-color: transparent; background: transparent; color: #8fa8bd;
+      justify-content: center; font-size: 12.5px; height: 30px; margin-top: 2px;
+    }
+    .knopf.leise:hover { color: #e8e1d1; }
+
+    .tuer-fuss {
+      margin: 34px 0 0; font-size: 11.5px; line-height: 1.6;
+      color: #7d94a8; max-width: 400px;
+    }
+
+    .tuer-ecke {
+      position: absolute; left: 0; right: 0; bottom: 22px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      color: #5d7488;
+    }
+    .punkt-still { width: 3px; height: 3px; border-radius: 50%; background: #3d5a73; }
+  </style>
+</helmet>
+<div class="wurzel tuer">
+  <div class="hafenbild" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <g fill="none" stroke="#2e5f7a" stroke-width="2" opacity="0.45">
+        <path d="M-40 690 C 240 650, 420 740, 720 690 S 1200 630, 1480 700"/>
+        <path d="M-40 748 C 240 708, 420 798, 720 748 S 1200 688, 1480 758"/>
+        <path d="M-40 806 C 240 766, 420 856, 720 806 S 1200 746, 1480 816"/>
+      </g>
+      <g fill="none" stroke="#2e5f7a" stroke-width="1.5" opacity="0.22">
+        <path d="M-40 864 C 240 824, 420 914, 720 864 S 1200 804, 1480 874"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="tuer-inhalt">
+    <svg class="marke-gross" viewBox="0 0 256 256" width="64" height="64" aria-hidden="true">
+      <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b3d5c"/><stop offset="1" stop-color="#0b1b2b"/></linearGradient></defs>
+      <rect width="256" height="256" rx="56" fill="url(#tg)"/>
+      <g fill="none" stroke="#2e5f7a" stroke-width="8" opacity="0.8">
+        <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+        <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+      </g>
+      <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+      <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+    </svg>
+
+    <h1 class="tuer-titel serife">Lotse entsperren</h1>
+    <p class="tuer-unter">Gerät »Werkstatt-Mac«</p>
+
+    <div class="tuer-formular">
+      <label class="tuer-feld">
+        <span>Master-Passwort</span>
+        <div class="tuer-eingabe"><span class="punkte">••••••••••••••</span><span class="karett"></span></div>
+      </label>
+      <button class="knopf leuchte gross" type="button">Entsperren</button>
+      <button class="knopf leise" type="button">Passwort vergessen? Mit Wiederherstellungscode öffnen</button>
+    </div>
+
+    <p class="tuer-fuss">
+      Das Master-Passwort verlässt diesen Rechner nie. Es wird nicht geprüft, sondern zum
+      Schlüssel gerechnet – falsch heißt: die Daten bleiben unlesbar, nicht „Zugriff verweigert“.
+    </p>
+  </div>
+
+  <div class="tuer-ecke">
+    <span>v0.4.0</span>
+    <span class="punkt-still"></span>
+    <span>Alles liegt auf diesem Rechner</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

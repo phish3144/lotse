@@ -1,0 +1,106 @@
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" data-nav="hafen">Hafen</a>
+      <a href="#" data-nav="offen">Offene Punkte</a>
+      <a href="#" data-nav="tresor">Tresor</a>
+      <a href="#" data-nav="einstellungen">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn">
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Hafen</h1>
+      <div class="kopf-aktionen">
+        <button class="knopf" type="button">Erfassen</button>
+        <button class="knopf leuchte" type="button">＋ Neues Projekt</button>
+      </div>
+    </div>
+
+    <div class="leer-flaeche">
+      <div class="leer-mitte">
+        <svg class="leer-bild" viewBox="0 0 240 120" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.55">
+            <path d="M-10 84 C 40 72, 72 96, 120 84 S 200 70, 250 88"/>
+            <path d="M-10 100 C 40 88, 72 112, 120 100 S 200 86, 250 104"/>
+          </g>
+          <g fill="none" stroke="currentColor" stroke-width="1.8" opacity="0.85">
+            <path d="M120 24 v52"/>
+            <path d="M120 30 l34 16 -34 16 z" fill="currentColor" opacity="0.14"/>
+            <path d="M120 76 h-22 a8 8 0 0 0 0 8 h44 a8 8 0 0 0 0-8 z" opacity="0.5"/>
+          </g>
+        </svg>
+
+        <h2 class="leer-titel serife">Noch nichts an Bord.</h2>
+        <p class="leer-text">
+          Lotse merkt sich, was du getan hast und was als Nächstes dran ist – für alles, was
+          länger dauert als ein Nachmittag. Drei Wege hinein:
+        </p>
+
+        <ol class="wege">
+          <li class="weg">
+            <span class="weg-zahl">1</span>
+            <div>
+              <strong>Ordner durchsuchen lassen.</strong>
+              <span>
+                Lotse sucht nach Marken wie <code>.git</code>, <code>Cargo.toml</code> oder einer
+                README und schlägt vor, was es findet. Übernommen wird nichts von allein, und
+                Dateiinhalte liest es dabei nicht.
+              </span>
+              <button class="knopf klein" type="button">Ordner wählen …</button>
+            </div>
+          </li>
+          <li class="weg">
+            <span class="weg-zahl">2</span>
+            <div>
+              <strong>Ein Vorhaben von Hand anlegen.</strong>
+              <span>
+                Titel und ein Satz dazu, worum es geht. Das ist der Kurs – die eine Zeile, die
+                dir in drei Monaten sagt, was du eigentlich wolltest.
+              </span>
+              <button class="knopf klein" type="button">Neues Projekt …</button>
+            </div>
+          </li>
+          <li class="weg">
+            <span class="weg-zahl">3</span>
+            <div>
+              <strong>Einfach anfangen zu schreiben.</strong>
+              <span>
+                <kbd>⌘K</kbd> von überall. Ohne Zuordnung landet der Gedanke im Postkorb und
+                wartet dort, bis du weißt, wohin er gehört.
+              </span>
+            </div>
+          </li>
+        </ol>
+
+        <p class="leer-fuss">
+          Alles bleibt auf diesem Rechner, bis du den Abgleich einrichtest. Und wenn Lotse
+          morgen weg ist, kommst du trotzdem an alles: ein Befehl legt jedes Vorhaben als
+          Markdown ab.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

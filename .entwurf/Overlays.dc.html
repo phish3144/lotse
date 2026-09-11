@@ -1,0 +1,317 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Palette aus dem Logo: Marine #14304a, Bernstein #f2b544, Pergament,
+       Stahlblau #2e5f7a (die Wellen). Keine Fremd-Fonts – CLAUDE.md verbietet
+       CDNs in apps/web; die Serife fürs Logbuch ist eine System-Serife. */
+    .wurzel {
+      --grund: #f4efe4;
+      --flaeche: #fffdf7;
+      --flaeche-still: #efe9db;
+      --fg: #14304a;
+      --gedaempft: #5b6b78;
+      --rahmen: #e0d7c4;
+      --rahmen-still: #ece5d6;
+      --akzent: #2e5f7a;
+      --feuer: #f2b544;
+      --feuer-tief: #8a6212;
+      --ruhig: #3f7d5c;
+      --auffaellig: #c8873a;
+      --ueberfaellig: #b0392f;
+      --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
+    }
+    .wurzel.dunkel {
+      --grund: #0b1b2b;
+      --flaeche: #14263a;
+      --flaeche-still: #102032;
+      --fg: #e8e1d1;
+      --gedaempft: #93a7b8;
+      --rahmen: #24405a;
+      --rahmen-still: #1b3349;
+      --akzent: #7fb4d4;
+      --feuer: #f2b544;
+      --feuer-tief: #f2b544;
+      --ruhig: #7bc28c;
+      --auffaellig: #d9a441;
+      --ueberfaellig: #e0685c;
+      --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    body { margin: 0; }
+    a { color: var(--akzent); }
+    a:hover { color: var(--fg); }
+    .wurzel {
+      width: 1440px; height: 900px; overflow: hidden;
+      background: var(--grund); color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px; line-height: 1.45;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serife { font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+
+    /* ---- Kopfleiste ---- */
+    .leiste {
+      display: flex; align-items: center; gap: 28px;
+      padding: 0 28px; height: 56px; flex: none;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .marke { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .navi { display: flex; gap: 4px; }
+    .navi a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 6px 11px; border-radius: 7px;
+    }
+    .navi a:hover { color: var(--fg); background: var(--flaeche-still); }
+    .navi a.aktiv { color: var(--fg); font-weight: 600; background: var(--flaeche-still); }
+    .leiste-rechts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .suchfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 6px 10px; width: 210px; color: var(--gedaempft);
+      font-size: 13px; background: var(--grund);
+    }
+    .taste {
+      font-size: 10.5px; border: 1px solid var(--rahmen); border-radius: 4px;
+      padding: 1px 4px; margin-left: auto; color: var(--gedaempft);
+    }
+
+    /* ---- Knöpfe ---- */
+    .knopf {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--rahmen); background: var(--flaeche);
+      color: var(--fg); border-radius: 8px; padding: 0 12px; height: 34px;
+      font-size: 13.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .knopf:hover { border-color: var(--akzent); }
+    .knopf.leuchte {
+      background: var(--feuer); border-color: var(--feuer);
+      color: #14304a; font-weight: 600;
+    }
+    .knopf.still { border-color: transparent; background: transparent; color: var(--gedaempft); }
+    .knopf.still:hover { background: var(--flaeche-still); color: var(--fg); }
+    .knopf.klein { height: 28px; font-size: 12.5px; padding: 0 9px; border-radius: 7px; }
+
+    /* ---- Karten ---- */
+    .karte {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; box-shadow: var(--schatten);
+    }
+    .karten-kopf {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px 0;
+    }
+    .karten-titel {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .zahl {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      background: var(--flaeche-still); border-radius: 999px; padding: 1px 7px;
+    }
+
+    /* ---- Marken und Punkte ---- */
+    .punkt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .lage {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; border-radius: 999px;
+      padding: 3px 10px 3px 8px; border: 1px solid var(--rahmen);
+      background: var(--flaeche-still);
+    }
+    .quelle {
+      font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--gedaempft); font-weight: 600;
+    }
+    .ueber { position: relative; align-items: center; justify-content: center; }
+
+    /* Geisterseite: Formen ohne Inhalt, damit erkennbar bleibt, worüber die Dialoge
+       liegen, ohne dass man anfängt, sie zu lesen. */
+    .geisterseite { position: absolute; inset: 0; padding: 0 28px; }
+    .g-leiste {
+      display: flex; align-items: center; gap: 22px; height: 56px;
+      margin: 0 -28px; padding: 0 28px;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .g-marke { width: 74px; height: 15px; border-radius: 4px; background: var(--rahmen); }
+    .g-navi { width: 62px; height: 11px; border-radius: 4px; background: var(--rahmen-still); }
+    .g-werkzeug { margin-left: auto; width: 210px; height: 26px; border-radius: 8px; background: var(--rahmen-still); }
+    .g-kopfzeile { display: flex; align-items: center; margin-top: 26px; }
+    .g-titel { width: 168px; height: 24px; border-radius: 6px; background: var(--rahmen); }
+    .g-knopf { margin-left: auto; width: 128px; height: 30px; border-radius: 8px; background: var(--rahmen-still); }
+    .g-band { width: 118px; height: 10px; border-radius: 4px; background: var(--rahmen-still); margin: 22px 0 12px; }
+    .g-raster { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .g-karte {
+      height: 128px; border-radius: 12px;
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+    }
+    /* Die Rückwand dunkelt, statt zu verwischen: ein Weichzeichner über der ganzen Seite
+       kostet auf jedem Bild Rechenzeit und bringt hier nichts. */
+    .dunst { position: absolute; inset: 0; background: rgba(11, 27, 43, 0.55); }
+
+    .paar {
+      position: relative; display: grid; grid-template-columns: 1fr 1fr;
+      gap: 40px; width: 1140px; align-items: start; margin-top: -30px;
+    }
+    .spalte { min-width: 0; }
+    .beschriftung {
+      margin: 0 0 10px; font-size: 11.5px; letter-spacing: 0.06em;
+      text-transform: uppercase; font-weight: 700; color: #cdd8e0;
+    }
+    .beschriftung kbd {
+      font-family: inherit; text-transform: none; letter-spacing: 0;
+      border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 4px;
+      padding: 1px 5px; font-size: 10.5px;
+    }
+
+    .dialog {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 14px; box-shadow: 0 22px 60px rgba(11, 27, 43, 0.45);
+      overflow: hidden;
+    }
+    .d-feld {
+      display: flex; align-items: center;
+      padding: 16px 18px; font-size: 17px;
+      border-bottom: 1px solid var(--rahmen-still);
+    }
+    .karett { width: 2px; height: 19px; background: var(--akzent); margin-left: 2px; }
+
+    .vorschlaege { list-style: none; margin: 0; padding: 6px; }
+    .vorschlag {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px; font-size: 14px;
+    }
+    .vorschlag.gewaehlt { background: var(--flaeche-still); font-weight: 600; }
+    .v-kurs, .v-lage { margin-left: auto; font-size: 11.5px; color: var(--gedaempft); font-weight: 400; }
+
+    .d-arten { display: flex; gap: 5px; padding: 4px 12px 10px; }
+    .art {
+      border: 1px solid transparent; background: transparent; color: var(--gedaempft);
+      border-radius: 999px; padding: 3px 10px; font-size: 12px;
+      font-family: inherit; cursor: pointer;
+    }
+    .art.gewaehlt { background: var(--flaeche-still); color: var(--fg); font-weight: 600; }
+
+    .d-fuss {
+      display: flex; align-items: center; gap: 12px;
+      padding: 9px 15px; border-top: 1px solid var(--rahmen-still);
+      background: var(--grund); font-size: 11.5px; color: var(--gedaempft);
+    }
+    .ziel { font-weight: 600; color: var(--akzent); }
+    .tasten { margin-left: auto; }
+
+    /* Auf dem abgedunkelten Grund braucht der Text mehr Helligkeit, sonst verschwindet
+       er darin – auf der grauen Fläche war er vorher praktisch unlesbar. */
+
+    /* Die Rückmeldung nach dem Speichern: unten, kurz, mit einem Weg zurück. */
+    .meldung {
+      position: absolute; left: 50%; transform: translateX(-50%); bottom: 34px;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 10px; padding: 9px 10px 9px 14px;
+      box-shadow: 0 10px 30px rgba(11, 27, 43, 0.35);
+      font-size: 13.5px;
+    }
+  </style>
+</helmet>
+<div class="wurzel ueber">
+  <!-- Eine angedeutete Seite dahinter: ein Dialog über einer leeren Fläche sieht aus
+       wie eine Karte, nicht wie eine Überlagerung. -->
+  <div class="geisterseite" aria-hidden="true">
+    <div class="g-leiste">
+      <span class="g-marke"></span>
+      <span class="g-navi"></span><span class="g-navi"></span><span class="g-navi"></span>
+      <span class="g-werkzeug"></span>
+    </div>
+    <div class="g-kopfzeile"><span class="g-titel"></span><span class="g-knopf"></span></div>
+    <div class="g-band"></div>
+    <div class="g-raster">
+      <span class="g-karte"></span><span class="g-karte"></span><span class="g-karte"></span>
+      <span class="g-karte"></span><span class="g-karte"></span><span class="g-karte"></span>
+    </div>
+    <div class="g-band"></div>
+    <div class="g-raster">
+      <span class="g-karte"></span><span class="g-karte"></span><span class="g-karte"></span>
+    </div>
+  </div>
+  <div class="dunst" aria-hidden="true"></div>
+
+  <div class="paar">
+
+    <div class="spalte">
+      <p class="beschriftung">Schnellerfassung · <kbd>⌘K</kbd> von überall</p>
+      <div class="dialog">
+        <div class="d-feld">
+          <span class="d-text">Schrauben M6 nachkaufen, 40 Stück, @gart</span>
+          <span class="karett"></span>
+        </div>
+        <ul class="vorschlaege">
+          <li class="vorschlag gewaehlt">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <span>Gartenhaus</span>
+            <span class="v-kurs">Fundament bis Oktober.</span>
+          </li>
+          <li class="vorschlag">
+            <span class="punkt" style="background: var(--gedaempft)"></span>
+            <span>Gartenteich</span>
+            <span class="v-kurs">Vor Anker seit Mai.</span>
+          </li>
+        </ul>
+        <div class="d-arten">
+          <button class="art gewaehlt" type="button">Notiz</button>
+          <button class="art" type="button">Offener Faden</button>
+          <button class="art" type="button">Entscheidung</button>
+        </div>
+        <div class="d-fuss">
+          <span class="ziel">→ Gartenhaus</span>
+          <span class="tasten">Enter speichert · Esc schließt</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="spalte">
+      <p class="beschriftung">Springen · <kbd>⌘P</kbd></p>
+      <div class="dialog">
+        <div class="d-feld">
+          <span class="d-text">gart</span>
+          <span class="karett"></span>
+        </div>
+        <ul class="vorschlaege lang">
+          <li class="vorschlag gewaehlt">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <span>Gartenhaus</span>
+            <span class="v-lage">Aktiv</span>
+          </li>
+          <li class="vorschlag">
+            <span class="punkt" style="background: var(--gedaempft)"></span>
+            <span>Gartenteich</span>
+            <span class="v-lage">Vor Anker</span>
+          </li>
+          <li class="vorschlag">
+            <span class="punkt" style="background: var(--auffaellig)"></span>
+            <span>Vereinsvorstand Kassenwart</span>
+            <span class="v-lage">Wartet</span>
+          </li>
+        </ul>
+        <div class="d-fuss">
+          <span class="tasten">↑↓ wählen · Enter springt · Esc schließt</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="meldung">
+    <span class="punkt" style="background: var(--ruhig)"></span>
+    <span>Eingetragen bei „Gartenhaus“.</span>
+    <button class="knopf still klein" type="button">Ansehen</button>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

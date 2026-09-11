@@ -1,0 +1,353 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    /* Palette aus dem Logo: Marine #14304a, Bernstein #f2b544, Pergament,
+       Stahlblau #2e5f7a (die Wellen). Keine Fremd-Fonts – CLAUDE.md verbietet
+       CDNs in apps/web; die Serife fürs Logbuch ist eine System-Serife. */
+    .wurzel {
+      --grund: #f4efe4;
+      --flaeche: #fffdf7;
+      --flaeche-still: #efe9db;
+      --fg: #14304a;
+      --gedaempft: #5b6b78;
+      --rahmen: #e0d7c4;
+      --rahmen-still: #ece5d6;
+      --akzent: #2e5f7a;
+      --feuer: #f2b544;
+      --feuer-tief: #8a6212;
+      --ruhig: #3f7d5c;
+      --auffaellig: #c8873a;
+      --ueberfaellig: #b0392f;
+      --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
+    }
+    .wurzel.dunkel {
+      --grund: #0b1b2b;
+      --flaeche: #14263a;
+      --flaeche-still: #102032;
+      --fg: #e8e1d1;
+      --gedaempft: #93a7b8;
+      --rahmen: #24405a;
+      --rahmen-still: #1b3349;
+      --akzent: #7fb4d4;
+      --feuer: #f2b544;
+      --feuer-tief: #f2b544;
+      --ruhig: #7bc28c;
+      --auffaellig: #d9a441;
+      --ueberfaellig: #e0685c;
+      --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    body { margin: 0; }
+    a { color: var(--akzent); }
+    a:hover { color: var(--fg); }
+    .wurzel {
+      width: 1440px; height: 900px; overflow: hidden;
+      background: var(--grund); color: var(--fg);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 15px; line-height: 1.45;
+      display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serife { font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+
+    /* ---- Kopfleiste ---- */
+    .leiste {
+      display: flex; align-items: center; gap: 28px;
+      padding: 0 28px; height: 56px; flex: none;
+      border-bottom: 1px solid var(--rahmen); background: var(--flaeche);
+    }
+    .marke { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .navi { display: flex; gap: 4px; }
+    .navi a {
+      color: var(--gedaempft); text-decoration: none; font-size: 13.5px;
+      padding: 6px 11px; border-radius: 7px;
+    }
+    .navi a:hover { color: var(--fg); background: var(--flaeche-still); }
+    .navi a.aktiv { color: var(--fg); font-weight: 600; background: var(--flaeche-still); }
+    .leiste-rechts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .suchfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 6px 10px; width: 210px; color: var(--gedaempft);
+      font-size: 13px; background: var(--grund);
+    }
+    .taste {
+      font-size: 10.5px; border: 1px solid var(--rahmen); border-radius: 4px;
+      padding: 1px 4px; margin-left: auto; color: var(--gedaempft);
+    }
+
+    /* ---- Knöpfe ---- */
+    .knopf {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--rahmen); background: var(--flaeche);
+      color: var(--fg); border-radius: 8px; padding: 0 12px; height: 34px;
+      font-size: 13.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .knopf:hover { border-color: var(--akzent); }
+    .knopf.leuchte {
+      background: var(--feuer); border-color: var(--feuer);
+      color: #14304a; font-weight: 600;
+    }
+    .knopf.still { border-color: transparent; background: transparent; color: var(--gedaempft); }
+    .knopf.still:hover { background: var(--flaeche-still); color: var(--fg); }
+    .knopf.klein { height: 28px; font-size: 12.5px; padding: 0 9px; border-radius: 7px; }
+
+    /* ---- Karten ---- */
+    .karte {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; box-shadow: var(--schatten);
+    }
+    .karten-kopf {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px 0;
+    }
+    .karten-titel {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .zahl {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      background: var(--flaeche-still); border-radius: 999px; padding: 1px 7px;
+    }
+
+    /* ---- Marken und Punkte ---- */
+    .punkt { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .lage {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; border-radius: 999px;
+      padding: 3px 10px 3px 8px; border: 1px solid var(--rahmen);
+      background: var(--flaeche-still);
+    }
+    .quelle {
+      font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--gedaempft); font-weight: 600;
+    }
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .seitenkopf { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 16px; flex: none; }
+    .seiten-titel { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-meta { font-size: 12.5px; color: var(--gedaempft); }
+    .filter { margin-left: auto; display: flex; gap: 3px; }
+    .filter-chip {
+      border: none; background: transparent; color: var(--gedaempft);
+      border-radius: 999px; padding: 4px 11px; font-size: 12.5px;
+      font-family: inherit; cursor: pointer;
+    }
+    .filter-chip.gewaehlt { background: var(--fg); color: var(--flaeche); font-weight: 600; }
+
+    .flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: minmax(0, 1fr) 366px; gap: 24px; padding-bottom: 24px;
+      overflow: hidden;
+    }
+    .spalte-haupt { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+    .spalte-neben { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+    /* Nach Vorhaben gebündelt, nicht nach Datum: ein Faden ohne sein Projekt ist eine
+       Zeile ohne Zusammenhang. Der Punkt am Bündel zeigt, wie lange das Vorhaben ruht. */
+    .buendel-kopf {
+      display: flex; align-items: center; gap: 9px;
+      padding-bottom: 7px; margin-bottom: 2px;
+      border-bottom: 1px solid var(--rahmen);
+    }
+    .buendel-name {
+      font-weight: 600; font-size: 14.5px; color: inherit; text-decoration: none;
+    }
+    .buendel-name:hover { color: var(--akzent); }
+    .buendel-alter { margin-left: auto; font-size: 11.5px; color: var(--gedaempft); }
+
+    .faeden { list-style: none; margin: 0; padding: 0; }
+    .faden {
+      display: flex; align-items: flex-start; gap: 11px;
+      padding: 9px 6px 9px 2px; border-radius: 8px;
+      font-size: 14.5px; line-height: 1.45;
+    }
+    .faden.schwebt { background: var(--flaeche-still); }
+    .haken {
+      width: 17px; height: 17px; border: 1.5px solid var(--rahmen);
+      border-radius: 5px; flex: none; margin-top: 2px; background: var(--flaeche);
+    }
+    .faden.schwebt .haken { border-color: var(--akzent); }
+    .faden-text { min-width: 0; }
+    .springen { margin-left: auto; flex: none; }
+    .faden-alter {
+      margin-left: auto; flex: none; font-size: 11.5px; color: var(--gedaempft);
+      font-variant-numeric: tabular-nums; padding-top: 2px;
+    }
+    .faden.schwebt .faden-alter { margin-left: 10px; }
+
+    .hinweis-karte { border-left: 3px solid var(--rahmen); }
+    .karten-text {
+      margin: 7px 14px 14px; font-size: 12.5px; color: var(--gedaempft); line-height: 1.5;
+    }
+    .mini-liste {
+      list-style: none; margin: 8px 0 14px; padding: 0 14px;
+      display: flex; flex-direction: column; gap: 8px; font-size: 13px;
+    }
+    .mini-liste li { display: flex; gap: 10px; align-items: baseline; }
+    .mini-alter {
+      font-size: 11px; font-weight: 700; color: var(--gedaempft);
+      font-variant-numeric: tabular-nums; min-width: 26px;
+    }
+  </style>
+</helmet>
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" data-nav="hafen">Hafen</a>
+      <a href="#" class="aktiv" data-nav="offen">Offene Punkte</a>
+      <a href="#" data-nav="tresor">Tresor</a>
+      <a href="#" data-nav="einstellungen">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn">
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Offene Punkte</h1>
+      <span class="kopf-meta">7 Fäden über 5 Vorhaben · ältester seit 40 Tagen</span>
+      <div class="filter">
+        <button class="filter-chip gewaehlt" type="button">Alle 7</button>
+        <button class="filter-chip" type="button">Überfällig 2</button>
+        <button class="filter-chip" type="button">Diese Woche 3</button>
+      </div>
+    </div>
+
+    <div class="flaeche">
+      <main class="spalte-haupt">
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ueberfaellig)"></span>
+            <a class="buendel-name" href="#">Vereinsvorstand Kassenwart</a>
+            <span class="buendel-alter">seit 40 Tagen nichts</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Kassenbericht für die Herbstversammlung fertigstellen.</span>
+              <span class="faden-alter">40 T</span>
+            </li>
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Beitragsrückstände: Liste mit dem Vorstand durchgehen.</span>
+              <span class="faden-alter">40 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--auffaellig)"></span>
+            <a class="buendel-name" href="#">Getränkekasse-App</a>
+            <span class="buendel-alter">seit 20 Tagen nichts</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Stripe-Webhook: Fehlerbehandlung bei doppelten Events fehlt noch.</span>
+              <span class="faden-alter">25 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <a class="buendel-name" href="#">Gartenhaus</a>
+            <span class="buendel-alter">heute berührt</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Bewehrung: Q188 oder Q257? Statiker fragen.</span>
+              <span class="faden-alter">3 T</span>
+            </li>
+            <li class="faden schwebt">
+              <span class="haken"></span>
+              <span class="faden-text">Beton bestellen, sobald drei trockene Tage kommen.</span>
+              <button class="knopf still klein springen" type="button">Zum Projekt →</button>
+              <span class="faden-alter">1 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <a class="buendel-name" href="#">Lampe ESP32</a>
+            <span class="buendel-alter">vor 2 Tagen berührt</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Gehäuse: Wandstärke prüfen, 1,2 mm war zu dünn.</span>
+              <span class="faden-alter">2 T</span>
+            </li>
+          </ul>
+        </div>
+      </main>
+
+      <aside class="spalte-neben">
+        <section class="karte hinweis-karte">
+          <div class="karten-kopf"><span class="karten-titel">Was das hier nicht ist</span></div>
+          <p class="karten-text">
+            Keine Aufgabenliste mit Prioritäten, Zuweisungen und Fristen. Ein offener Faden ist
+            eine Frage, die beim nächsten Mal im Weg steht – mehr nicht. Wer Tickets braucht,
+            braucht ein Ticketsystem.
+          </p>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Am längsten offen</span></div>
+          <ul class="mini-liste">
+            <li><span class="mini-alter">40 T</span><span>Kassenbericht fertigstellen</span></li>
+            <li><span class="mini-alter">40 T</span><span>Beitragsrückstände durchgehen</span></li>
+            <li><span class="mini-alter">25 T</span><span>Stripe-Webhook absichern</span></li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Ohne Faden</span><span class="zahl">2</span></div>
+          <p class="karten-text">
+            Zwei aktive Vorhaben haben keinen offenen Faden. Beim Abschließen fragt Lotse nach
+            einer Sache fürs nächste Mal.
+          </p>
+          <ul class="mini-liste">
+            <li><span>Machine-Learning-Grundlagen</span></li>
+            <li><span>Steuer 2026</span></li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

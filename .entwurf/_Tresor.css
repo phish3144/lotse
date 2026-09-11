@@ -1,0 +1,70 @@
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .seitenkopf { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 16px; flex: none; }
+    .seiten-titel { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
+    .kopf-meta { font-size: 12.5px; color: var(--gedaempft); }
+    .kopf-aktionen { margin-left: auto; display: flex; gap: 8px; align-self: center; }
+    .filterfeld {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid var(--rahmen); border-radius: 8px;
+      padding: 0 11px; height: 34px; color: var(--gedaempft); font-size: 13px;
+      background: var(--grund);
+    }
+
+    .flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: minmax(0, 1fr) 366px; gap: 24px; padding-bottom: 24px;
+      overflow: hidden;
+    }
+    .spalte-haupt { min-width: 0; }
+    .spalte-neben { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+    .tresor-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .zugang {
+      background: var(--flaeche); border: 1px solid var(--rahmen);
+      border-radius: 12px; padding: 13px 15px 11px; box-shadow: var(--schatten);
+      min-width: 0;
+    }
+    /* Die Stufe „nur Desktop“ ist kein Etikett, sondern eine Eigenschaft des Eintrags –
+       deshalb auch an der Kante ablesbar, ohne zu lesen. */
+    .zugang--desktop { border-left: 3px solid var(--akzent); }
+    .z-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; min-width: 0; }
+    .z-titel {
+      font-weight: 600; font-size: 14.5px; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .stufe {
+      margin-left: auto; flex: none;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
+      color: var(--gedaempft); border: 1px solid var(--rahmen);
+      border-radius: 999px; padding: 2px 8px;
+    }
+    .stufe--desktop { color: var(--akzent); border-color: var(--akzent); }
+
+    .z-projekte { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+    .projekt-chip {
+      font-size: 11px; background: var(--flaeche-still);
+      border-radius: 999px; padding: 2px 9px; color: var(--gedaempft);
+    }
+    .chip--still { font-style: italic; }
+
+    .felder { margin: 0; display: flex; flex-direction: column; gap: 1px; }
+    .feld {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 0; border-top: 1px solid var(--rahmen-still);
+    }
+    .feld:first-child { border-top: none; }
+    .feld dt { font-size: 12.5px; color: var(--gedaempft); min-width: 96px; }
+    .feld dd { margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .punkte {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.12em;
+      background: var(--flaeche-still); border-radius: 5px; padding: 2px 8px;
+      font-size: 12px; color: var(--gedaempft);
+    }
+    .feld dd .knopf { margin-left: auto; }
+
+    .hinweis-karte { border-left: 3px solid var(--rahmen); }
+    .karten-text {
+      margin: 7px 14px 12px; font-size: 12.5px; color: var(--gedaempft); line-height: 1.5;
+    }
+    .karten-text strong { color: var(--fg); }

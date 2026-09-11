@@ -1,0 +1,70 @@
+    .bahn { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 28px; }
+    .suchkopf { padding: 26px 0 18px; flex: none; }
+    /* Auf dieser Seite ist kein Reiter aktiv: die Suche wohnt im Werkzeugfeld oben
+       rechts, nicht in der Navigation. Das Feld dort zeigt, wo man ist. */
+    .suchfeld--aktiv { border-color: var(--akzent); color: var(--fg); }
+    /* Die Suche ist die Seite: ein Feld, so groß wie die Absicht. Keine Überschrift
+       darüber – „Suche“ zu lesen, während man in ein Suchfeld tippt, hilft niemandem. */
+    .suchfeld-gross {
+      display: flex; align-items: center; gap: 12px;
+      border: 1px solid var(--rahmen); border-bottom-width: 2px;
+      border-bottom-color: var(--akzent);
+      border-radius: 12px; background: var(--flaeche);
+      padding: 14px 18px; box-shadow: var(--schatten);
+      max-width: 760px;
+    }
+    .suchfeld-gross svg { color: var(--gedaempft); flex: none; }
+    .suchtext { font-size: 21px; letter-spacing: -0.01em; }
+    .karett { width: 2px; height: 22px; background: var(--akzent); margin-left: -8px; }
+    .treffer-zahl { margin-left: auto; font-size: 12.5px; color: var(--gedaempft); flex: none; }
+
+    .flaeche {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: 176px minmax(0, 1fr); gap: 28px;
+      padding-bottom: 24px; overflow: hidden;
+    }
+    .arten-rail { display: flex; flex-direction: column; gap: 2px; }
+    .art-knopf {
+      display: flex; align-items: center; gap: 8px;
+      border: none; background: transparent; color: var(--gedaempft);
+      border-radius: 8px; padding: 7px 11px; font-size: 13.5px;
+      font-family: inherit; cursor: pointer; text-align: left;
+    }
+    .art-knopf.gewaehlt { background: var(--flaeche-still); color: var(--fg); font-weight: 600; }
+    .art-zahl { margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+    .rail-notiz {
+      margin: 16px 11px 0; font-size: 11.5px; color: var(--gedaempft); line-height: 1.5;
+      padding-top: 12px; border-top: 1px solid var(--rahmen);
+    }
+
+    .treffer { min-width: 0; display: flex; flex-direction: column; overflow: hidden; max-width: 800px; }
+    .treffer-zeile {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 12px 12px 12px 10px; border-radius: 9px;
+      color: inherit; text-decoration: none;
+      border-bottom: 1px solid var(--rahmen-still);
+    }
+    .treffer-zeile:first-child { background: var(--flaeche-still); border-bottom-color: transparent; }
+    .treffer-art {
+      flex: none; width: 74px; padding-top: 2px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+      text-transform: uppercase; color: var(--gedaempft);
+    }
+    .treffer-art.art--projekt { color: var(--akzent); }
+    .treffer-art.art--referenz { color: var(--gedaempft); }
+    .treffer-leib { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .treffer-titel { font-weight: 600; font-size: 15px; }
+    .treffer-weg { font-size: 11.5px; color: var(--gedaempft); }
+    .treffer-text { font-size: 14px; line-height: 1.45; }
+    .treffer-text.mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; }
+    /* Der Treffer wird unterstrichen, nicht eingefärbt: eine Fläche in Bernstein würde
+       im Fließtext lauter schreien als die Zeile selbst. */
+    mark {
+      background: transparent; color: inherit; font-weight: 600;
+      box-shadow: inset 0 -0.4em 0 rgba(242, 181, 68, 0.45);
+      border-radius: 2px;
+    }
+    .treffer-alter {
+      margin-left: auto; flex: none; font-size: 11.5px; color: var(--gedaempft); padding-top: 2px;
+    }
+    .mehr { padding: 14px 10px; font-size: 13px; color: var(--gedaempft); }

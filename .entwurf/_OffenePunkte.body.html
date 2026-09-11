@@ -1,0 +1,152 @@
+<div class="wurzel">
+  <header class="leiste">
+    <span class="marke">
+      <svg width="22" height="22" viewBox="0 0 256 256" aria-hidden="true">
+        <rect width="256" height="256" rx="56" fill="#14304a"/>
+        <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+          <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205"/>
+          <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227"/>
+        </g>
+        <path d="M80 56h32v112h64v32H80z" fill="#f2b544"/>
+        <circle cx="184" cy="72" r="20" fill="#e8e1d1"/>
+      </svg>
+      Lotse
+    </span>
+    <nav class="navi">
+      <a href="#" data-nav="hafen">Hafen</a>
+      <a href="#" data-nav="offen">Offene Punkte</a>
+      <a href="#" data-nav="tresor">Tresor</a>
+      <a href="#" data-nav="einstellungen">Einstellungen</a>
+    </nav>
+    <div class="leiste-rechts">
+      <div class="suchfeld">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Suchen oder erfassen
+        <span class="taste">⌘K</span>
+      </div>
+      <button class="knopf still" type="button" title="Sperren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="bahn">
+    <div class="seitenkopf">
+      <h1 class="serife seiten-titel">Offene Punkte</h1>
+      <span class="kopf-meta">7 Fäden über 5 Vorhaben · ältester seit 40 Tagen</span>
+      <div class="filter">
+        <button class="filter-chip gewaehlt" type="button">Alle 7</button>
+        <button class="filter-chip" type="button">Überfällig 2</button>
+        <button class="filter-chip" type="button">Diese Woche 3</button>
+      </div>
+    </div>
+
+    <div class="flaeche">
+      <main class="spalte-haupt">
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ueberfaellig)"></span>
+            <a class="buendel-name" href="#">Vereinsvorstand Kassenwart</a>
+            <span class="buendel-alter">seit 40 Tagen nichts</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Kassenbericht für die Herbstversammlung fertigstellen.</span>
+              <span class="faden-alter">40 T</span>
+            </li>
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Beitragsrückstände: Liste mit dem Vorstand durchgehen.</span>
+              <span class="faden-alter">40 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--auffaellig)"></span>
+            <a class="buendel-name" href="#">Getränkekasse-App</a>
+            <span class="buendel-alter">seit 20 Tagen nichts</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Stripe-Webhook: Fehlerbehandlung bei doppelten Events fehlt noch.</span>
+              <span class="faden-alter">25 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <a class="buendel-name" href="#">Gartenhaus</a>
+            <span class="buendel-alter">heute berührt</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Bewehrung: Q188 oder Q257? Statiker fragen.</span>
+              <span class="faden-alter">3 T</span>
+            </li>
+            <li class="faden schwebt">
+              <span class="haken"></span>
+              <span class="faden-text">Beton bestellen, sobald drei trockene Tage kommen.</span>
+              <button class="knopf still klein springen" type="button">Zum Projekt →</button>
+              <span class="faden-alter">1 T</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="buendel">
+          <div class="buendel-kopf">
+            <span class="punkt" style="background: var(--ruhig)"></span>
+            <a class="buendel-name" href="#">Lampe ESP32</a>
+            <span class="buendel-alter">vor 2 Tagen berührt</span>
+          </div>
+          <ul class="faeden">
+            <li class="faden">
+              <span class="haken"></span>
+              <span class="faden-text">Gehäuse: Wandstärke prüfen, 1,2 mm war zu dünn.</span>
+              <span class="faden-alter">2 T</span>
+            </li>
+          </ul>
+        </div>
+      </main>
+
+      <aside class="spalte-neben">
+        <section class="karte hinweis-karte">
+          <div class="karten-kopf"><span class="karten-titel">Was das hier nicht ist</span></div>
+          <p class="karten-text">
+            Keine Aufgabenliste mit Prioritäten, Zuweisungen und Fristen. Ein offener Faden ist
+            eine Frage, die beim nächsten Mal im Weg steht – mehr nicht. Wer Tickets braucht,
+            braucht ein Ticketsystem.
+          </p>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Am längsten offen</span></div>
+          <ul class="mini-liste">
+            <li><span class="mini-alter">40 T</span><span>Kassenbericht fertigstellen</span></li>
+            <li><span class="mini-alter">40 T</span><span>Beitragsrückstände durchgehen</span></li>
+            <li><span class="mini-alter">25 T</span><span>Stripe-Webhook absichern</span></li>
+          </ul>
+        </section>
+
+        <section class="karte">
+          <div class="karten-kopf"><span class="karten-titel">Ohne Faden</span><span class="zahl">2</span></div>
+          <p class="karten-text">
+            Zwei aktive Vorhaben haben keinen offenen Faden. Beim Abschließen fragt Lotse nach
+            einer Sache fürs nächste Mal.
+          </p>
+          <ul class="mini-liste">
+            <li><span>Machine-Learning-Grundlagen</span></li>
+            <li><span>Steuer 2026</span></li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,57 @@
+    /* Die Tür ist der eine Ort, an dem das Marineblau die Fläche ist – auch im hellen
+       Thema. Draußen ist es Nacht, drinnen brennt das Licht; und niemand liest hier
+       lange Texte, also kostet der dunkle Grund nichts. */
+    .tuer {
+      background: linear-gradient(175deg, #14304a 0%, #0b1b2b 62%, #081521 100%);
+      color: #e8e1d1;
+      position: relative;
+      align-items: center;
+      justify-content: center;
+    }
+    .hafenbild { position: absolute; inset: 0; pointer-events: none; }
+    .hafenbild svg { width: 100%; height: 100%; display: block; }
+
+    .tuer-inhalt {
+      position: relative;
+      width: 420px;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+      margin-top: -40px;
+    }
+    .marke-gross { border-radius: 16px; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.42); }
+    .tuer-titel { margin: 22px 0 4px; font-size: 30px; font-weight: 600; letter-spacing: -0.015em; }
+    .tuer-unter { margin: 0 0 30px; font-size: 13.5px; color: #8fa8bd; }
+
+    .tuer-formular { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .tuer-feld { display: flex; flex-direction: column; gap: 7px; text-align: left; }
+    .tuer-feld > span { font-size: 12px; color: #8fa8bd; letter-spacing: 0.03em; }
+    .tuer-eingabe {
+      display: flex; align-items: center;
+      height: 46px; padding: 0 15px;
+      border: 1px solid #2c4b68; border-radius: 10px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+    .tuer-eingabe .punkte {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      letter-spacing: 0.22em; font-size: 15px;
+    }
+    .karett { width: 2px; height: 20px; background: #f2b544; margin-left: 3px; }
+
+    .knopf.gross { height: 46px; font-size: 15px; justify-content: center; border-radius: 10px; }
+    .knopf.leise {
+      border-color: transparent; background: transparent; color: #8fa8bd;
+      justify-content: center; font-size: 12.5px; height: 30px; margin-top: 2px;
+    }
+    .knopf.leise:hover { color: #e8e1d1; }
+
+    .tuer-fuss {
+      margin: 34px 0 0; font-size: 11.5px; line-height: 1.6;
+      color: #7d94a8; max-width: 400px;
+    }
+
+    .tuer-ecke {
+      position: absolute; left: 0; right: 0; bottom: 22px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      color: #5d7488;
+    }
+    .punkt-still { width: 3px; height: 3px; border-radius: 50%; background: #3d5a73; }

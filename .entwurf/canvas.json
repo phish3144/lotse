@@ -1,15 +1,30 @@
 {
+  "pages": [
+    { "id": "page-1", "name": "Gebaut" },
+    { "id": "page-2", "name": "Noch zu bauen" }
+  ],
   "artboards": [
-    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Projektseite — Arbeitsfläche" },
-    { "file": "Hafen.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Hafen" },
-    { "file": "Einstellungen.dc.html", "x": 0, "y": 1060, "w": 1440, "h": 900, "title": "Einstellungen — Verbindungen" },
-    { "file": "Palette.dc.html", "x": 1560, "y": 1060, "w": 1440, "h": 980, "title": "Farben und Bausteine" }
+    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Projektseite — Arbeitsfläche" },
+    { "file": "Hafen.dc.html", "page": "page-1", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Hafen" },
+    { "file": "Einstellungen.dc.html", "page": "page-1", "x": 0, "y": 1060, "w": 1440, "h": 900, "title": "Einstellungen — Verbindungen" },
+    { "file": "Palette.dc.html", "page": "page-1", "x": 1560, "y": 1060, "w": 1440, "h": 980, "title": "Farben und Bausteine" },
+
+    { "file": "OffenePunkte.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Offene Punkte" },
+    { "file": "Suche.dc.html", "page": "page-2", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Suche" },
+    { "file": "Tresor.dc.html", "page": "page-2", "x": 0, "y": 1060, "w": 1440, "h": 900, "title": "Tresor" },
+    { "file": "LeererHafen.dc.html", "page": "page-2", "x": 1560, "y": 1060, "w": 1440, "h": 900, "title": "Erster Start — leerer Hafen" },
+    { "file": "Entsperren.dc.html", "page": "page-2", "x": 0, "y": 2120, "w": 1440, "h": 900, "title": "Entsperren" },
+    { "file": "Einrichten.dc.html", "page": "page-2", "x": 1560, "y": 2120, "w": 1440, "h": 900, "title": "Einrichten — die zwei Schlüssel" },
+    { "file": "Overlays.dc.html", "page": "page-2", "x": 780, "y": 3180, "w": 1440, "h": 900, "title": "Schnellerfassung und Springen" }
   ],
   "annotations": [
-    { "id": "warum-zwei", "x": 0, "y": -150, "w": 460, "text": "Das Logbuch ist die Seite. Kurs, Fäden, Referenzen und Zugänge stehen daneben statt darunter — man sieht alles auf einmal, ohne zu scrollen.\n\nDie Erklärtexte sind raus: „Datei deuten\" ist jetzt ein Knopf, kein Absatz." },
-    { "id": "warum-farben", "x": 1560, "y": -150, "w": 460, "text": "Bernstein #f2b544 trägt genau eine Handlung je Ansicht (hier „Neues Projekt\") und die Statuspunkte. Sonst nichts — sonst ist es kein Leuchtfeuer mehr.\n\nDer Punkt links an der Karte ersetzt den alten Auffälligkeits-Punkt." },
-    { "id": "warum-connector", "x": 0, "y": 2000, "w": 460, "text": "Der neue Connector, wie er seit heute im Code steht: ein Feld, ein Knopf. Den Tresor-Eintrag legt Lotse selbst an.\n\nDie Einstellungen sind in Reiter zerlegt — vorher waren es 1234 Zeilen auf einer Seite." },
-    { "id": "warum-palette", "x": 1560, "y": 2080, "w": 460, "text": "Jeder Wert stammt aus icon.svg. Keine Fremd-Font: CLAUDE.md verbietet CDNs in apps/web, deshalb System-Serife fürs Logbuch und system-ui für den Rest." }
+    { "id": "gebaut", "x": 0, "y": -150, "w": 520, "page": "page-1", "text": "Diese vier sind seit heute in der App. Sie sind die Vorlage für alles Weitere: Kopfleiste, Karten, Kleinkapitälchen als Abschnittstitel, Bernstein für genau eine Handlung je Ansicht." },
+    { "id": "offen-warum", "x": 0, "y": -190, "w": 500, "page": "page-2", "text": "Gebündelt nach Vorhaben, nicht nach Datum: ein Faden ohne sein Projekt ist eine Zeile ohne Zusammenhang. Der Punkt am Bündel zeigt, wie lange das Vorhaben ruht — nicht, wie alt der Faden ist.\n\nDie Karte rechts sagt, was das hier NICHT ist. Das steht dort, weil die Seite sonst nach einer Aufgabenliste aussieht, und genau das soll sie nicht werden." },
+    { "id": "suche-warum", "x": 1560, "y": -190, "w": 500, "page": "page-2", "text": "Keine Überschrift „Suche“ über einem Suchfeld. Das Feld ist die Seite.\n\nEin Strom statt vier getrennter Listen, links die Arten als Filter mit Zahlen. Der Treffer wird unterstrichen, nicht eingefärbt — eine Bernsteinfläche im Fließtext schreit lauter als die Zeile selbst." },
+    { "id": "tresor-warum", "x": 0, "y": 2000, "w": 500, "page": "page-2", "text": "„nur Desktop“ ist keine Beschriftung, sondern eine Eigenschaft: sie sitzt auch an der linken Kante, damit man sie im Raster sieht, ohne zu lesen.\n\nDie Werte bleiben Punkte, bis man sie anfasst. Kopiertes räumt Lotse nach 30 Sekunden weg — das steht rechts, weil es sonst niemand erfährt." },
+    { "id": "leer-warum", "x": 1560, "y": 2000, "w": 500, "page": "page-2", "text": "Der erste Eindruck, nicht ein Fehlerzustand. Statt „keine Daten“ steht hier, wofür das Ganze gut ist und drei Wege hinein — jeder mit dem Knopf daneben, der ihn geht.\n\nDer letzte Absatz nennt den Fluchtweg. Wer am ersten Tag liest, dass er jederzeit wieder rauskommt, fängt eher an." },
+    { "id": "tuer-warum", "x": 0, "y": 3060, "w": 500, "page": "page-2", "text": "Die beiden Türen sind der eine Ort, an dem Marineblau die Fläche ist — auch im hellen Thema. Draußen ist Nacht, drinnen brennt Licht, und lange Texte liest hier niemand.\n\nBeim Einrichten trägt der Schlüssel selbst das Bernstein: er ist das Einzige auf der Seite, das man wirklich mitnehmen muss. „Weiter“ ist gesperrt und sieht auch so aus, statt blass zu leuchten." },
+    { "id": "overlay-warum", "x": 780, "y": 4120, "w": 620, "page": "page-2", "text": "Beide Dialoge ersetzen keine Navigation — sie machen sie überflüssig, solange man weiß, wohin man will. Die Schnellerfassung schlägt beim Tippen von @gart schon Projekte vor; ohne Zuordnung landet der Gedanke im Postkorb.\n\nUnten die Rückmeldung nach dem Speichern: kurz, mit einem Weg zurück zu dem, was man gerade eingetragen hat." }
   ],
-  "launch": { "view": "canvas" }
+  "launch": { "view": "canvas", "page": "page-2" }
 }

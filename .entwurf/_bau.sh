@@ -3,6 +3,7 @@
 # Logik und data-props kommen aus _<name>.props / _<name>.logic.js, falls vorhanden.
 set -euo pipefail
 name="$1"
+nav="${2:-}"   # welcher Reiter in der Kopfleiste aktiv ist
 {
   echo '<!doctype html>'
   echo '<html>'
@@ -28,4 +29,7 @@ name="$1"
   echo '</body>'
   echo '</html>'
 } > "${name}.dc.html"
+if [ -n "$nav" ]; then
+  sed -i "s|<a href=\"#\" data-nav=\"$nav\">|<a href=\"#\" class=\"aktiv\" data-nav=\"$nav\">|" "${name}.dc.html"
+fi
 echo "${name}.dc.html: $(wc -l < "${name}.dc.html") Zeilen"
