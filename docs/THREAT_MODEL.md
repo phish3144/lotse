@@ -245,11 +245,19 @@ Damit kehrt sich die Rechnung um, und der Austausch findet in der App statt:
 | Der Austausch beginnt nur auf Klick; nichts wird im Hintergrund installiert | stille Änderungen an einem Programm, das den Tresor öffnet |
 | Vor dem Austausch wird gesperrt | der Schlüssel liegt im Speicher dieses Prozesses und soll den Neustart nicht überleben |
 | Aus `.deb` und `.rpm` heraus wird gar nicht erst versucht (erkannt an fehlendem `APPIMAGE`) | zerrissene Buchführung der Paketverwaltung |
+| Zwei Endpunkte in fester Reihenfolge: erst die Landing Page, dann GitHub | ein Ausfall einer der beiden Seiten |
 
 Was das **nicht** ist: Code-Signierung. Windows SmartScreen und macOS Gatekeeper warnen
 weiterhin beim ersten Start, weil dafür kostenpflichtige Zertifikate nötig sind. Die
 Update-Signatur schützt den Weg von einer Fassung zur nächsten, nicht den ersten
 Download.
+
+Wo die Liste liegt: die Releases bleiben Vorabversionen, und GitHub lässt Vorabversionen
+aus `/releases/latest` heraus. Deshalb spiegelt der Release-Workflow die fertige
+`latest.json` nach `site/`, von wo GitHub Pages sie ausliefert; die App fragt dort zuerst
+und erst danach bei GitHub. Beide Adressen stehen fest im Programm und lassen sich nicht
+zur Laufzeit umbiegen – wer sie ändern will, muss eine neue Fassung ausliefern, und die
+müsste wiederum signiert sein.
 
 Was der Schlüssel **nicht** kann: er beweist, dass eine Fassung mit diesem Schlüssel
 signiert wurde – nicht, dass sie gutartig ist. Wer den privaten Schlüssel hat, kann jedem

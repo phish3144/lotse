@@ -1900,11 +1900,18 @@ async fn update_installieren(app: tauri::AppHandle, state: State<'_, AppState>) 
         return Err(grund.unwrap_or_else(|| "Hier nicht möglich.".into()));
     }
 
-    let updater = app.updater().map_err(|e| format!("Updater: {e}"))?;
-    let gefunden = updater
-        .check()
-        .await
-        .map_err(|e| format!("Nachsehen fehlgeschlagen: {e}"))?;
+    let updater = app
+        .updater()
+        .map_err(|e| format!("Der Updater ließ sich nicht einrichten: {e}"))?;
+
+    // Antwortet kein Endpunkt, ist das kein Grund, den Menschen mit einer rohen
+    // Netzwerkmeldung stehen zu lassen: der Weg von Hand steht auf derselben Seite.
+    let gefunden = updater.check().await.map_err(|e| {
+        format!(
+            "Die Liste der Fassungen war nicht erreichbar ({e}). \
+             Der Download von Hand geht weiterhin – der Knopf „Was ist neu“ führt hin."
+        )
+    })?;
     let Some(update) = gefunden else {
         return Err("Diese Version ist die neueste.".into());
     };

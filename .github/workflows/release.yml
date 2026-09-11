@@ -9,9 +9,10 @@ name: Release
 # austauschen darf – ohne sie wäre der Updater ein bequemer Weg für jeden, der die
 # Verbindung oder das Konto kontrolliert.
 #
-# Die Releases sind bewusst KEINE Vorabversionen mehr: GitHub lässt Vorabversionen aus
-# `/releases/latest` heraus, und genau dort sucht der Updater seine `latest.json`. Wer
-# wieder Vorabversionen will, braucht einen anderen Endpunkt.
+# Die Releases bleiben Vorabversionen. GitHub lässt die aber aus `/releases/latest`
+# heraus – über diese Adresse fände der Updater also nie etwas. Deshalb spiegelt der
+# Job `pages` die fertige `latest.json` zusätzlich auf die Landing Page, und die App
+# fragt dort zuerst (siehe `plugins.updater.endpoints` in tauri.conf.json).
 #
 # Auslösen: git tag v0.1.0 && git push origin v0.1.0
 # oder von Hand unter Actions mit dem gewünschten Tag; das Release legt den Tag dann an.
@@ -128,7 +129,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Lotse ${{ env.RELEASE_TAG }}"
-          prerelease: false
+          prerelease: true
           files: |
             dist/*.tar.gz
             dist/*.zip
@@ -201,5 +202,70 @@ jobs:
           # Die Datei, in der der Updater nachsieht. Jeder Bau-Job trägt seine Plattform
           # nach; die Aktion liest die vorhandene und führt zusammen.
           uploadUpdaterJson: true
-          prerelease: false
+
+  # Die fertige `latest.json` auf die Landing Page spiegeln. Nötig, weil die Releases
+  # Vorabversionen sind und GitHub die aus `/releases/latest` heraushält – die App
+  # fragt deshalb zuerst die Seite und erst danach GitHub.
+  pages:
+    name: latest.json auf die Seite spiegeln
+    needs: desktop
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Holen und eintragen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          url=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            | python3 -c "
+          import json,sys
+          for a in json.load(sys.stdin)['assets']:
+              if a['name'] == 'latest.json':
+                  print(a['url']); break
+          ")
+          if [ -z "$url" ]; then
+            echo "::error::Im Release ${RELEASE_TAG} liegt keine latest.json."
+            echo "Ohne sie findet der Updater nichts. Haben die Desktop-Jobs signiert gebaut?"
+            exit 1
+          fi
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+            -o site/latest.json "$url"
+          # Lieber hier merken als beim Nutzer: eine kaputte Datei wäre ein stiller Ausfall.
+          python3 -c "
+          import json,sys
+          d = json.load(open('site/latest.json'))
+          if not d.get('platforms'):
+              sys.exit('latest.json enthält keine Plattformen')
+          print('Plattformen:', ', '.join(sorted(d['platforms'])))
+          "
+
+      - name: Einchecken
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- site/latest.json; then
+            echo "Unverändert, nichts zu tun."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/latest.json
+          git commit -m "latest.json für ${RELEASE_TAG}"
+          # Zwischen Prüfen und Schieben kann jemand anders gepusht haben.
+          for versuch in 1 2 3 4 5; do
+            if git push origin HEAD:main; then exit 0; fi
+            echo "Push abgelehnt, hole nach (Versuch $versuch)…"
+            git pull --rebase origin main
+            sleep $((versuch * 3))
+          done
+          echo "::error::latest.json ließ sich nicht nach main schieben."
+          exit 1
+          prerelease: true
           args: ${{ matrix.args }}
