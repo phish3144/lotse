@@ -1,32 +1,49 @@
-/* Plain CSS, keine Utility-Frameworks. Helles Thema als Basis auf :root,
-   dunkles Thema ausschließlich über prefers-color-scheme – siehe artifact/
-   UI-Vorgaben: kein Fremdlayer, kein CSS-Framework. */
+/* Plain CSS, keine Utility-Frameworks, keine Fremd-Schriften – CLAUDE.md verbietet
+   CDNs und Fonts in apps/web. Helles Thema als Basis auf :root, dunkles Thema
+   ausschließlich über prefers-color-scheme.
+
+   Die Farben stammen aus dem Logo (apps/desktop/src-tauri/icons/icon.svg) und sind
+   nicht erfunden: Marine ist der Verlauf, Stahlblau sind die Wellen, Bernstein ist
+   das „L“, Pergament der Kreis. Bernstein trägt genau eine Handlung je Ansicht und
+   die Zustandspunkte – wird es zur Fläche, ist es kein Leuchtfeuer mehr. */
 
 :root {
-  --hintergrund: #f7f6f3;
-  --fg: #1c1b19;
-  --karten-hintergrund: #ffffff;
-  --rahmen: #ddd9d1;
-  --text-gedaempft: #6b675f;
-  --akzent: #1d5f8a;
-  --farbe-ruhig: #4c8c5b;
-  --farbe-auffaellig: #b8860b;
+  --hintergrund: #f4efe4; /* Pergament */
+  --fg: #14304a; /* Logo-Marine */
+  --karten-hintergrund: #fffdf7;
+  --flaeche-still: #efe9db; /* gewählte Reiter, Chips, Codeflächen */
+  --rahmen: #e0d7c4;
+  --rahmen-still: #ece5d6; /* Trenner innerhalb einer Karte */
+  --linie: #d3c6ab; /* Zeitachse: dunkler als ein Rahmen, sonst sieht man sie nicht */
+  --text-gedaempft: #5b6b78; /* Stahl */
+  --akzent: #2e5f7a; /* Logo-Wellen: Links, Aktives, Fokus */
+  --feuer: #f2b544; /* Logo-„L“: sparsam */
+  --farbe-ruhig: #3f7d5c;
+  --farbe-auffaellig: #c8873a;
   --farbe-ueberfaellig: #b0392f;
+  --gruen: var(--farbe-ruhig);
+  --warnung: var(--farbe-auffaellig);
+  --schatten: 0 1px 2px rgba(20, 48, 74, 0.05);
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --hintergrund: #17181a;
-    --fg: #eceae5;
-    --karten-hintergrund: #212327;
-    --rahmen: #35373b;
-    --text-gedaempft: #9a978f;
-    --akzent: #6fb3dd;
+    --hintergrund: #0b1b2b; /* unteres Ende des Logo-Verlaufs */
+    --fg: #e8e1d1; /* der Kreis im Logo */
+    --karten-hintergrund: #14263a;
+    --flaeche-still: #102032;
+    --rahmen: #24405a;
+    --rahmen-still: #1b3349;
+    --linie: #325873;
+    --text-gedaempft: #93a7b8;
+    --akzent: #7fb4d4;
+    --feuer: #f2b544; /* bleibt gleich: es ist das Leuchtfeuer, nicht Dekoration */
     --farbe-ruhig: #7bc28c;
     --farbe-auffaellig: #d9a441;
     --farbe-ueberfaellig: #e0685c;
+    --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -40,10 +57,16 @@ body {
   font-family:
     system-ui,
     -apple-system,
-    'Segoe UI',
+    "Segoe UI",
     Roboto,
     sans-serif;
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Kurs und Titel tragen eine Serife – aber eine, die schon da ist. */
+.serife {
+  font-family: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 
 h1,
@@ -51,6 +74,7 @@ h2,
 h3 {
   font-weight: 600;
   line-height: 1.25;
+  letter-spacing: -0.012em;
 }
 
 a {
@@ -67,18 +91,51 @@ button:not(:disabled) {
 }
 
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
+  font-size: 0.9rem;
   color: inherit;
   background: var(--hintergrund);
   border: 1px solid var(--rahmen);
-  border-radius: 0.4rem;
-  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-gedaempft);
 }
 
 input:focus,
 textarea:focus,
-button:focus-visible {
+select:focus,
+button:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--akzent);
   outline-offset: 1px;
+}
+
+/* Die eine hervorgehobene Handlung je Ansicht. Bernstein trägt Marine-Text –
+   die Paarung aus dem Logo, und der Kontrast reicht in beiden Themen. */
+button.primaer {
+  background: var(--feuer);
+  border: 1px solid var(--feuer);
+  color: #14304a;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.75rem;
+}
+
+button.primaer:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Gesperrt wird der Knopf neutral, nicht blass: Bernstein bei halber Deckkraft auf
+   Pergament ergibt einen matschigen Ton, der weder „aus“ noch „an“ sagt. */
+button.primaer:disabled {
+  background: transparent;
+  border-color: var(--rahmen);
+  color: var(--text-gedaempft);
+  font-weight: 400;
 }

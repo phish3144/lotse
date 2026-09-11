@@ -13,12 +13,14 @@
     ANLEGBARE_REFERENZ_TYPEN,
     ART_LABEL,
     datumText,
+    nachTagen,
     PRUEFSTATUS_LABEL,
     QUELLE_LABEL,
     REFERENZ_ROLLE_LABEL,
     REFERENZ_TYP_LABEL,
     STATUS_LABEL,
     tageText,
+    uhrzeitText,
     VORLAGEN_LABEL,
   } from '../lib/format';
   import type { Id, Notiz, NotizArt, Projekt, ProjektStatus, ReferenzRolle, ReferenzTyp } from '../lib/data/types';
@@ -615,13 +617,6 @@
           </button>
         </div>
       </section>
-    {:else}
-      <p class="kurs">{projekt.kurs || 'Noch kein Kurs gesetzt.'}</p>
-      <p class="meta">
-        {VORLAGEN_LABEL[projekt.vorlage]} · ruhig für {projekt.erwartungsintervall_tage} Tage
-        {#if projekt.wiedervorlage}· Wiedervorlage {projekt.wiedervorlage}{/if}
-        {#if projekt.tags.length > 0}· {projekt.tags.join(', ')}{/if}
-      </p>
     {/if}
 
     {#if ausstehenderStatus}
@@ -646,276 +641,310 @@
       <p class="hinweis fehler">{fehlerText}</p>
     {/if}
 
-    <section class="erfassen" aria-labelledby="erfassen-titel">
-      <h2 id="erfassen-titel">Was gibt's?</h2>
-      <textarea
-        bind:value={notizText}
-        onkeydown={aufNotizTaste}
-        rows="2"
-        placeholder="Ein Satz ins Logbuch. Strg+Enter speichert."
-      ></textarea>
-      <div class="erfassen-zeile">
-        <div class="arten" role="group" aria-label="Art des Eintrags">
-          {#each ERFASSBARE_ARTEN as art (art)}
-            <button type="button" class:gewaehlt={notizArt === art} onclick={() => (notizArt = art)}>
-              {ART_LABEL[art]}
-            </button>
-          {/each}
+    <!-- Arbeitsfläche: das Logbuch ist die Seite, alles Begleitende steht daneben.
+         Unter 64rem fällt die Nebenspalte darunter – dieselbe Reihenfolge, nur gestapelt. -->
+    <div class="arbeitsflaeche">
+      <main class="spalte-haupt">
+      <section class="erfassen" aria-labelledby="erfassen-titel">
+        <h2 id="erfassen-titel">Was gibt's?</h2>
+        <textarea
+          bind:value={notizText}
+          onkeydown={aufNotizTaste}
+          rows="2"
+          placeholder="Ein Satz ins Logbuch. Strg+Enter speichert."
+        ></textarea>
+        <div class="erfassen-zeile">
+          <div class="arten" role="group" aria-label="Art des Eintrags">
+            {#each ERFASSBARE_ARTEN as art (art)}
+              <button type="button" class:gewaehlt={notizArt === art} onclick={() => (notizArt = art)}>
+                {ART_LABEL[art]}
+              </button>
+            {/each}
+          </div>
+          <button type="button" class="primaer" onclick={notizSpeichern} disabled={!notizText.trim() || wirdGespeichert}>
+            {wirdGespeichert ? 'Speichere …' : 'Eintragen'}
+          </button>
         </div>
-        <button type="button" class="primaer" onclick={notizSpeichern} disabled={!notizText.trim() || wirdGespeichert}>
-          {wirdGespeichert ? 'Speichere …' : 'Eintragen'}
-        </button>
-      </div>
-    </section>
-
-    <section aria-labelledby="offene-faeden-titel">
-      <h2 id="offene-faeden-titel">Offene Fäden</h2>
-      {#if offeneFaeden.length === 0}
-        <p class="hinweis">Keine offenen Fäden.</p>
-      {:else}
-        <ul class="einfache-liste">
-          {#each offeneFaeden as faden (faden.id)}
-            <li>
-              <button
-                type="button"
-                class="haken"
-                title="Faden abhaken"
-                aria-label="Faden abhaken"
-                onclick={() => fadenErledigen(faden.id)}
-              >
-                ✓
-              </button>
-              <div class="faden-text"><NoteText text={faden.text} /></div>
-              <span class="alter">{alterInTagenText(faden.ts)}</span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-
-    <section aria-labelledby="referenzen-titel">
-      <div class="abschnitt-kopf">
-        <h2 id="referenzen-titel">Referenzen</h2>
-        <button type="button" class="schlicht" onclick={() => (referenzFormular = !referenzFormular)}>
-          {referenzFormular ? 'Abbrechen' : 'Hinzufügen'}
-        </button>
-      </div>
-
-      {#if referenzFormular}
-        <form class="referenz-formular" onsubmit={referenzSpeichern}>
-          <select bind:value={rTyp} aria-label="Typ">
-            {#each REFERENZ_TYPEN as t (t)}
-              <option value={t}>{REFERENZ_TYP_LABEL[t]}</option>
+      </section>
+      <section aria-labelledby="logbuch-titel">
+        <h2 id="logbuch-titel">Logbuch</h2>
+        {#if notizen.length === 0}
+          <p class="hinweis">Noch keine Einträge.</p>
+        {:else}
+          <!-- Zeitachse statt Kistenstapel: eine Marke je Tag, darunter die Einträge
+               des Tages an einer Linie. Die Quelle steht als Punkt und als Wort. -->
+          <div class="strom">
+            {#each nachTagen(notizen) as gruppe (gruppe.marke + gruppe.eintraege[0].id)}
+              <p class="tagesmarke">{gruppe.marke}</p>
+              <ul class="logbuch">
+                {#each gruppe.eintraege as notiz (notiz.id)}
+                  <li class:erledigt={notiz.erledigt_am}>
+                    <span class="strom-punkt quelle--{notiz.quelle}" aria-hidden="true"></span>
+                    <div class="eintrag">
+                      <NoteText text={notiz.text} />
+                      <div class="logbuch-fuss">
+                        <span class="quelle-marke">{QUELLE_LABEL[notiz.quelle]}</span>
+                        <span class="hinweis">{ART_LABEL[notiz.art]}</span>
+                        {#if notiz.erledigt_am}<span class="hinweis">· erledigt</span>{/if}
+                        <span class="alter" title={datumText(notiz.ts)}>{uhrzeitText(notiz.ts)}</span>
+                        <button
+                          type="button"
+                          class="schlicht umsortieren"
+                          title="Einem anderen Projekt zuordnen"
+                          aria-label="Einem anderen Projekt zuordnen"
+                          onclick={() => (verschiebeNotiz = verschiebeNotiz === notiz.id ? null : notiz.id)}
+                        >
+                          ⇢
+                        </button>
+                      </div>
+                      {#if verschiebeNotiz === notiz.id}
+                        <div class="verschieben">
+                          <label for={`ziel-${notiz.id}`}>Zuordnen zu</label>
+                          <select
+                            id={`ziel-${notiz.id}`}
+                            onchange={(e) => {
+                              const ziel = (e.currentTarget as HTMLSelectElement).value;
+                              if (ziel) notizVerschieben(notiz.id, ziel);
+                            }}
+                          >
+                            <option value="">Projekt wählen …</option>
+                            {#each projekte.filter((p) => p.id !== projekt.id) as p (p.id)}
+                              <option value={p.id}>{p.titel}</option>
+                            {/each}
+                          </select>
+                          <button type="button" class="schlicht" onclick={() => (verschiebeNotiz = null)}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
+                  </li>
+                {/each}
+              </ul>
             {/each}
-          </select>
-          <input
-            bind:value={rZiel}
-            type="text"
-            placeholder="Pfad, URL oder Ort – „Keller, Regal 3, blaue Kiste“"
-            aria-label="Ziel"
-            required
-          />
-          <select bind:value={rRolle} aria-label="Rolle">
-            {#each REFERENZ_ROLLEN as r (r)}
-              <option value={r}>{REFERENZ_ROLLE_LABEL[r]}</option>
-            {/each}
-          </select>
-          <button type="submit" class="primaer" disabled={!rZiel.trim() || wirdGespeichert}>Speichern</button>
-        </form>
-        <p class="hinweis klein">
-          Zwei Adressen kann Lotse selbst lesen: die Abonnement-Adresse eines Kalenders (endet auf
-          <code>.ics</code> oder beginnt mit <code>webcal://</code>) erscheint als <em>Was ansteht</em>, und ein Ordner
-          mit Git-Remote zu GitHub oder GitLab bringt den Stand der Gegenseite mit.
+          </div>
+        {/if}
+      </section>
+      </main>
+
+      <aside class="spalte-neben">
+      {#if !bearbeiten}
+      <section class="karte kurs-karte" aria-labelledby="kurs-titel">
+        <h2 id="kurs-titel">Kurs</h2>
+        <p class="kurs serife">{projekt.kurs || 'Noch kein Kurs gesetzt.'}</p>
+        <p class="meta">
+          {VORLAGEN_LABEL[projekt.vorlage]} · ruhig für {projekt.erwartungsintervall_tage} Tage
+          {#if projekt.wiedervorlage}· Wiedervorlage {projekt.wiedervorlage}{/if}
+          {#if projekt.tags.length > 0}· {projekt.tags.join(', ')}{/if}
         </p>
+      </section>
       {/if}
-
-      {#if gegenseite}
-        <p class="gegenseite">
-          <span class="referenz-typ">{gegenseite.anbieter}</span>
-          <button
-            type="button"
-            class="referenz-ziel oeffnen"
-            onclick={() => referenzOeffnen(gegenseite!.url)}
-            title="Im Browser öffnen"
-          >
-            {gegenseite.repo}
-          </button>
-          {#if gegenseite.herkunft === 'ordner'}<span class="hinweis rolle">aus dem Ordner erkannt</span>{/if}
-          <button type="button" class="schlicht" onclick={gegenseiteAbfragen} disabled={gegenseiteLaeuft}>
-            {gegenseiteLaeuft ? '…' : 'Stand holen'}
-          </button>
-        </p>
-      {/if}
-
-      {#if referenzen.length === 0}
-        <p class="hinweis">Keine Referenzen. Hier gehört hin, wo das Material liegt – auch Regale und Kisten.</p>
-      {:else}
-        <ul class="einfache-liste">
-          {#each referenzen as ref (ref.id)}
-            <li>
-              <span class="referenz-typ">{REFERENZ_TYP_LABEL[ref.typ]}</span>
-              {#if echteDaten && OEFFENBAR.includes(ref.typ)}
-                <button
-                  type="button"
-                  class="referenz-ziel oeffnen"
-                  onclick={() => referenzOeffnen(ref.ziel)}
-                  title="Im System öffnen"
-                >
-                  {ref.ziel}
-                </button>
-              {:else}
-                <span class="referenz-ziel">{ref.ziel}</span>
-              {/if}
-              <span class="hinweis rolle">{REFERENZ_ROLLE_LABEL[ref.rolle]}</span>
-              <span class="badge badge--{ref.pruefstatus}">{PRUEFSTATUS_LABEL[ref.pruefstatus]}</span>
-              <button type="button" class="schlicht" onclick={() => referenzPruefen(ref.id)} disabled={geprueftWird === ref.id}>
-                {geprueftWird === ref.id ? '…' : 'Prüfen'}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-
-    {#if terminQuellen > 0 || terminFehler.length > 0}
-      <section aria-labelledby="termine-titel">
-        <h2 id="termine-titel">Was ansteht</h2>
-        {#each terminFehler as f (f)}
-          <p class="hinweis">{f}</p>
-        {/each}
-        {#if termine.length === 0 && terminFehler.length === 0}
-          <p class="hinweis">In den nächsten 90 Tagen steht nichts im Kalender.</p>
+      <section aria-labelledby="offene-faeden-titel">
+        <h2 id="offene-faeden-titel">Offene Fäden</h2>
+        {#if offeneFaeden.length === 0}
+          <p class="hinweis">Keine offenen Fäden.</p>
         {:else}
           <ul class="einfache-liste">
-            {#each termine as t (t.datum + t.titel + (t.uhrzeit ?? ''))}
+            {#each offeneFaeden as faden (faden.id)}
               <li>
-                <span class="termin-datum">{datumText(t.datum)}</span>
-                <span class="hinweis rolle">{terminZeit(t)}</span>
-                <span class="referenz-ziel">{t.titel}</span>
-                {#if t.ort}<span class="hinweis rolle">{t.ort}</span>{/if}
-                {#if t.ungenau}
-                  <span class="hinweis rolle" title="Die Wiederholungsregel wird nicht ausgerechnet">
-                    wiederholt sich
-                  </span>
-                {/if}
+                <button
+                  type="button"
+                  class="haken"
+                  title="Faden abhaken"
+                  aria-label="Faden abhaken"
+                  onclick={() => fadenErledigen(faden.id)}
+                >
+                  ✓
+                </button>
+                <div class="faden-text"><NoteText text={faden.text} /></div>
+                <span class="alter">{alterInTagenText(faden.ts)}</span>
               </li>
             {/each}
           </ul>
         {/if}
       </section>
-    {/if}
-
-    {#if echteDaten}
-      <section aria-labelledby="deuten-titel">
-        <div class="abschnitt-kopf">
-          <h2 id="deuten-titel">Datei deuten</h2>
-          <button type="button" class="schlicht" onclick={dateiWaehlen} disabled={auszugLaeuft}>
-            {auszugLaeuft ? 'Moment …' : 'Datei wählen'}
-          </button>
-        </div>
-
-        {#if !auszug}
-          <p class="hinweis">
-            Eine einzelne Datei aufmachen und deuten lassen – PDF, Text, Markdown, CSV oder JSON. Du siehst den
-            vollständigen Auszug, bevor etwas gesendet wird. Der Ordner-Beobachter liest weiterhin keine Inhalte.
-          </p>
-          {#if dateiVorschlaege.length > 0}
+      {#if terminQuellen > 0 || terminFehler.length > 0}
+        <section aria-labelledby="termine-titel">
+          <h2 id="termine-titel">Was ansteht</h2>
+          {#each terminFehler as f (f)}
+            <p class="hinweis">{f}</p>
+          {/each}
+          {#if termine.length === 0 && terminFehler.length === 0}
+            <p class="hinweis">In den nächsten 90 Tagen steht nichts im Kalender.</p>
+          {:else}
             <ul class="einfache-liste">
-              {#each dateiVorschlaege as p (p)}
+              {#each termine as t (t.datum + t.titel + (t.uhrzeit ?? ''))}
                 <li>
-                  <button type="button" class="referenz-ziel oeffnen" onclick={() => dateiOeffnen(p)}>{p}</button>
+                  <span class="termin-datum">{datumText(t.datum)}</span>
+                  <span class="hinweis rolle">{terminZeit(t)}</span>
+                  <span class="referenz-ziel">{t.titel}</span>
+                  {#if t.ort}<span class="hinweis rolle">{t.ort}</span>{/if}
+                  {#if t.ungenau}
+                    <span class="hinweis rolle" title="Die Wiederholungsregel wird nicht ausgerechnet">
+                      wiederholt sich
+                    </span>
+                  {/if}
                 </li>
               {/each}
             </ul>
           {/if}
+        </section>
+      {/if}
+      <section aria-labelledby="referenzen-titel">
+        <div class="abschnitt-kopf">
+          <h2 id="referenzen-titel">Referenzen</h2>
+          <button type="button" class="schlicht" onclick={() => (referenzFormular = !referenzFormular)}>
+            {referenzFormular ? 'Abbrechen' : 'Hinzufügen'}
+          </button>
+        </div>
+
+        {#if referenzFormular}
+          <form class="referenz-formular" onsubmit={referenzSpeichern}>
+            <select bind:value={rTyp} aria-label="Typ">
+              {#each REFERENZ_TYPEN as t (t)}
+                <option value={t}>{REFERENZ_TYP_LABEL[t]}</option>
+              {/each}
+            </select>
+            <input
+              bind:value={rZiel}
+              type="text"
+              placeholder="Pfad, URL oder Ort – „Keller, Regal 3, blaue Kiste“"
+              aria-label="Ziel"
+              required
+            />
+            <select bind:value={rRolle} aria-label="Rolle">
+              {#each REFERENZ_ROLLEN as r (r)}
+                <option value={r}>{REFERENZ_ROLLE_LABEL[r]}</option>
+              {/each}
+            </select>
+            <button type="submit" class="primaer" disabled={!rZiel.trim() || wirdGespeichert}>Speichern</button>
+          </form>
+          <p class="hinweis klein">
+            Zwei Adressen kann Lotse selbst lesen: die Abonnement-Adresse eines Kalenders (endet auf
+            <code>.ics</code> oder beginnt mit <code>webcal://</code>) erscheint als <em>Was ansteht</em>, und ein Ordner
+            mit Git-Remote zu GitHub oder GitLab bringt den Stand der Gegenseite mit.
+          </p>
+        {/if}
+
+        {#if gegenseite}
+          <p class="gegenseite">
+            <span class="referenz-typ">{gegenseite.anbieter}</span>
+            <button
+              type="button"
+              class="referenz-ziel oeffnen"
+              onclick={() => referenzOeffnen(gegenseite!.url)}
+              title="Im Browser öffnen"
+            >
+              {gegenseite.repo}
+            </button>
+            {#if gegenseite.herkunft === 'ordner'}<span class="hinweis rolle">aus dem Ordner erkannt</span>{/if}
+            <button type="button" class="schlicht" onclick={gegenseiteAbfragen} disabled={gegenseiteLaeuft}>
+              {gegenseiteLaeuft ? '…' : 'Stand holen'}
+            </button>
+          </p>
+        {/if}
+
+        {#if referenzen.length === 0}
+          <p class="hinweis">Keine Referenzen. Hier gehört hin, wo das Material liegt – auch Regale und Kisten.</p>
         {:else}
-          <div class="ki">
-            <strong>
-              {auszug.name} · {auszug.format_anzeige}{#if auszug.seiten}, {auszug.seiten}
-                {auszug.seiten === 1 ? 'Seite' : 'Seiten'}{/if}
-            </strong>
-            {#if auszug.gekuerzt}
-              <p class="hinweis klein">
-                Gekürzt: die Datei hat {auszug.zeichen_gesamt.toLocaleString('de-DE')} Zeichen, gesendet wird der
-                Anfang.
-              </p>
-            {/if}
-            <strong>Das würde gesendet:</strong>
-            <pre class="ki-text">{auszug.text}</pre>
-            {#if auszugErgebnis}
-              <strong>Antwort:</strong>
-              <div class="ki-antwort"><NoteText text={auszugErgebnis} /></div>
-              <div class="ki-aktionen">
-                <button type="button" onclick={auszugVerwerfen}>Verwerfen</button>
-                <button type="button" class="primaer" onclick={auszugUebernehmen}>Ins Logbuch übernehmen</button>
-              </div>
-            {:else}
-              <div class="ki-aktionen">
-                <button type="button" onclick={auszugVerwerfen}>Abbrechen</button>
-                <button type="button" class="primaer" onclick={auszugSenden} disabled={auszugLaeuft}>
-                  {auszugLaeuft ? 'Frage …' : 'Senden'}
-                </button>
-              </div>
-            {/if}
-          </div>
+          <ul class="einfache-liste">
+            {#each referenzen as ref (ref.id)}
+              <li>
+                <span class="referenz-typ">{REFERENZ_TYP_LABEL[ref.typ]}</span>
+                {#if echteDaten && OEFFENBAR.includes(ref.typ)}
+                  <button
+                    type="button"
+                    class="referenz-ziel oeffnen"
+                    onclick={() => referenzOeffnen(ref.ziel)}
+                    title="Im System öffnen"
+                  >
+                    {ref.ziel}
+                  </button>
+                {:else}
+                  <span class="referenz-ziel">{ref.ziel}</span>
+                {/if}
+                <span class="ref-fuss">
+                  <span class="hinweis rolle">{REFERENZ_ROLLE_LABEL[ref.rolle]}</span>
+                  <span class="badge badge--{ref.pruefstatus}">{PRUEFSTATUS_LABEL[ref.pruefstatus]}</span>
+                  <button
+                    type="button"
+                    class="schlicht"
+                    onclick={() => referenzPruefen(ref.id)}
+                    disabled={geprueftWird === ref.id}
+                  >
+                    {geprueftWird === ref.id ? '…' : 'Prüfen'}
+                  </button>
+                </span>
+              </li>
+            {/each}
+          </ul>
         {/if}
       </section>
-    {/if}
+      <section aria-labelledby="zugaenge-titel">
+        <div class="abschnitt-kopf">
+          <h2 id="zugaenge-titel">Zugänge</h2>
+          <button type="button" class="schlicht" onclick={() => (tresorOffen = true)}>Hinzufügen</button>
+        </div>
+        <TresorListe eintraege={zugaenge} projekte={[projekt]} />
+      </section>
+      {#if echteDaten}
+        <section aria-labelledby="deuten-titel">
+          <div class="abschnitt-kopf">
+            <h2 id="deuten-titel">Datei deuten</h2>
+            <button type="button" class="schlicht" onclick={dateiWaehlen} disabled={auszugLaeuft}>
+              {auszugLaeuft ? 'Moment …' : 'Datei wählen'}
+            </button>
+          </div>
 
-    <section aria-labelledby="zugaenge-titel">
-      <div class="abschnitt-kopf">
-        <h2 id="zugaenge-titel">Zugänge</h2>
-        <button type="button" class="schlicht" onclick={() => (tresorOffen = true)}>Hinzufügen</button>
-      </div>
-      <TresorListe eintraege={zugaenge} projekte={[projekt]} />
-    </section>
-
-    <section aria-labelledby="logbuch-titel">
-      <h2 id="logbuch-titel">Logbuch</h2>
-      {#if notizen.length === 0}
-        <p class="hinweis">Noch keine Einträge.</p>
-      {:else}
-        <ul class="logbuch">
-          {#each notizen as notiz (notiz.id)}
-            <li class:erledigt={notiz.erledigt_am}>
-              <div class="logbuch-kopf">
-                <span class="badge badge--quelle">{QUELLE_LABEL[notiz.quelle]}</span>
-                <span class="hinweis">{ART_LABEL[notiz.art]}</span>
-                {#if notiz.erledigt_am}<span class="hinweis">· erledigt</span>{/if}
-                <span class="alter" title={datumText(notiz.ts)}>{alterInTagenText(notiz.ts)}</span>
-                <button
-                  type="button"
-                  class="schlicht umsortieren"
-                  title="Einem anderen Projekt zuordnen"
-                  onclick={() => (verschiebeNotiz = verschiebeNotiz === notiz.id ? null : notiz.id)}
-                >
-                  ⇢
-                </button>
-              </div>
-              <NoteText text={notiz.text} />
-              {#if verschiebeNotiz === notiz.id}
-                <div class="verschieben">
-                  <label for={`ziel-${notiz.id}`}>Zuordnen zu</label>
-                  <select
-                    id={`ziel-${notiz.id}`}
-                    onchange={(e) => {
-                      const ziel = (e.currentTarget as HTMLSelectElement).value;
-                      if (ziel) notizVerschieben(notiz.id, ziel);
-                    }}
-                  >
-                    <option value="">Projekt wählen …</option>
-                    {#each projekte.filter((p) => p.id !== projekt.id) as p (p.id)}
-                      <option value={p.id}>{p.titel}</option>
-                    {/each}
-                  </select>
-                  <button type="button" class="schlicht" onclick={() => (verschiebeNotiz = null)}>Abbrechen</button>
+          {#if !auszug}
+            <p class="hinweis">
+              Eine einzelne Datei aufmachen und deuten lassen – PDF, Text, Markdown, CSV oder JSON. Du siehst den
+              vollständigen Auszug, bevor etwas gesendet wird. Der Ordner-Beobachter liest weiterhin keine Inhalte.
+            </p>
+            {#if dateiVorschlaege.length > 0}
+              <ul class="einfache-liste">
+                {#each dateiVorschlaege as p (p)}
+                  <li>
+                    <button type="button" class="referenz-ziel oeffnen" onclick={() => dateiOeffnen(p)}>{p}</button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {:else}
+            <div class="ki">
+              <strong>
+                {auszug.name} · {auszug.format_anzeige}{#if auszug.seiten}, {auszug.seiten}
+                  {auszug.seiten === 1 ? 'Seite' : 'Seiten'}{/if}
+              </strong>
+              {#if auszug.gekuerzt}
+                <p class="hinweis klein">
+                  Gekürzt: die Datei hat {auszug.zeichen_gesamt.toLocaleString('de-DE')} Zeichen, gesendet wird der
+                  Anfang.
+                </p>
+              {/if}
+              <strong>Das würde gesendet:</strong>
+              <pre class="ki-text">{auszug.text}</pre>
+              {#if auszugErgebnis}
+                <strong>Antwort:</strong>
+                <div class="ki-antwort"><NoteText text={auszugErgebnis} /></div>
+                <div class="ki-aktionen">
+                  <button type="button" onclick={auszugVerwerfen}>Verwerfen</button>
+                  <button type="button" class="primaer" onclick={auszugUebernehmen}>Ins Logbuch übernehmen</button>
+                </div>
+              {:else}
+                <div class="ki-aktionen">
+                  <button type="button" onclick={auszugVerwerfen}>Abbrechen</button>
+                  <button type="button" class="primaer" onclick={auszugSenden} disabled={auszugLaeuft}>
+                    {auszugLaeuft ? 'Frage …' : 'Senden'}
+                  </button>
                 </div>
               {/if}
-            </li>
-          {/each}
-        </ul>
+            </div>
+          {/if}
+        </section>
       {/if}
-    </section>
+      </aside>
+    </div>
   {/if}
 {:catch fehler}
   <p class="hinweis fehler">Projekt konnte nicht geladen werden: {fehler.message}</p>
@@ -992,9 +1021,13 @@
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
+    margin-bottom: 1.25rem;
   }
   .kopf h1 {
     margin: 0;
+    font-size: 1.7rem;
+    font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-weight: 600;
   }
   .kopf-rechts {
     display: flex;
@@ -1003,12 +1036,13 @@
   }
   .kurs {
     font-size: 1.05rem;
-    margin: 0.5rem 0 0.3rem;
+    margin: 0.4rem 0 0.5rem;
+    line-height: 1.4;
   }
   .meta {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-gedaempft);
-    margin: 0 0 1.5rem;
+    margin: 0;
   }
 
   .status-bereich {
@@ -1129,9 +1163,10 @@
 
   .erfassen {
     border: 1px solid var(--rahmen);
-    border-radius: 0.6rem;
-    padding: 0.9rem 1rem;
+    border-radius: 0.7rem;
+    padding: 0.85rem 0.95rem;
     background: var(--karten-hintergrund);
+    box-shadow: var(--schatten);
   }
   .erfassen h2 {
     margin: 0 0 0.5rem;
@@ -1168,12 +1203,63 @@
     font-weight: 600;
   }
 
+  /* Arbeitsfläche: Logbuch links, alles Begleitende rechts. Unter 64rem fällt die
+     Nebenspalte darunter – gleiche Reihenfolge, nur gestapelt. */
+  .arbeitsflaeche {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .spalte-haupt {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .spalte-neben {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: sticky;
+    top: 1rem;
+  }
+  @media (max-width: 64rem) {
+    .arbeitsflaeche {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .spalte-neben {
+      position: static;
+    }
+  }
+
+  /* Jeder Abschnitt der Nebenspalte ist eine Karte. Im Hauptteil trägt nur die
+     Erfassung einen Rahmen – das Logbuch soll fließen, nicht in einer Kiste sitzen. */
+  .spalte-neben > :global(section) {
+    border: 1px solid var(--rahmen);
+    border-radius: 0.7rem;
+    background: var(--karten-hintergrund);
+    padding: 0.75rem 0.85rem;
+    margin: 0;
+    box-shadow: var(--schatten);
+  }
+  .kurs-karte {
+    border-left: 3px solid var(--feuer) !important;
+  }
   section {
-    margin-bottom: 1.75rem;
+    margin-bottom: 0;
   }
   h2 {
-    font-size: 1rem;
-    margin: 0 0 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-gedaempft);
+    margin: 0 0 0.55rem;
+  }
+  .spalte-haupt > section:not(.erfassen) > h2 {
+    margin-bottom: 0.8rem;
   }
   .abschnitt-kopf {
     display: flex;
@@ -1198,11 +1284,6 @@
   }
   button:disabled {
     opacity: 0.5;
-  }
-  button.primaer {
-    border-color: var(--akzent);
-    color: var(--akzent);
-    font-weight: 600;
   }
   button.schlicht {
     padding: 0.2rem 0.6rem;
@@ -1302,6 +1383,83 @@
     border-radius: 0.5rem;
     background: var(--karten-hintergrund);
   }
+  /* In der Nebenspalte sitzt die Liste schon in einer Karte. Noch ein Rahmen darin
+     wäre eine Kiste in der Kiste – dort reicht eine Trennlinie. */
+  .spalte-neben .einfache-liste {
+    gap: 0;
+  }
+  .spalte-neben .einfache-liste li {
+    border: none;
+    border-top: 1px solid var(--rahmen-still);
+    border-radius: 0;
+    background: transparent;
+    padding: 0.55rem 0;
+  }
+  .spalte-neben .einfache-liste li:first-child {
+    border-top: none;
+    padding-top: 0.15rem;
+  }
+  /* Das Alter bekommt eine eigene Zeile. Stand es neben dem Text, blieben dem Faden
+     in 22rem Breite vier Wörter pro Zeile. */
+  /* `flex-basis: auto` heißt „so breit wie mein Inhalt“ – ein umbrechender Container
+     schiebt das Feld dann in die nächste Zeile, statt es schrumpfen zu lassen. Mit
+     Basis 0 teilt es sich die Zeile mit dem Haken. */
+  .spalte-neben .einfache-liste .faden-text {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .spalte-neben .einfache-liste .alter {
+    flex-basis: 100%;
+    text-align: right;
+    font-size: 0.72rem;
+  }
+  /* Tresor-Einträge sitzen hier schon in einer Karte. */
+  .spalte-neben :global(.tresor-liste > li) {
+    border: none;
+    border-top: 1px solid var(--rahmen-still);
+    border-radius: 0;
+    background: transparent;
+    padding: 0.6rem 0;
+  }
+  .spalte-neben :global(.tresor-liste > li:first-child) {
+    border-top: none;
+    padding-top: 0.15rem;
+  }
+  .spalte-neben :global(.tresor-liste) {
+    gap: 0;
+  }
+  /* Adressen brechen sonst mitten im Wort um; in 22rem Breite ist ein sauberes
+     Abschneiden lesbarer als „…beis / piel/getraenkekasse.git“. */
+  .spalte-neben .referenz-ziel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    font-size: 0.82rem;
+  }
+  .spalte-neben .referenz-typ {
+    font-size: 0.66rem;
+    letter-spacing: 0.07em;
+  }
+  .spalte-neben .rolle {
+    font-size: 0.72rem;
+  }
+  /* Rolle, Prüfstatus und Knopf in eine zweite Zeile: sonst bleiben der Adresse in
+     22rem Breite acht Zeichen und ein Auslassungszeichen. */
+  .ref-fuss {
+    display: contents;
+  }
+  .spalte-neben .ref-fuss {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-basis: 100%;
+    margin-top: 0.1rem;
+  }
+  .spalte-neben .ref-fuss .schlicht {
+    margin-left: auto;
+  }
   .haken {
     align-self: center;
     padding: 0 0.45rem;
@@ -1375,30 +1533,100 @@
     border-color: var(--akzent);
   }
 
+  /* Der Strom: eine senkrechte Linie, an der die Tage hängen. Die Linie liegt hinter
+     den Punkten, die Punkte tragen einen Rand in Hintergrundfarbe – so wirkt es
+     durchbrochen, ohne dass die Linie stückweise gezeichnet werden müsste. */
+  .strom {
+    position: relative;
+    padding-left: 1.4rem;
+  }
+  .strom::before {
+    content: '';
+    position: absolute;
+    left: 0.28rem;
+    top: 0.4rem;
+    bottom: 0.6rem;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--linie);
+  }
+  /* Die Marke steht neben der Linie, nicht auf ihr. Erst hatte sie eine Fläche in
+     Hintergrundfarbe, um die Linie zu durchbrechen – bei einem Eintrag pro Tag hat
+     das die Linie restlos verdeckt. Jetzt läuft sie durch. */
+  .tagesmarke {
+    margin: 1rem 0 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-gedaempft);
+  }
+  .tagesmarke:first-child {
+    margin-top: 0;
+  }
+
   .logbuch {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.15rem;
   }
   .logbuch li {
-    padding: 0.7rem 0.9rem;
-    border: 1px solid var(--rahmen);
-    border-radius: 0.5rem;
-    background: var(--karten-hintergrund);
+    position: relative;
+    padding: 0.4rem 0;
   }
   .logbuch li.erledigt {
-    opacity: 0.6;
+    opacity: 0.55;
   }
-  .logbuch-kopf {
+  .strom-punkt {
+    position: absolute;
+    left: -1.47rem;
+    top: 0.72rem;
+    width: 0.64rem;
+    height: 0.64rem;
+    border-radius: 50%;
+    background: var(--text-gedaempft);
+    outline: 3px solid var(--hintergrund);
+  }
+  /* Woher der Eintrag kommt, auf einen Blick. Bernstein steht für „von Hand“ –
+     das ist die Quelle, die zählt. */
+  .strom-punkt.quelle--mensch,
+  .strom-punkt.quelle--cli {
+    background: var(--feuer);
+  }
+  .strom-punkt.quelle--git,
+  .strom-punkt.quelle--mcp,
+  .strom-punkt.quelle--ki {
+    background: var(--akzent);
+  }
+  .eintrag {
+    min-width: 0;
+  }
+  .logbuch-fuss {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
   }
-  .logbuch-kopf .alter {
+  .logbuch-fuss .alter {
     margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .quelle-marke {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-gedaempft);
+  }
+  /* Das Umsortieren ist selten gebraucht: erst zeigen, wenn man den Eintrag anfasst. */
+  .umsortieren {
+    opacity: 0;
+  }
+  .logbuch li:hover .umsortieren,
+  .umsortieren:focus-visible {
+    opacity: 1;
   }
 </style>

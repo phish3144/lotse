@@ -14,5 +14,6 @@ Vier Artboards: Projektseite als Arbeitsfläche, Hafen, Einstellungen, Palette.
 Ändern heißt: `_*`-Quelle bearbeiten, `./_bau.sh <Name>` je Artboard, neu zusammensetzen.
 Die zusammengesetzte Datei steht in `.gitignore` – sie ist erzeugt, nicht gepflegt.
 
-Die Palette gilt noch nicht in `apps/web`: `src/app.css` trägt die alten Werte, bis der
-Umbau ansteht.
+Die Palette ist seit dem Umbau in `apps/web/src/app.css` umgesetzt; die Artboards sind
+damit Vorlage und Gedächtnis, nicht mehr Vorschlag. Weicht der Entwurf von der App ab,
+gilt die App.

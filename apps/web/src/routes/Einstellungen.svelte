@@ -25,8 +25,27 @@
     type SyncStatus,
     type UpdateStand,
   } from '../lib/data/tauri';
+  import { router } from '../lib/router.svelte';
   import { datumText } from '../lib/format';
   import { meldungen } from '../lib/meldung.svelte';
+
+  // --- Reiter ---------------------------------------------------------------
+  // Der gewählte Bereich steht in der Adresse (#/einstellungen/ki). Das kostet nichts
+  // und macht Lesezeichen, Zurück-Taste und „schick mir den Link“ möglich.
+  const REITER = [
+    { id: 'ordner', name: 'Ordner' },
+    { id: 'verbindungen', name: 'Verbindungen' },
+    { id: 'abgleich', name: 'Abgleich' },
+    { id: 'ki', name: 'KI' },
+    { id: 'export', name: 'Export' },
+    { id: 'sicherheit', name: 'Sicherheit' },
+    { id: 'version', name: 'Version' },
+  ] as const;
+
+  const reiter = $derived.by(() => {
+    const gewaehlt = router.current.segmente[1];
+    return REITER.some((r) => r.id === gewaehlt) ? gewaehlt : 'ordner';
+  });
 
   // --- Ordner durchsuchen und beobachten ------------------------------------
   let wurzel = $state('');
@@ -484,6 +503,18 @@
 
 <h1>Einstellungen</h1>
 
+<!-- Reiter statt einer Bahn: die Seite war 1234 Zeilen lang und alles stand
+     gleichzeitig offen. Die Reiter liegen in der Adresse (#/einstellungen/ki), damit
+     ein Lesezeichen und die Zurück-Taste weiter funktionieren. -->
+<div class="einst-flaeche">
+  <nav class="reiter" aria-label="Bereiche">
+    {#each REITER as r (r.id)}
+      <a href={`#/einstellungen/${r.id}`} class:aktiv={reiter === r.id}>{r.name}</a>
+    {/each}
+  </nav>
+  <div class="einst-inhalt">
+
+{#if reiter === 'ordner'}
 <section aria-labelledby="ordner-titel">
   <h2 id="ordner-titel">Ordner</h2>
   <p class="hinweis">
@@ -530,7 +561,9 @@
     <p class="nur-desktop">Nur in der Desktop-App: der Browser hat keinen Zugriff auf deine Ordner.</p>
   {/if}
 </section>
+{/if}
 
+{#if reiter === 'export'}
 <section aria-labelledby="export-titel">
   <h2 id="export-titel">Export</h2>
   <p class="hinweis">
@@ -559,7 +592,9 @@
     <p class="nur-desktop">Nur in der Desktop-App.</p>
   {/if}
 </section>
+{/if}
 
+{#if reiter === 'ki'}
 <section aria-labelledby="ki-titel">
   <h2 id="ki-titel">KI-Verdichtung</h2>
   <p class="hinweis">
@@ -657,7 +692,9 @@
     {/if}
   {/if}
 </section>
+{/if}
 
+{#if reiter === 'verbindungen'}
 <section aria-labelledby="mcp-titel">
   <h2 id="mcp-titel">Zugang für Assistenten (MCP)</h2>
   <p class="hinweis">
@@ -860,7 +897,9 @@
     dass er sich wiederholt.
   </p>
 </section>
+{/if}
 
+{#if reiter === 'abgleich'}
 <section aria-labelledby="sync-titel">
   <h2 id="sync-titel">Abgleich zwischen Geräten</h2>
   {#if !echteDaten}
@@ -941,8 +980,10 @@
     {/if}
   {/if}
 </section>
+{/if}
 
 {#if echteDaten}
+  {#if reiter === 'sicherheit'}
   <section aria-labelledby="sicherheit-titel">
     <h2 id="sicherheit-titel">Sicherheit</h2>
 
@@ -986,7 +1027,9 @@
       <button type="button" onclick={() => (pwOffen = true)}>Master-Passwort ändern</button>
     {/if}
   </section>
+  {/if}
 
+  {#if reiter === 'version'}
   <section aria-labelledby="update-titel">
   <h2 id="update-titel">Version und Updates</h2>
   {#if !echteDaten}
@@ -1040,7 +1083,9 @@
     </button>
   {/if}
 </section>
+  {/if}
 
+{#if reiter === 'sicherheit'}
 <section aria-labelledby="geraet-titel">
     <h2 id="geraet-titel">Dieses Gerät</h2>
     {#if kontoStatus}
@@ -1068,8 +1113,62 @@
     <button type="button" onclick={sperren}>Jetzt sperren</button>
   </section>
 {/if}
+{/if}
+  </div>
+</div>
 
 <style>
+  h1 {
+    font-size: 1.7rem;
+    font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-weight: 600;
+    margin: 0 0 1.25rem;
+  }
+  .einst-flaeche {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+  .reiter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    position: sticky;
+    top: 1rem;
+  }
+  .reiter a {
+    color: var(--text-gedaempft);
+    text-decoration: none;
+    font-size: 0.88rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.5rem;
+  }
+  .reiter a:hover {
+    color: var(--fg);
+    background: var(--flaeche-still);
+  }
+  .reiter a.aktiv {
+    color: var(--fg);
+    font-weight: 600;
+    background: var(--flaeche-still);
+  }
+  .einst-inhalt {
+    min-width: 0;
+    max-width: 46rem;
+  }
+  @media (max-width: 60rem) {
+    .einst-flaeche {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+    }
+    .reiter {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+
   h1 {
     font-size: 1.5rem;
     margin: 0 0 1.5rem;
@@ -1230,11 +1329,6 @@
   }
   button:hover:not(:disabled) {
     border-color: var(--akzent);
-  }
-  button.primaer {
-    border-color: var(--akzent);
-    color: var(--akzent);
-    font-weight: 600;
   }
   button.gefahr {
     border-color: var(--farbe-ueberfaellig);

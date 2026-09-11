@@ -168,11 +168,6 @@
     border-radius: 0.4rem;
     padding: 0.45rem 0.9rem;
   }
-  .aktionen .primaer {
-    border-color: var(--akzent);
-    color: var(--akzent);
-    font-weight: 600;
-  }
   .aktionen button:disabled {
     opacity: 0.5;
   }

@@ -76,14 +76,6 @@
     margin: 0;
     font-size: 1.5rem;
   }
-  .primaer {
-    border: 1px solid var(--akzent);
-    background: var(--karten-hintergrund);
-    color: var(--akzent);
-    font-weight: 600;
-    border-radius: 0.4rem;
-    padding: 0.4rem 0.85rem;
-  }
   .einleitung {
     max-width: 46rem;
     margin: 0 0 1rem;

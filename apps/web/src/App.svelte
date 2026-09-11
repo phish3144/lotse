@@ -164,9 +164,25 @@
     <header class="kopfzeile">
       <div class="links">
         {#if router.kannZurueck}
-          <button type="button" class="zurueck" onclick={zurueck} title="Zurück (Alt+←)" aria-label="Zurück">←</button>
+          <button type="button" class="zurueck" onclick={zurueck} title="Zurück (Alt+←)" aria-label="Zurück">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+          </button>
         {/if}
-        <a class="logo" href="#/">Lotse</a>
+        <a class="logo" href="#/">
+          <!-- Dieselbe Marke wie das App-Icon (src-tauri/icons/icon.svg), inline:
+               CLAUDE.md erlaubt keine Fremdressourcen, und eine Datei zu laden wäre
+               für vier Formen Verschwendung. -->
+          <svg viewBox="0 0 256 256" width="22" height="22" aria-hidden="true">
+            <rect width="256" height="256" rx="56" fill="#14304a" />
+            <g fill="none" stroke="#2e5f7a" stroke-width="10" opacity="0.75">
+              <path d="M-10 200 C 40 180, 70 220, 120 200 S 200 180, 270 205" />
+              <path d="M-10 222 C 40 202, 70 242, 120 222 S 200 202, 270 227" />
+            </g>
+            <path d="M80 56h32v112h64v32H80z" fill="#f2b544" />
+            <circle cx="184" cy="72" r="20" fill="#e8e1d1" />
+          </svg>
+          Lotse
+        </a>
       </div>
       <nav>
         <a href="#/" class:aktiv={router.current.segmente.length === 0}>Hafen</a>
@@ -226,9 +242,9 @@
 
 <style>
   .app-geruest {
-    max-width: 64rem;
+    max-width: 82rem;
     margin: 0 auto;
-    padding: 0 1.25rem 3rem;
+    padding: 0 1.5rem 3rem;
   }
   .update-band {
     display: flex;
@@ -262,38 +278,49 @@
     gap: 0.6rem;
   }
   .zurueck {
-    border: 1px solid var(--rahmen);
-    background: var(--karten-hintergrund);
-    color: inherit;
-    border-radius: 0.4rem;
-    padding: 0.15rem 0.55rem;
-    font-size: 1rem;
-    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-gedaempft);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.4rem;
   }
   .zurueck:hover {
-    border-color: var(--akzent);
+    background: var(--flaeche-still);
+    color: var(--fg);
   }
   .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 700;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
+    letter-spacing: -0.015em;
     color: inherit;
     text-decoration: none;
   }
   nav {
     display: flex;
-    gap: 1.1rem;
+    gap: 0.15rem;
   }
+  /* Reiter statt Textlinks: die aktive Seite trägt eine Fläche, keine Farbe –
+     Bernstein und Akzent bleiben den Handlungen und Zuständen vorbehalten. */
   nav a {
     color: var(--text-gedaempft);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 0.45rem;
   }
   nav a:hover {
     color: var(--fg);
+    background: var(--flaeche-still);
   }
   nav a.aktiv {
-    color: var(--akzent);
+    color: var(--fg);
     font-weight: 600;
+    background: var(--flaeche-still);
   }
   .aktionen {
     display: flex;
@@ -302,13 +329,18 @@
   .werkzeug {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     border: 1px solid var(--rahmen);
-    background: var(--karten-hintergrund);
-    color: inherit;
-    border-radius: 0.4rem;
-    padding: 0.35rem 0.7rem;
+    background: var(--hintergrund);
+    color: var(--text-gedaempft);
+    border-radius: 0.5rem;
+    padding: 0.38rem 0.7rem;
+    font-size: 0.85rem;
     white-space: nowrap;
+  }
+  .werkzeug:hover {
+    color: var(--fg);
+    border-color: var(--akzent);
   }
   .werkzeug:hover {
     border-color: var(--akzent);

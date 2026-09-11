@@ -260,11 +260,6 @@
   .aktionen button {
     padding: 0.45rem 0.9rem;
   }
-  .aktionen .primaer {
-    border-color: var(--akzent);
-    color: var(--akzent);
-    font-weight: 600;
-  }
   button:disabled {
     opacity: 0.5;
   }
