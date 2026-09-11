@@ -242,6 +242,7 @@ Damit kehrt sich die Rechnung um, und der Austausch findet in der App statt:
 |---|---|
 | Die geladene Fassung muss zum öffentlichen Schlüssel in `tauri.conf.json` passen, sonst wird sie verworfen | ausgetauschte Dateien auf dem Weg, ein übernommenes GitHub-Konto, ein untergeschobener Spiegel |
 | Der private Schlüssel liegt ausschließlich als GitHub-Geheimnis, nie im Repo und nie auf einem Entwicklerrechner im Klartext | Diebstahl aus dem Quelltext oder aus einem Backup |
+| Der öffentliche Schlüssel (`4BDDE1BB5195DE67`) steht versioniert in `tauri.conf.json` – jede Änderung daran ist im Verlauf sichtbar | ein stiller Tausch des Vertrauensankers |
 | Der Austausch beginnt nur auf Klick; nichts wird im Hintergrund installiert | stille Änderungen an einem Programm, das den Tresor öffnet |
 | Vor dem Austausch wird gesperrt | der Schlüssel liegt im Speicher dieses Prozesses und soll den Neustart nicht überleben |
 | Aus `.deb` und `.rpm` heraus wird gar nicht erst versucht (erkannt an fehlendem `APPIMAGE`) | zerrissene Buchführung der Paketverwaltung |

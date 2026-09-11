@@ -54,9 +54,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Workspace
+        uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories bans licenses sources
+      # Die Tauri-Hülle ist kein Workspace-Mitglied und wurde deshalb lange gar nicht
+      # geprüft – eine halbe Abhängigkeitskette ohne Aufsicht. Ihre Ausnahmen stehen
+      # kommentiert in deny.toml.
+      - name: Tauri-Hülle
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          manifest-path: apps/desktop/src-tauri/Cargo.toml
 
   web:
     name: Web-Oberfläche

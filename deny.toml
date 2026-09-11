@@ -7,6 +7,29 @@ ignore = [
   # proc-macro-error2 ist unbetreut; kommt nur über age → i18n-embed-fl (Fehlermeldungs-Lokalisierung)
   # zur Compile-Zeit ins Spiel, keine Laufzeitwirkung. Beobachten, bis age umstellt.
   { id = "RUSTSEC-2026-0173", reason = "nur Build-Zeit über age/i18n-embed-fl, keine Alternative ohne age-Fork" },
+
+  # Hinweis: beim Lauf über den Workspace meldet cargo-deny für die folgenden sechs
+  # „no crate matched advisory criteria“. Das ist richtig so – sie greifen nur beim
+  # zweiten Lauf über die Hülle. Eine eigene deny.toml dafür würde die Lizenzliste
+  # verdoppeln, und zwei Wahrheiten sind schlechter als sechs Warnungen.
+  #
+  # --- Ab hier: nur im Baum der Tauri-Hülle (apps/desktop/src-tauri), eingetragen am
+  # 2026-09-11, als die Hülle erstmals mitgeprüft wurde. „Unbetreut“ heißt: das Projekt
+  # dahinter wird nicht weiterentwickelt – nicht, dass wir eine alte Fassung benutzen.
+  # Keines davon ist eine bekannte Lücke, und keines liegt in unserer Hand: sie kommen
+  # aus Tauris eigenen Abhängigkeiten. Beim nächsten Tauri-Sprung nachsehen, ob sie weg
+  # sind, und diese Zeilen dann streichen.
+
+  # Fünf Unicode-Tabellen über urlpattern → tauri-utils. Laufzeit, aber reine
+  # Tabellendaten ohne Ein-/Ausgabe.
+  { id = "RUSTSEC-2025-0081", reason = "unic-char-property über urlpattern → tauri-utils; Tauri-eigener Baum" },
+  { id = "RUSTSEC-2025-0075", reason = "unic-char-range über urlpattern → tauri-utils; Tauri-eigener Baum" },
+  { id = "RUSTSEC-2025-0080", reason = "unic-common über urlpattern → tauri-utils; Tauri-eigener Baum" },
+  { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident über urlpattern → tauri-utils; Tauri-eigener Baum" },
+  { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version über urlpattern → tauri-utils; Tauri-eigener Baum" },
+
+  # Nur Linux und nur zur Compile-Zeit: glib-macros → gtk → libappindicator → tray-icon.
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error nur Build-Zeit über gtk/tray-icon (Linux); Tauri-eigener Baum" },
 ]
 
 [licenses]

@@ -5,6 +5,11 @@ version = "0.5.0"
 edition = "2021"
 rust-version = "1.85"
 license-file = "../../../LICENSE-PENDING"
+repository = "https://github.com/phish3144/lotse"
+# Wie jedes andere Crate hier: nichts davon gehört nach crates.io. Fehlte bisher, weil
+# dieses Crate kein Workspace-Mitglied ist und die Vorgabe daher nicht geerbt hat –
+# `cargo deny` hat es gemeldet, sobald die Hülle mitgeprüft wurde.
+publish = false
 
 # Bewusst kein Workspace-Mitglied: braucht GTK/WebKit (Linux), Xcode (macOS) bzw. WebView2
 # (Windows) zum Bauen. Aufnahme in den Workspace, sobald die CI diese Abhängigkeiten hat.
