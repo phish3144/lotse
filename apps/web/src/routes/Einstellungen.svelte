@@ -177,6 +177,41 @@
   let forgeFeldGitlab = $state('token');
   let forgeLaeuft = $state(false);
 
+  let forgeToken = $state('');
+  let forgeTokenGitlab = $state('');
+  let forgeMehr = $state(false);
+
+  /** Ist für diesen Hoster ein Token hinterlegt? */
+  function forgeVerbunden(anbieter: 'GitHub' | 'GitLab') {
+    const e = anbieter === 'GitHub' ? forgeStatus?.token_eintrag : forgeStatus?.token_eintrag_gitlab;
+    return !!e;
+  }
+
+  // Ein Feld, ein Knopf. Den Tresor-Eintrag legt Lotse selbst an.
+  async function forgeTokenEinfuegen(anbieter: 'GitHub' | 'GitLab') {
+    const token = (anbieter === 'GitHub' ? forgeToken : forgeTokenGitlab).trim();
+    if (!token) return;
+    try {
+      await forge.tokenEinfuegen(anbieter, token);
+      if (anbieter === 'GitHub') forgeToken = '';
+      else forgeTokenGitlab = '';
+      forgeStatus = await forge.status();
+      meldungen.zeigen(`Mit ${anbieter} verbunden. Das Token liegt verschlüsselt im Tresor.`);
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
+  async function forgeTrennen(anbieter: 'GitHub' | 'GitLab') {
+    try {
+      await forge.trennen(anbieter);
+      forgeStatus = await forge.status();
+      meldungen.zeigen(`Verbindung zu ${anbieter} gelöst. Das Token bleibt im Tresor.`);
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
   // Je Hoster eine eigene Bindung: ein GitHub-Token darf nie bei GitLab landen.
   async function forgeVerbinden(anbieter: 'GitHub' | 'GitLab') {
     const eintrag = anbieter === 'GitHub' ? forgeEintrag : forgeEintragGitlab;
@@ -715,30 +750,79 @@
         </li>
       {/each}
     </ul>
-    <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitHub'); }}>
-      <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem GitHub-Token">
-        <option value="">GitHub ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
-        {#each tresorEintraege as t (t.id)}
-          <option value={t.id}>GitHub: {t.titel}</option>
-        {/each}
-      </select>
-      <input bind:value={forgeFeld} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
-      <button type="submit">Merken</button>
-    </form>
-    <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitLab'); }}>
-      <select bind:value={forgeEintragGitlab} aria-label="Tresor-Eintrag mit dem GitLab-Token">
-        <option value="">GitLab ohne Token (nur öffentliche Repos, kleines Kontingent)</option>
-        {#each tresorEintraege as t (t.id)}
-          <option value={t.id}>GitLab: {t.titel}</option>
-        {/each}
-      </select>
-      <input bind:value={forgeFeldGitlab} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
-      <button type="submit">Merken</button>
-    </form>
-    <p class="hinweis klein">
-      Für private Repos und ein größeres Kontingent: einen Token als Tresor-Eintrag anlegen und hier wählen – je
-      Hoster getrennt, damit ein GitHub-Token nie bei GitLab landet. Lotse liest ihn nur beim Abfragen.
-    </p>
+    {#each [{ name: 'GitHub', url: 'https://github.com/settings/tokens', hinweis: 'Berechtigung „repo“ genügt' }, { name: 'GitLab', url: 'https://gitlab.com/-/user_settings/personal_access_tokens', hinweis: 'Bereich „read_api“ genügt' }] as h (h.name)}
+      {@const verbunden = forgeVerbunden(h.name as 'GitHub' | 'GitLab')}
+      <div class="verbindung">
+        <span class="verbindung-name">{h.name}</span>
+        {#if verbunden}
+          <span class="verbindung-lage verbunden">Verbunden</span>
+          <span class="hinweis klein">Token liegt im Tresor. Private Repos sind erreichbar.</span>
+          <button type="button" onclick={() => forgeTrennen(h.name as 'GitHub' | 'GitLab')}>Trennen</button>
+        {:else}
+          <input
+            type="password"
+            placeholder="Token einfügen"
+            autocomplete="off"
+            aria-label={`${h.name}-Token`}
+            value={h.name === 'GitHub' ? forgeToken : forgeTokenGitlab}
+            oninput={(e) => {
+              if (h.name === 'GitHub') forgeToken = e.currentTarget.value;
+              else forgeTokenGitlab = e.currentTarget.value;
+            }}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                forgeTokenEinfuegen(h.name as 'GitHub' | 'GitLab');
+              }
+            }}
+          />
+          <button
+            type="button"
+            class="primaer"
+            disabled={!(h.name === 'GitHub' ? forgeToken : forgeTokenGitlab).trim()}
+            onclick={() => forgeTokenEinfuegen(h.name as 'GitHub' | 'GitLab')}
+          >
+            Verbinden
+          </button>
+          {#if echteDaten}
+            <button type="button" class="schlicht" onclick={() => system.oeffnen(h.url)}>Token erstellen …</button>
+          {/if}
+        {/if}
+      </div>
+      {#if !verbunden}
+        <p class="hinweis klein">{h.hinweis}. Ohne Token gehen nur öffentliche Repos, und nur wenige Abfragen pro Stunde.</p>
+      {/if}
+    {/each}
+
+    <button type="button" class="schlicht" onclick={() => (forgeMehr = !forgeMehr)}>
+      {forgeMehr ? 'Weniger' : 'Ich habe das Token schon im Tresor'}
+    </button>
+    {#if forgeMehr}
+      <p class="hinweis klein">
+        Dann zeig hier auf den vorhandenen Eintrag statt ein Token einzufügen. Je Hoster getrennt, damit ein
+        GitHub-Token nie bei GitLab landet.
+      </p>
+      <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitHub'); }}>
+        <select bind:value={forgeEintrag} aria-label="Tresor-Eintrag mit dem GitHub-Token">
+          <option value="">GitHub ohne Token</option>
+          {#each tresorEintraege as t (t.id)}
+            <option value={t.id}>GitHub: {t.titel}</option>
+          {/each}
+        </select>
+        <input bind:value={forgeFeld} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
+        <button type="submit">Merken</button>
+      </form>
+      <form class="zeile" onsubmit={(e) => { e.preventDefault(); forgeVerbinden('GitLab'); }}>
+        <select bind:value={forgeEintragGitlab} aria-label="Tresor-Eintrag mit dem GitLab-Token">
+          <option value="">GitLab ohne Token</option>
+          {#each tresorEintraege as t (t.id)}
+            <option value={t.id}>GitLab: {t.titel}</option>
+          {/each}
+        </select>
+        <input bind:value={forgeFeldGitlab} type="text" placeholder="Feldname" aria-label="Feldname" class="schmal" />
+        <button type="submit">Merken</button>
+      </form>
+    {/if}
     <label class="schalter">
       <input
         type="checkbox"
@@ -1078,6 +1162,28 @@
     border-radius: 0.6rem;
     background: var(--karten-hintergrund);
   }
+  .verbindung {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+  }
+
+  .verbindung-name {
+    font-weight: 600;
+    min-width: 5rem;
+  }
+
+  .verbindung-lage.verbunden {
+    color: var(--gruen, #2f6f4f);
+    font-weight: 600;
+  }
+
+  .verbindung input {
+    flex: 1 1 14rem;
+  }
+
   .beobachter .schmal {
     width: 7ch;
     text-align: center;

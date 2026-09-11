@@ -350,12 +350,31 @@ impl ReferenzTyp {
     }
 
     /// Pfade gelten nur auf dem Gerät, auf dem sie angelegt wurden.
+    ///
+    /// Achtung: Der Typ allein entscheidet das nicht. `git_repo` steht für zwei Dinge –
+    /// einen Ordner mit `.git` **und** eine Adresse wie `https://github.com/o/r`. Nur das
+    /// erste ist gerätegebunden. Deshalb fragt man besser `Referenz::geraetegebunden`,
+    /// die auch das Ziel ansieht.
     pub fn geraetegebunden(self) -> bool {
         matches!(
             self,
             ReferenzTyp::Ordner | ReferenzTyp::GitRepo | ReferenzTyp::Datei
         )
     }
+}
+
+/// Zeigt das Ziel ins Netz statt auf die Platte?
+///
+/// `git_repo` kann beides sein. Wer das verwechselt, sucht `https://github.com/o/r` im
+/// Dateisystem, findet es nicht und meldet »nicht erreichbar« – für eine Adresse, die es
+/// gibt.
+pub fn ziel_ist_adresse(ziel: &str) -> bool {
+    let z = ziel.trim();
+    ["http://", "https://", "ssh://", "git://"]
+        .iter()
+        .any(|p| z.len() > p.len() && z[..p.len()].eq_ignore_ascii_case(p))
+        // `git@github.com:o/r.git` – die Kurzform, die `git remote -v` ausgibt.
+        || (z.starts_with("git@") && z.contains(':'))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -427,6 +446,11 @@ pub struct Referenz {
 }
 
 impl Referenz {
+    /// Gilt diese Referenz nur auf einem Gerät? Adressen gelten überall.
+    pub fn geraetegebunden(&self) -> bool {
+        self.typ.geraetegebunden() && !ziel_ist_adresse(&self.ziel)
+    }
+
     pub fn neu(
         projekt_id: Ulid,
         typ: ReferenzTyp,

@@ -14,7 +14,7 @@
 
 use std::time::Duration;
 
-use crate::Error;
+use crate::{Error, Result};
 
 /// Ein Agent mit dem gemeinsamen Zuschnitt und eigener Zeitgrenze.
 pub fn agent(zeitgrenze: Duration) -> ureq::Agent {
@@ -43,5 +43,18 @@ pub fn fehler(e: ureq::Error, wohin: &str) -> Error {
         }
         ureq::Error::StatusCode(s) => Error::Netz(format!("{wohin} antwortete {s}")),
         andere => Error::Netz(andere.to_string()),
+    }
+}
+
+/// Gibt es das, was unter dieser Adresse liegt?
+///
+/// Bewusst großzügig: 401 und 403 heißen »da, aber nicht für dich« – das ist erreichbar.
+/// Nur 404/410 und ein Verbindungsfehler heißen »nicht da«. Ein `GET` statt `HEAD`, weil
+/// etliche Server `HEAD` gar nicht beantworten.
+pub fn erreichbar(url: &str) -> Result<bool> {
+    let a = agent(std::time::Duration::from_secs(10));
+    match a.get(url).call() {
+        Ok(r) => Ok(!matches!(r.status().as_u16(), 404 | 410)),
+        Err(e) => Err(fehler(e, url)),
     }
 }

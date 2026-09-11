@@ -255,6 +255,12 @@ export interface ForgeErgebnis {
  */
 export const forge = {
   status: () => invoke<ForgeStatus>('forge_status'),
+  /** Ein Token einfügen – Lotse legt den Tresor-Eintrag selbst an und merkt ihn sich. */
+  tokenEinfuegen: (anbieter: 'GitHub' | 'GitLab', token: string) =>
+    invoke<void>('forge_token_einfuegen', { anbieter, token }),
+  /** Verbindung lösen. Das Token bleibt im Tresor, Lotse benutzt es nur nicht mehr. */
+  trennen: (anbieter: 'GitHub' | 'GitLab') => invoke<void>('forge_trennen', { anbieter }),
+  /** Fortgeschritten: auf einen vorhandenen Tresor-Eintrag zeigen. */
   tokenSetzen: (anbieter: 'GitHub' | 'GitLab', eintragId: string, feld: string) =>
     invoke<void>('forge_token_setzen', { anbieter, eintragId, feld }),
   autoSetzen: (an: boolean) => invoke<void>('forge_auto_setzen', { an }),

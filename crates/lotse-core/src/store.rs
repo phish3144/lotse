@@ -544,12 +544,30 @@ impl Store {
 
     pub fn referenz_speichern(&mut self, x: &Referenz) -> Result<()> {
         let mut x = x.clone();
-        if x.typ.geraetegebunden() && x.geraet_id.is_none() {
-            x.geraet_id = Some(self.device_id);
+        if x.geraetegebunden() {
+            if x.geraet_id.is_none() {
+                x.geraet_id = Some(self.device_id);
+            }
+        } else {
+            // Eine Adresse an ein Gerät zu binden war ein Fehler: auf jedem anderen Gerät
+            // wäre sie dann für immer »nicht prüfbar«. Ältere Bestände heilen hier.
+            x.geraet_id = None;
         }
         let hlc = self.hlc.next(now_ms());
         self.referenz_row_schreiben(&x, &hlc, false)?;
         self.aenderung(RecordKind::Reference, x.id, &hlc, false)
+    }
+
+    /// Eine einzelne Referenz. `None`, wenn es sie nicht (mehr) gibt.
+    pub fn referenz(&self, id: Ulid) -> Result<Option<Referenz>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT * FROM referenzen WHERE id = ?1 AND deleted = 0",
+                params![id.to_string()],
+                Self::referenz_aus_row,
+            )
+            .optional()?)
     }
 
     pub fn referenzen(&self, projekt_id: Ulid) -> Result<Vec<Referenz>> {
@@ -571,8 +589,12 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Prüft eine Referenz auf diesem Gerät (nur Pfade; URLs und Physisches bleiben
-    /// `nicht_pruefbar`).
+    /// Prüft eine Referenz auf diesem Gerät – **nur Pfade**.
+    ///
+    /// Adressen bleiben `nicht_pruefbar`: der Speicher hat kein Netz. Wer eine Adresse
+    /// wirklich prüfen will, nimmt `referenz_status_setzen` und fragt vorher draußen nach
+    /// (die Hülle tut das über `forge`/`netz`). Früher landete eine Adresse hier im
+    /// Pfad-Zweig und kam als »nicht erreichbar« zurück.
     pub fn referenz_pruefen(&mut self, id: Ulid) -> Result<Pruefstatus> {
         let mut x = self
             .conn
@@ -584,6 +606,7 @@ impl Store {
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("Referenz {id}")))?;
         let status = match x.typ {
+            _ if crate::model::ziel_ist_adresse(&x.ziel) => Pruefstatus::NichtPruefbar,
             ReferenzTyp::Ordner | ReferenzTyp::GitRepo | ReferenzTyp::Datei => {
                 if x.geraet_id.is_some_and(|g| g != self.device_id) {
                     Pruefstatus::NichtPruefbar
@@ -599,6 +622,23 @@ impl Store {
         x.zuletzt_geprueft = Some(now_ms());
         self.referenz_speichern(&x)?;
         Ok(status)
+    }
+
+    /// Schreibt einen Prüfstatus, den jemand anders ermittelt hat – die Hülle, nachdem
+    /// sie eine Adresse tatsächlich im Netz gefragt hat.
+    pub fn referenz_status_setzen(&mut self, id: Ulid, status: Pruefstatus) -> Result<()> {
+        let mut x = self
+            .conn
+            .query_row(
+                "SELECT * FROM referenzen WHERE id = ?1 AND deleted = 0",
+                params![id.to_string()],
+                Self::referenz_aus_row,
+            )
+            .optional()?
+            .ok_or_else(|| Error::NotFound(format!("Referenz {id}")))?;
+        x.pruefstatus = status;
+        x.zuletzt_geprueft = Some(now_ms());
+        self.referenz_speichern(&x)
     }
 
     // --------------------------------------------------------------- tresor
@@ -1146,6 +1186,62 @@ fn opt_ulid_col_idx(r: &Row, idx: usize) -> rusqlite::Result<Option<Ulid>> {
 
 #[cfg(test)]
 mod tests {
+    /// Eine Adresse ist kein Dateipfad.
+    ///
+    /// `git_repo` steht für beides: einen Ordner mit `.git` und eine Adresse. Früher lief
+    /// die Adresse in den Pfad-Zweig, `Path::exists()` sagte nein, und die Oberfläche
+    /// meldete »nicht erreichbar« für ein Repo, das es gibt.
+    #[test]
+    fn adresse_wird_nicht_im_dateisystem_gesucht() {
+        use crate::model::{Projekt, Referenz, ReferenzTyp, Rolle, Vorlage};
+        let ak = crate::crypto::Key32::random().unwrap();
+        let mut s = Store::open_in_memory(&ak, Ulid::new()).unwrap();
+        let p = Projekt::neu("Lotse", Vorlage::Software, now_ms());
+        s.projekt_speichern(&p).unwrap();
+
+        let adresse = Referenz::neu(
+            p.id,
+            ReferenzTyp::GitRepo,
+            "https://github.com/phish3144/lotse",
+            Rolle::Material,
+        );
+        s.referenz_speichern(&adresse).unwrap();
+        assert_eq!(
+            s.referenz_pruefen(adresse.id).unwrap(),
+            Pruefstatus::NichtPruefbar,
+            "eine Adresse ist im Speicher nicht prüfbar – aber ganz sicher nicht »nicht erreichbar«"
+        );
+
+        // Und sie hängt an keinem Gerät: sonst wäre sie auf dem zweiten Rechner blind.
+        assert_eq!(s.referenz(adresse.id).unwrap().unwrap().geraet_id, None);
+
+        // Die Hülle trägt das Ergebnis von draußen nach.
+        s.referenz_status_setzen(adresse.id, Pruefstatus::Ok)
+            .unwrap();
+        let danach = s.referenz(adresse.id).unwrap().unwrap();
+        assert_eq!(danach.pruefstatus, Pruefstatus::Ok);
+        assert!(danach.zuletzt_geprueft.is_some());
+
+        // Ein echter Ordner bleibt ein Pfad und wird ans Gerät gebunden.
+        let t = tempfile::tempdir().unwrap();
+        let ordner = Referenz::neu(
+            p.id,
+            ReferenzTyp::GitRepo,
+            t.path().to_string_lossy().to_string(),
+            Rolle::Material,
+        );
+        s.referenz_speichern(&ordner).unwrap();
+        assert_eq!(s.referenz_pruefen(ordner.id).unwrap(), Pruefstatus::Ok);
+        assert!(s.referenz(ordner.id).unwrap().unwrap().geraet_id.is_some());
+
+        let weg = Referenz::neu(p.id, ReferenzTyp::Ordner, "/gibt/es/nicht", Rolle::Material);
+        s.referenz_speichern(&weg).unwrap();
+        assert_eq!(
+            s.referenz_pruefen(weg.id).unwrap(),
+            Pruefstatus::NichtErreichbar
+        );
+    }
+
     use super::*;
     use crate::vault::VaultKeys;
 

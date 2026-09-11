@@ -591,10 +591,44 @@ fn referenz_anlegen(
     })
 }
 
+/// Prüft eine Referenz. Pfade auf der Platte, Adressen im Netz.
+///
+/// Der Netzteil läuft **außerhalb** der Sitzungssperre – sonst stünde die Oberfläche
+/// still, solange GitHub antwortet. Deshalb: Ziel kurz holen, Sperre los, fragen, Ergebnis
+/// kurz zurückschreiben.
 #[tauri::command]
 fn referenz_pruefen(state: State<AppState>, id: String) -> R<Pruefstatus> {
+    use lotse_core::forge::RepoZeiger;
+    use lotse_core::model::ziel_ist_adresse;
+
     let id = ulid(&id)?;
-    mit(&state, |s| s.store.referenz_pruefen(id))
+    let ziel = mit(&state, |s| Ok(s.store.referenz(id)?.map(|r| r.ziel)))?;
+    let Some(ziel) = ziel else {
+        return Err(format!("Referenz {id} gibt es nicht"));
+    };
+
+    if !ziel_ist_adresse(&ziel) {
+        return mit(&state, |s| s.store.referenz_pruefen(id));
+    }
+
+    // GitHub und GitLab über ihre API: das erreicht auch ein privates Repo, sobald ein
+    // Token hinterlegt ist. Alles andere per schlichter Abfrage.
+    let erreicht = match RepoZeiger::erkennen(&ziel) {
+        Some(z) => {
+            let token = forge_token(&state, z.anbieter)?;
+            lotse_core::forge::abfragen(&z, token.as_deref()).is_ok()
+        }
+        None => lotse_core::netz::erreichbar(&ziel).unwrap_or(false),
+    };
+    let status = if erreicht {
+        Pruefstatus::Ok
+    } else {
+        Pruefstatus::NichtErreichbar
+    };
+    mit(&state, |s| {
+        s.store.referenz_status_setzen(id, status)?;
+        Ok(status)
+    })
 }
 
 #[tauri::command]
@@ -1379,6 +1413,70 @@ fn forge_meta_schluessel(anbieter: &str) -> R<(&'static str, &'static str)> {
     } else {
         Err(format!("Unbekannter Hoster: {anbieter}"))
     }
+}
+
+/// Nimmt ein Token entgegen und erledigt den Rest selbst.
+///
+/// Bisher musste man erst einen Tresor-Eintrag anlegen, sich den Feldnamen merken, beides
+/// in den Einstellungen wieder zusammensuchen und merken lassen – sechs Schritte für
+/// „verbinde dich mit GitHub“. Der Tresor bleibt der Ort, an dem das Token liegt (dort ist
+/// es verschlüsselt und wird mit abgeglichen), aber die Oberfläche muss ihn dafür nicht
+/// erklären. Ein vorhandener Eintrag gleichen Titels wird ergänzt statt verdoppelt.
+#[tauri::command]
+fn forge_token_einfuegen(state: State<AppState>, anbieter: String, token: String) -> R<()> {
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err("Kein Token angegeben".into());
+    }
+    let (k_eintrag, k_feld) = forge_meta_schluessel(&anbieter)?;
+    let titel = if anbieter.eq_ignore_ascii_case("gitlab") {
+        "GitLab-Token"
+    } else {
+        "GitHub-Token"
+    };
+    mit(&state, |s| {
+        let jetzt = now_ms();
+        let vorhanden = s
+            .store
+            .tresor_eintraege(None)?
+            .into_iter()
+            .find(|e| e.titel == titel);
+        let id = match vorhanden {
+            Some(mut e) => {
+                e.feld_setzen(&s.vault, "token", token.as_str(), jetzt)?;
+                s.store.tresor_speichern(&e)?;
+                e.id
+            }
+            None => {
+                let e = TresorEintrag::neu(
+                    &s.vault,
+                    titel,
+                    Vec::new(),
+                    Stufe::Ueberall,
+                    &[("token", token.as_str())],
+                    jetzt,
+                )?;
+                s.store.tresor_speichern(&e)?;
+                e.id
+            }
+        };
+        s.store.meta_set(k_eintrag, &id.to_string())?;
+        s.store.meta_set(k_feld, "token")?;
+        Ok(())
+    })
+}
+
+/// Trennt die Verbindung: das Token bleibt im Tresor, Lotse benutzt es nur nicht mehr.
+/// Löschen ist Sache des Tresors – hier still Geheimnisse wegzuräumen wäre eine
+/// Überraschung.
+#[tauri::command]
+fn forge_trennen(state: State<AppState>, anbieter: String) -> R<()> {
+    let (k_eintrag, k_feld) = forge_meta_schluessel(&anbieter)?;
+    mit(&state, |s| {
+        s.store.meta_set(k_eintrag, "")?;
+        s.store.meta_set(k_feld, "token")?;
+        Ok(())
+    })
 }
 
 /// „Von allein mitlaufen“: der Beobachter fragt die Gegenseite in großem Abstand mit ab.
@@ -2191,6 +2289,8 @@ pub fn run() {
             ki_verbrauch_loeschen,
             forge_status,
             forge_token_setzen,
+            forge_token_einfuegen,
+            forge_trennen,
             forge_auto_setzen,
             forge_projekt,
             forge_abfragen,
