@@ -84,6 +84,7 @@ Vollständige Referenzen, abgelesen aus dem laufenden Code.
 - **[[Schlüssel und Krypto|Schluessel-und-Krypto]]** – die Schlüsselhierarchie zum Nachrechnen
 - **[[Nicht-Ziele]]** – was Lotse bewusst nicht tut
 - **[[Änderungen|Aenderungen]]** – was sich je Fassung geändert hat
+- **[[Roadmap]]** – was ansteht, und woran es hängt
 
 ## Mitarbeiten
 

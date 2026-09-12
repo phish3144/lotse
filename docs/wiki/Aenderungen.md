@@ -137,15 +137,11 @@ Erste Fassung mit bedienbarer Oberfläche: anlegen, erfassen, Fäden abhaken, St
 
 ## Was noch kommt
 
-Kein Versprechen, eine Richtung.
+Vollständig, mit Phasen und Auslösern: **[[Roadmap]]**.
 
-| Vorhaben | Stand |
-|---|---|
-| Symbol im Infobereich, globales Erfassen-Kürzel | geplant ([[Tastenkürzel\|Tastenkuerzel]]) |
-| Browser-Fassung (Kern als WebAssembly) | der Kern baut schon ohne Dateisystem-Anteile |
-| Konto im Dienst löschen | noch nicht gebaut |
-| Selbst gehostete Git-Instanzen (GitHub Enterprise, eigenes GitLab) | noch nicht erkannt |
-| Lizenz | noch nicht festgelegt (`LICENSE-PENDING`) |
+Die größte offene Lücke ist der Zugriff aus dem **Browser** – der Kern ist WASM-tauglich
+gehalten, die Brücke fehlt. Rechtlich offen und nicht mehr aufschiebbar ist die
+**Lizenz**: das Repository ist öffentlich ohne `LICENSE`.
 
 Was **dauerhaft** nicht kommt und warum, steht in [[Nicht-Ziele]]. Die Liste ist kürzer,
 wenn man sie einmal liest, als die Enttäuschung, wenn man es nicht tut.
