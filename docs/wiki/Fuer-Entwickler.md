@@ -106,7 +106,8 @@ verschwände die Regel unbemerkt mit ihm.
 - Zeitstempel sind Unix-Millisekunden (`i64`), Datumsangaben `JJJJ-MM-TT`.
 - Nutzertexte auf Deutsch; nur die fünf Metaphern **Hafen, Kurs, Logbuch, vor Anker, Hafeneinfahrt**.
 - Neue Features müssen den Aufnahmetest in `NON_GOALS.md` bestehen.
-- Die Lizenz ist noch nicht festgelegt (`LICENSE-PENDING`) – **keine Lizenz-Header einfügen**.
+- Die Lizenz ist **AGPL-3.0-only** (`LICENSE`) – **keine Lizenz-Header in einzelne Dateien einfügen**.
+  Sie steht einmal im Repo und in den Cargo-Manifesten.
 
 ## Ein Release bauen
 
@@ -146,5 +147,7 @@ Issues und Pull Requests sind willkommen. Zwei Bitten:
 1. **Lies `NON_GOALS.md` zuerst.** Ein Feature, das den Aufnahmetest nicht besteht, wird abgelehnt – auch wenn es gut gebaut ist.
 2. **Die Prüfliste muss grün sein.** CI prüft dasselbe, aber lokal geht es schneller.
 
-Die Lizenz ist noch offen. Bis das geklärt ist, sind Beiträge Dritter schwierig – sprich
-vorher in einem Issue darüber, damit niemand umsonst arbeitet.
+Die Lizenz ist **AGPL-3.0-only**. Beiträge sind willkommen, brauchen aber ein **DCO**
+(`Signed-off-by:` in der Commit-Nachricht) – ohne das wäre der kommerzielle Doppelvertrieb
+dahin, auf dem das Geschäftsmodell beruht (`BUSINESS.md` 3). Bei größeren Änderungen vorher
+ein Issue, damit niemand umsonst arbeitet.

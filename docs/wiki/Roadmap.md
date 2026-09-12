@@ -130,7 +130,7 @@ Aus `BUSINESS.md`, Abschnitt 4. Kein Punkt davon ist erledigt.
 
 | Punkt | Warum es nicht wartet |
 |---|---|
-| **Lizenz festlegen** | Das Repository ist **öffentlich ohne `LICENSE`**. Damit gilt »alle Rechte vorbehalten« bei einsehbarem Code – laut `BUSINESS.md` »ein Zustand, kein Plan«. Zur Wahl stehen AGPL-3.0, FSL/BSL oder proprietär mit einsehbarer Quelle. |
+| ~~Lizenz festlegen~~ | **Erledigt am 2026-09-12: AGPL-3.0-only.** Begründung im Entscheidungsprotokoll (`CONCEPT.md` 12) und in `BUSINESS.md` 3. Offen bleibt davon nur: ab dem ersten fremden Pull Request ein DCO verlangen. |
 | Impressum, Datenschutzerklärung, AV-Vertrag mit Cloudflare | Rechtlich zwingend, sobald jemand anderes den Dienst benutzt. |
 | Markenrecherche »Lotse« (DPMA, EUIPO) und Domain | Je später, desto teurer eine Umbenennung. |
 | Zahlungsabwicklung über einen Merchant of Record | Damit die EU-Umsatzsteuer nicht selbst abzuführen ist. |

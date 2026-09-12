@@ -140,8 +140,7 @@ Erste Fassung mit bedienbarer Oberfläche: anlegen, erfassen, Fäden abhaken, St
 Vollständig, mit Phasen und Auslösern: **[[Roadmap]]**.
 
 Die größte offene Lücke ist der Zugriff aus dem **Browser** – der Kern ist WASM-tauglich
-gehalten, die Brücke fehlt. Rechtlich offen und nicht mehr aufschiebbar ist die
-**Lizenz**: das Repository ist öffentlich ohne `LICENSE`.
+gehalten, die Brücke fehlt.
 
 Was **dauerhaft** nicht kommt und warum, steht in [[Nicht-Ziele]]. Die Liste ist kürzer,
 wenn man sie einmal liest, als die Enttäuschung, wenn man es nicht tut.

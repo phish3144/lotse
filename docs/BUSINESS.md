@@ -16,7 +16,7 @@ Monetarisierung möglich bleibt, ohne dass heute Bezahl-Code entsteht.
 | Sync-Protokoll gehört uns, Dienst ist ~300 Zeilen | Wechsel von Cloudflare auf eigene Server ist ein Nachmittag, kein Projekt. |
 | Client kann gegen beliebige API-Basis-URL laufen | Selbsthosting bleibt möglich – wichtig für das Open-Core-Modell. |
 | Keine stille Telemetrie | Vertrauen ist bei diesem Publikum das Produkt. |
-| Lizenz noch offen, Repo privat | Eine einmal gewählte Open-Source-Lizenz lässt sich nicht zurücknehmen. |
+| Lizenz **AGPL-3.0-only**, Repo öffentlich (seit 2026-09-12; davor stand hier »Lizenz offen, Repo privat«) | Eine einmal gewählte Open-Source-Lizenz lässt sich nicht zurücknehmen – deshalb war die Entscheidung aufgeschoben, bis die Architektur stand. Jetzt steht sie: verkauft werden die Dienste, nicht der Client. |
 
 ## 1a. KI als zweiter Weg zur Monetarisierung
 
@@ -73,9 +73,20 @@ Vor der ersten Veröffentlichung entscheiden:
 | **Functional Source License (FSL)** oder BSL | Quelloffen, aber kein kommerzielles Konkurrenz-Hosting für zwei Jahre, danach automatisch Apache/MIT. Weniger Akzeptanz in der Community. |
 | **Proprietär, Quelle einsehbar** | Maximale Kontrolle, minimales Vertrauen. |
 
-**Stand 2026-09-07: Das Repository ist öffentlich, eine `LICENSE`-Datei gibt es nicht.**
-Damit gilt „alle Rechte vorbehalten" bei öffentlich einsehbarem Code – ein Zustand, kein
-Plan. Die Entscheidung ist damit fällig, nicht mehr aufschiebbar.
+**Entschieden am 2026-09-12: AGPL-3.0-only.** `LICENSE` liegt im Repo, die Cargo-Manifeste
+tragen `license = "AGPL-3.0-only"`. Der Zustand davor – öffentlich einsehbar ohne Lizenz,
+also „alle Rechte vorbehalten" – ist damit beendet.
+
+Gewählt wurde `-only` statt `-or-later`: eine künftige AGPLv4 gilt damit nicht automatisch,
+was die Kontrolle über den Doppelvertrieb erhält. Umstellen wäre eine Zeile.
+
+Warum AGPL und nicht FSL/BSL oder proprietär: Die realistische Bedrohung ist nicht, dass
+jemand Lotse selbst baut – das darf er bei Open Core ohnehin und kostet nichts. Sie ist,
+dass jemand eine **geschlossene** Fassung als Dienst anbietet. Genau das verhindert §13.
+Dazu kommt das Argument aus Abschnitt 1: Vertrauen ist bei diesem Publikum das Produkt, und
+ein Krypto-Client, dessen Code niemand prüfen kann, ist in dieser Nische schwer zu verkaufen.
+Die drei Vorbilder aus Abschnitt 2 – Obsidian, Bitwarden, Standard Notes – sind alle
+quelloffen oder quell-einsehbar.
 
 Zur Sorge, eine offene Lizenz verbaue den späteren bezahlten KI-Zugang: Sie tut es nicht.
 Als alleiniger Urheber darf derselbe Code zusätzlich anders lizenziert werden. Eng wird es

@@ -52,4 +52,6 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 - Nutzertexte in der Oberfläche und CLI auf Deutsch; nur die fünf Metaphern Hafen, Kurs,
   Logbuch, vor Anker, Hafeneinfahrt.
 - Neue Features müssen den Aufnahmetest in `NON_GOALS.md` bestehen.
-- Lizenz ist noch nicht festgelegt (`LICENSE-PENDING`); keine Lizenz-Header einfügen.
+- Lizenz ist **AGPL-3.0-only** (`LICENSE`). Keine Lizenz-Header in einzelne Dateien einfügen –
+  die Lizenz steht einmal im Repo und in den Cargo-Manifesten. Beiträge Dritter brauchen ein
+  DCO oder eine CLA, sonst ist der kommerzielle Doppelvertrieb dahin (`BUSINESS.md` 3).

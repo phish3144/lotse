@@ -179,5 +179,12 @@ Siehe `CLAUDE.md` für die Verzeichnisstruktur und die Prüfbefehle.
 
 ## Lizenz
 
-Noch nicht festgelegt. Alle Rechte vorbehalten, bis `docs/BUSINESS.md` Abschnitt 3
-entschieden ist.
+**GNU Affero General Public License v3.0 only** – der vollständige Text steht in
+[`LICENSE`](LICENSE).
+
+Kurz: Du darfst Lotse benutzen, verändern und weitergeben. Wer eine veränderte Fassung als
+Netzdienst anbietet, muss seinen Quellcode offenlegen (§13) – genau dafür ist die AGPL da.
+Selbst betreiben bleibt ausdrücklich erwünscht und kostenlos.
+
+Als alleiniger Urheber bleibt eine zusätzliche kommerzielle Lizenzierung möglich; siehe
+`docs/BUSINESS.md` Abschnitt 3.

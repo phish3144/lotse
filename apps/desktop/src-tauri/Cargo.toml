@@ -4,7 +4,7 @@ description = "Lotse Desktop-Hülle (Tauri 2)"
 version = "0.6.1"
 edition = "2021"
 rust-version = "1.85"
-license-file = "../../../LICENSE-PENDING"
+license = "AGPL-3.0-only"
 repository = "https://github.com/phish3144/lotse"
 # Wie jedes andere Crate hier: nichts davon gehört nach crates.io. Fehlte bisher, weil
 # dieses Crate kein Workspace-Mitglied ist und die Vorgabe daher nicht geerbt hat –

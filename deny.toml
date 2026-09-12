@@ -34,7 +34,8 @@ ignore = [
 
 [licenses]
 version = 2
-# Die eigenen Crates sind unveröffentlicht (publish = false) und noch ohne Lizenz.
+# Die eigenen Crates sind unveröffentlicht (publish = false) und tragen AGPL-3.0-only.
+# Sie werden hier übersprungen; die Liste unten gilt den Abhängigkeiten.
 private = { ignore = true }
 allow = [
   "MIT",
