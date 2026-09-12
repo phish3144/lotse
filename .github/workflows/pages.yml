@@ -47,3 +47,40 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # Deployt heisst nicht ausgeliefert. Genau das ging bei 0.6.0 und 0.6.1 schief: die
+      # Datei lag im Repo, die Adresse antwortete mit 404, und niemandem fiel es auf.
+      # Diese Pruefung gehoert hierher und nicht in `release.yml` – dort muesste sie auf
+      # einen Deploy warten, den erst das Ende jenes Laufs ausloest.
+      - name: Liefert die Adresse wirklich den eingecheckten Stand?
+        run: |
+          set -uo pipefail
+          if [ ! -f site/latest.json ]; then
+            echo "Keine site/latest.json im Baum - nichts nachzufassen."
+            exit 0
+          fi
+          soll=$(python3 -c "import json;print(json.load(open('site/latest.json')).get('version',''))")
+          if [ -z "$soll" ]; then
+            echo "::error::site/latest.json nennt keine Fassung."
+            exit 1
+          fi
+          adresse=https://lotse.sanctora.eu/latest.json
+          for versuch in $(seq 1 15); do
+            ist=$(curl -fsSL --max-time 20 "$adresse" 2>/dev/null \
+              | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',''))" 2>/dev/null) || ist=""
+            if [ "$ist" = "$soll" ]; then
+              echo "$adresse liefert $ist - deckungsgleich mit dem Repo."
+              exit 0
+            fi
+            echo "Noch nicht da (erwartet $soll, bekommen \"${ist:-nichts}\"), warte 20 s ... ($versuch/15)"
+            sleep 20
+          done
+          echo "::error::${adresse} liefert nicht ${soll}."
+          echo "Das ist die Adresse, in der der Updater ZUERST nachsieht. Stimmt sie nicht,"
+          echo "findet keine installierte Fassung ein Update."
+          echo ""
+          echo "Zu pruefen:"
+          echo "  1. Settings > Pages: Custom domain = lotse.sanctora.eu, Quelle GitHub Actions"
+          echo "  2. Settings > Environments > github-pages: ist main als Branch erlaubt?"
+          echo "  3. Loest lotse.sanctora.eu noch auf 185.199.x.x auf?"
+          exit 1

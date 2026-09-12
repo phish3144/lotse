@@ -13,7 +13,32 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.6.1 — laufende Fassung
+## 0.6.2 — laufende Fassung
+
+**Die Landing Page läuft unter [lotse.sanctora.eu](https://lotse.sanctora.eu/), und der
+Updater fragt dort zuerst nach.** Bis 0.6.1 stand dort die GitHub-Adresse; die bleibt als
+zweiter Endpunkt drin, damit installierte ältere Fassungen weiter fündig werden – GitHub
+leitet von dort auf die neue Domain um.
+
+Dazu die **Lizenz: AGPL-3.0-only**. Vorher war das Repository öffentlich einsehbar *ohne*
+`LICENSE`, was rechtlich »alle Rechte vorbehalten« bedeutet – für ein Werkzeug, dessen
+Sicherheitsversprechen von der Prüfbarkeit lebt, der schlechteste aller Zustände. Die
+Begründung steht im Entscheidungsprotokoll (`CONCEPT.md` 12): verkauft werden die Dienste,
+nicht der Client, und §13 der AGPL verhindert genau das, was dem im Weg stünde – eine
+geschlossene Fassung als Konkurrenzdienst.
+
+Und ein Fehler im Release-Ablauf, gefunden bevor er zuschlug: die Prüfung, die nachfasst,
+ob die Update-Liste wirklich ausgeliefert ist, stand im Release-Lauf selbst – und wartete
+dort auf einen Deploy, den erst das **Ende** genau dieses Laufs auslöst. Jedes Release wäre
+am Schluss rot gelaufen. Die Prüfung sitzt jetzt in `pages.yml`, direkt hinter dem Deploy,
+wo sie prüfen kann, was sie gerade veröffentlicht hat.
+
+**Für dich:** nichts zu tun. Wer 0.6.1 installiert hat, bekommt 0.6.2 über den eingebauten
+Updater.
+
+---
+
+## 0.6.1
 
 **Nur der reparierte Release-Ablauf. Am Programm ist nichts geändert.**
 
