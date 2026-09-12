@@ -311,7 +311,7 @@ jobs:
       # durchgelaufen, und der Release-Lauf blieb grün. Also hier nachfassen.
       - name: Adresse nachfassen, in der der Updater zuerst nachsieht
         env:
-          ADRESSE: https://phish3144.github.io/lotse/latest.json
+          ADRESSE: https://lotse.sanctora.eu/latest.json
         run: |
           set -uo pipefail
           # Pages braucht einen Moment; der Ablauf dafür läuft ohnehin nebenher.

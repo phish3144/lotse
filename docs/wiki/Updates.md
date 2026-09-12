@@ -68,16 +68,19 @@ herunter: eine CLI, die sich selbst ersetzt, wäre eine Überraschung im falsche
 
 Zwei Adressen, in fester Reihenfolge:
 
-1. `https://phish3144.github.io/lotse/latest.json`
-2. `https://github.com/phish3144/lotse/releases/latest/download/latest.json`
+1. `https://lotse.sanctora.eu/latest.json`
+2. `https://phish3144.github.io/lotse/latest.json`
+3. `https://github.com/phish3144/lotse/releases/latest/download/latest.json`
 
-Beide stehen fest im Programm und lassen sich nicht zur Laufzeit umbiegen – wer sie
+Alle drei stehen fest im Programm und lassen sich nicht zur Laufzeit umbiegen – wer sie
 ändern will, muss eine neue Fassung ausliefern, und die müsste wiederum signiert sein.
 
-Warum zwei? Die Veröffentlichungen sind Vorabversionen, und GitHub lässt Vorabversionen
-aus `/releases/latest` heraus – über die zweite Adresse findet der Updater also erst
-etwas, wenn eine Fassung keine Vorabversion mehr ist. Bis dahin trägt die erste allein,
-und der Release-Workflow spiegelt die Liste dafür auf die Landing Page.
+Warum drei? Die **erste** ist die Landing Page unter eigener Domain und trägt den
+Normalfall. Die **zweite** ist dieselbe Seite unter ihrer alten GitHub-Adresse; sie steht
+noch drin, weil bereits installierte Fassungen bis 0.6.1 nur diese kennen – dort leitet
+GitHub auf die neue Domain um. Die **dritte** greift erst, wenn eine Fassung keine
+Vorabversion mehr ist: GitHub lässt Vorabversionen aus `/releases/latest` heraus, dort
+findet der Updater bis dahin nichts.
 
 > In 0.6.0 ist diese Spiegelung ausgefallen, aus drei zusammenwirkenden Gründen: ein
 > `git diff` sah die noch nicht verfolgte Datei nicht und meldete »unverändert«; der

@@ -38,6 +38,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
+        "https://lotse.sanctora.eu/latest.json",
         "https://phish3144.github.io/lotse/latest.json",
         "https://github.com/phish3144/lotse/releases/latest/download/latest.json"
       ],
