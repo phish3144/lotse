@@ -38,23 +38,26 @@ Plattformen nach und bricht ab, wenn eine fehlt oder keine Signatur hat.
 installiertes 0.6.0 nach dieser Veröffentlichung wieder ein Update. 0.6.1 selbst muss noch
 von Hand geholt werden.
 
-> **Noch nicht erledigt.** `latest.json` enthält bei 0.6.1 alle vier Plattformen und liegt
-> auch auf `main` – aber `https://phish3144.github.io/lotse/latest.json` antwortet weiter
-> mit **404**, und der Release-Lauf war trotzdem grün. Zwei Gründe:
+> **Der Weg zurück für 0.6.0.** Dass 0.6.1 ausgeliefert ist, genügt nicht – 0.6.0 muss die
+> Liste auch *finden*. Nachgemessen, nicht angenommen:
 >
-> 1. Der Pages-Ablauf ist auf `main` noch nie durchgelaufen. Alle vier Läufe dort sind nach
->    wenigen Sekunden ohne einen einzigen Schritt fehlgeschlagen, alle vier auf dem
->    Feature-Branch waren erfolgreich – das Muster einer Branch-Regel am
->    `github-pages`-Umfeld, die noch den früheren Standard-Branch nennt. Das ist eine
->    Einstellung im Repository und nur dort zu ändern.
-> 2. Der Spiegel-Commit wird mit dem `GITHUB_TOKEN` geschoben, und ein solcher Push löst
->    keinen Workflow aus. Behoben: `pages.yml` hat jetzt einen `workflow_run`-Auslöser.
+> | Geprüft | Ergebnis |
+> |---|---|
+> | `latest.json` im Release | 11 Einträge, alle signiert, alle vier Plattformen |
+> | dieselbe Datei auf `main` und unter der Pages-Adresse | byteweise identisch |
+> | die vier Download-Adressen darin | alle antworten `200` |
+> | Schlüsselkennung der vier Signaturen | `4BDDE1BB5195DE67` – dieselbe wie der in der App eingebaute öffentliche Schlüssel |
 >
-> Dazu fasst der Release-Ablauf die Adresse jetzt selbst nach und bricht ab, wenn sie nicht
-> die gerade veröffentlichte Fassung liefert. Dass ein Ausfall dieser Art grün durchgeht,
-> war der eigentliche Fehler.
-
-Dazu: dieses Wiki, vollständig ([[Wiki pflegen|Wiki-pflegen]]).
+> Auf dem Weg dorthin kamen zwei weitere Fehler heraus. Der Pages-Ablauf war auf `main`
+> noch nie durchgelaufen: alle vier Läufe dort scheiterten in `Set up job`, alle vier auf
+> dem Feature-Branch waren erfolgreich – eine Branch-Regel am `github-pages`-Umfeld, die
+> noch den früheren Standard-Branch nannte. Und der Spiegel-Commit wird mit dem
+> `GITHUB_TOKEN` geschoben, was keinen Workflow auslöst; `pages.yml` hat dafür jetzt einen
+> `workflow_run`-Auslöser. Seit beidem liefert die Seite auch die Landing Page im aktuellen
+> Stand – vorher war es die Fassung vom 9. September.
+>
+> Damit so ein Ausfall nicht wieder grün durchgeht, fasst der Release-Ablauf die Adresse
+> jetzt selbst nach und bricht ab, wenn sie nicht die gerade veröffentlichte Fassung nennt.
 
 ---
 

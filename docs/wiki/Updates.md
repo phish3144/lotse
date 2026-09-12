@@ -79,10 +79,15 @@ aus `/releases/latest` heraus – über die zweite Adresse findet der Updater al
 etwas, wenn eine Fassung keine Vorabversion mehr ist. Bis dahin trägt die erste allein,
 und der Release-Workflow spiegelt die Liste dafür auf die Landing Page.
 
-> In 0.6.0 ist diese Spiegelung ausgefallen (ein `git diff` sah die noch nicht verfolgte
-> Datei nicht und meldete »unverändert«). Beide Adressen antworteten deshalb mit 404 und
-> 0.6.0 fand nie ein Update. Behoben mit 0.6.1; da die Adresse außerhalb der App liegt,
-> findet auch ein installiertes 0.6.0 danach wieder etwas.
+> In 0.6.0 ist diese Spiegelung ausgefallen, aus drei zusammenwirkenden Gründen: ein
+> `git diff` sah die noch nicht verfolgte Datei nicht und meldete »unverändert«; der
+> Pages-Ablauf war auf `main` durch eine Branch-Regel blockiert; und der Spiegel-Commit
+> wird mit dem `GITHUB_TOKEN` geschoben, was keinen Workflow auslöst. Beide Adressen
+> antworteten mit 404, und 0.6.0 fand nie ein Update.
+>
+> Seit 0.6.1 ist alles drei behoben und nachgemessen. Weil die Adresse außerhalb der App
+> liegt, findet auch ein installiertes 0.6.0 danach wieder etwas – es braucht dafür kein
+> Update von sich selbst. Was geprüft wurde, steht in [[Änderungen|Aenderungen]].
 
 ## Wenn etwas schiefgeht
 
