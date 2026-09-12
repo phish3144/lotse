@@ -38,6 +38,22 @@ Plattformen nach und bricht ab, wenn eine fehlt oder keine Signatur hat.
 installiertes 0.6.0 nach dieser Veröffentlichung wieder ein Update. 0.6.1 selbst muss noch
 von Hand geholt werden.
 
+> **Noch nicht erledigt.** `latest.json` enthält bei 0.6.1 alle vier Plattformen und liegt
+> auch auf `main` – aber `https://phish3144.github.io/lotse/latest.json` antwortet weiter
+> mit **404**, und der Release-Lauf war trotzdem grün. Zwei Gründe:
+>
+> 1. Der Pages-Ablauf ist auf `main` noch nie durchgelaufen. Alle vier Läufe dort sind nach
+>    wenigen Sekunden ohne einen einzigen Schritt fehlgeschlagen, alle vier auf dem
+>    Feature-Branch waren erfolgreich – das Muster einer Branch-Regel am
+>    `github-pages`-Umfeld, die noch den früheren Standard-Branch nennt. Das ist eine
+>    Einstellung im Repository und nur dort zu ändern.
+> 2. Der Spiegel-Commit wird mit dem `GITHUB_TOKEN` geschoben, und ein solcher Push löst
+>    keinen Workflow aus. Behoben: `pages.yml` hat jetzt einen `workflow_run`-Auslöser.
+>
+> Dazu fasst der Release-Ablauf die Adresse jetzt selbst nach und bricht ab, wenn sie nicht
+> die gerade veröffentlichte Fassung liefert. Dass ein Ausfall dieser Art grün durchgeht,
+> war der eigentliche Fehler.
+
 Dazu: dieses Wiki, vollständig ([[Wiki pflegen|Wiki-pflegen]]).
 
 ---

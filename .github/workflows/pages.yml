@@ -8,6 +8,13 @@ on:
   push:
     branches: [main]
     paths: ["site/**", ".github/workflows/pages.yml"]
+  # Nach einem Release. Nötig, weil der Release-Ablauf `site/latest.json` mit dem
+  # GITHUB_TOKEN nach main schiebt – und ein Push mit diesem Token loest keinen
+  # Workflow aus. Ohne diesen Auslöser blieb die Adresse, in der der Updater zuerst
+  # nachsieht, bis zur nächsten unabhängigen Änderung an `site/` auf dem alten Stand.
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -21,12 +28,19 @@ concurrency:
 
 jobs:
   deploy:
+    # Ein gescheitertes Release hat nichts zu veröffentlichen.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Bei `workflow_run` zeigt der Standard-Ref auf den Commit, der das Release
+          # ausgelöst hat – also auf den Stand *vor* dem Spiegel-Commit. Hier soll der
+          # Kopf von main veröffentlicht werden, samt der gerade eingetragenen Liste.
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

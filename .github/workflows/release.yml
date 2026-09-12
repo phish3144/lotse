@@ -305,3 +305,36 @@ jobs:
           done
           echo "::error::latest.json ließ sich nicht nach main schieben."
           exit 1
+
+      # Eingecheckt heißt nicht ausgeliefert. Bei 0.6.1 stand die Datei auf main und die
+      # Adresse antwortete trotzdem mit 404 – der Pages-Ablauf war nie auf main
+      # durchgelaufen, und der Release-Lauf blieb grün. Also hier nachfassen.
+      - name: Adresse nachfassen, in der der Updater zuerst nachsieht
+        env:
+          ADRESSE: https://phish3144.github.io/lotse/latest.json
+        run: |
+          set -uo pipefail
+          # Pages braucht einen Moment; der Ablauf dafür läuft ohnehin nebenher.
+          for versuch in $(seq 1 20); do
+            fassung=$(curl -fsSL --max-time 20 "$ADRESSE" 2>/dev/null \
+              | python3 -c "import json,sys; print(json.load(sys.stdin).get('version',''))" 2>/dev/null) || fassung=""
+            if [ "$fassung" = "${RELEASE_TAG#v}" ]; then
+              echo "$ADRESSE liefert ${fassung}."
+              exit 0
+            fi
+            echo "Noch nicht da (bekommen: »${fassung:-nichts}«), warte 30 s … ($versuch/20)"
+            sleep 30
+          done
+          echo "::error::${ADRESSE} liefert nicht ${RELEASE_TAG#v}."
+          echo "Das ist die Adresse, in der der Updater ZUERST nachsieht - die zweite"
+          echo "(/releases/latest) faellt bei Vorabversionen aus. Solange diese hier nicht"
+          echo "stimmt, findet keine installierte Fassung ein Update."
+          echo ""
+          echo "Zu pruefen:"
+          echo "  1. Settings > Pages: Quelle muss \"GitHub Actions\" sein."
+          echo "  2. Settings > Environments > github-pages > Deployment branches:"
+          echo "     main muss erlaubt sein. Jeder Pages-Lauf auf main ist bisher nach"
+          echo "     wenigen Sekunden ohne einen Schritt fehlgeschlagen - das Muster einer"
+          echo "     Branch-Regel, die noch den alten Standard-Branch nennt."
+          echo "  3. Actions > Landing Page: was sagt der letzte Lauf?"
+          exit 1
