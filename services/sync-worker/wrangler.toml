@@ -26,6 +26,14 @@ compatibility_date = "2026-08-22"
 # Gratisplan-Budget an CPU-Zeit sonst durch PBKDF2-Berechnungen von
 # Angreifern aufgebraucht werden kann.
 
+# Eigene Adresse statt *.workers.dev. Steht hier und nicht im Dashboard, damit sie
+# versioniert ist und ein Deploy sie herstellt. Cloudflare legt den DNS-Eintrag selbst an –
+# es darf deshalb VORHER kein Eintrag fuer diesen Namen existieren, sonst schlaegt es fehl.
+# Voraussetzung: sanctora.eu liegt als Zone im selben Konto (seit 2026-09-13).
+[[routes]]
+pattern = "lotse-sync.sanctora.eu"
+custom_domain = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "lotse"

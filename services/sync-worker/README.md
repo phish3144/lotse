@@ -32,16 +32,26 @@ test/                      vitest + @cloudflare/vitest-pool-workers
 
 ## One-time setup
 
+Already done for the production account (2026-09-13) — kept here so the setup can
+be repeated on a fresh account.
+
 ```bash
 npm install
 
-# Create the D1 database, then paste the printed database_id into
-# wrangler.toml (it currently has a placeholder UUID).
-npx wrangler d1 create lotse
+# D1 database. Paste the printed database_id into wrangler.toml.
+npx wrangler d1 create lotse --location weur
 
-# Create the R2 bucket (name must match wrangler.toml's `bucket_name`).
-npx wrangler r2 bucket create lotse-blobs
+# R2 bucket. The `--jurisdiction eu` flag is NOT optional: it guarantees objects are
+# stored *and processed* inside the EU, and it cannot be changed after creation.
+# A bucket created without it lands wherever Cloudflare picks — for us, ENAM.
+# Jurisdictional buckets live in a separate namespace: `wrangler r2 bucket list`
+# and the API will NOT show them unless the jurisdiction is given as well. A 404
+# there does not mean the bucket is missing.
+npx wrangler r2 bucket create lotse-blobs --jurisdiction eu
 ```
+
+D1 has no jurisdiction feature; `--location weur` is a hint, not a guarantee. That
+difference matters for the privacy policy and is recorded here on purpose.
 
 ## Migrations
 
@@ -79,8 +89,32 @@ network access are required to run `npm test`.
 ## Deploy
 
 ```bash
+npm run migrate:remote   # once, and after every new migration
 npm run deploy
 ```
+
+The deploy also creates the Custom Domain `lotse-sync.sanctora.eu` from the `[[routes]]`
+entry in `wrangler.toml`, including its DNS record. Do **not** create a DNS record for
+that name by hand first — Cloudflare refuses a Custom Domain on a hostname that already
+has a CNAME.
+
+### Rate limiting — required, and not in this code
+
+The auth endpoints are deliberately **not** rate-limited in the worker: every request
+that reaches the code has already cost CPU, and PBKDF2 with 600k iterations is exactly
+what an attacker would want to trigger. The limit belongs in front of the worker.
+
+Cloudflare dashboard → **Security** → **WAF** → **Rate limiting rules**:
+
+| Field | Value |
+|---|---|
+| Path | `/v1/auth/*` |
+| Requests | 10 |
+| Period | 1 minute |
+| Counting characteristic | IP address |
+| Action | Block |
+
+Without it, the free plan's CPU budget can be exhausted by anyone.
 
 ## Free-plan limits (SYNC_PROTOCOL.md section 8)
 
