@@ -86,6 +86,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      # Prueft nur, was im Browser landet. Werkzeuge (Vite, Vitest, svelte-check)
+      # laufen auf dem Entwicklerrechner und werden nie ausgeliefert; eine Meldung
+      # dort ist etwas anderes als eine im Bundle. Siehe docs/ABHAENGIGKEITEN.md.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
       - run: npm test
       - run: npm run build
@@ -104,5 +108,9 @@ jobs:
           cache: npm
           cache-dependency-path: services/sync-worker/package-lock.json
       - run: npm ci
+      # Der Worker hat null Laufzeit-Abhaengigkeiten: ausgeliefert wird nur eigener
+      # Code. Genau das prueft diese Zeile - und sie wird rot, sobald jemand eine
+      # Laufzeit-Abhaengigkeit mit Meldung hinzufuegt. Siehe docs/ABHAENGIGKEITEN.md.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
