@@ -29,12 +29,16 @@ compatibility_date = "2026-08-22"
 [[d1_databases]]
 binding = "DB"
 database_name = "lotse"
-database_id = "00000000-0000-0000-0000-000000000000" # placeholder, replace after `wrangler d1 create lotse`
+database_id = "6b05b944-ba40-400d-9d9d-112a8f14e977" # angelegt 2026-09-13, Standort WEUR
 migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "BLOBS"
 bucket_name = "lotse-blobs"
+# Anhänge bleiben in der EU. `jurisdiction` ist strenger als ein Standort-Hinweis: es
+# garantiert Speicherung *und* Verarbeitung dort. Nach dem Anlegen nicht mehr änderbar –
+# der Eimer muss deshalb mit `--jurisdiction eu` erzeugt werden (siehe README).
+jurisdiction = "eu"
 
 [observability]
 enabled = true
