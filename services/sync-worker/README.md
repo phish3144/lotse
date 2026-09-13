@@ -98,6 +98,23 @@ entry in `wrangler.toml`, including its DNS record. Do **not** create a DNS reco
 that name by hand first — Cloudflare refuses a Custom Domain on a hostname that already
 has a CNAME.
 
+### No CORS headers — deliberate today, a decision for the browser client
+
+The worker sends no `Access-Control-Allow-Origin` header, so a browser will refuse to
+read its responses from any other origin. That is correct right now: the desktop app and
+the CLI speak plain HTTP and are not subject to CORS.
+
+It is, however, a hard blocker for the planned browser client, and the fix should be a
+decision rather than a reflex. Two options, in order of preference:
+
+1. **Serve the client from this worker** (Workers Static Assets). Same origin, so no CORS,
+   no preflight round-trip, and the rate limiting rule covers the app as well as the API.
+2. **Allow exactly one origin.** Workable, but it adds a preflight to every request and a
+   list that has to be kept correct.
+
+Do not reach for `Access-Control-Allow-Origin: *`. The endpoints are token-authenticated,
+so it would not immediately leak data, but it removes a barrier for no gain.
+
 ### Rate limiting — required, and not in this code
 
 The auth endpoints are deliberately **not** rate-limited in the worker: every request
