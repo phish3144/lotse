@@ -2541,6 +2541,18 @@ struct KalenderErgebnis {
     fehler: Vec<String>,
 }
 
+fn termin_anzeige(t: lotse_core::kalender::Termin) -> TerminAnzeige {
+    TerminAnzeige {
+        titel: t.titel,
+        datum: t.datum,
+        uhrzeit: t.uhrzeit,
+        utc: t.utc,
+        ort: t.ort,
+        wiederholt: t.wiederholung.is_some(),
+        ungenau: t.wiederholung.is_some_and(|r| !r.genau),
+    }
+}
+
 /// Heutiges Datum als `JJJJ-MM-TT`, aus derselben Uhr wie alle Zeitstempel.
 fn heute() -> String {
     lotse_core::export::iso(now_ms())
@@ -2561,6 +2573,168 @@ fn kalender_holen(state: &State<AppState>, ziel: &str) -> lotse_core::Result<Str
     let ics = lotse_core::kalender::holen(ziel)?;
     sperre(&state.kalender).insert(ziel.to_string(), (now_ms(), ics.clone()));
     Ok(ics)
+}
+
+/// Die Kalender, die dieser Mensch besitzt – eine Vorratsliste, **keine Zuordnung**.
+///
+/// Gelesen wird ein Kalender weiterhin nur dort, wo er als Referenz an einem Vorhaben
+/// hängt (`docs/wiki/Kalender.md`). Die Liste erspart bloß das Abtippen derselben langen
+/// Adresse für jedes Vorhaben – und sie ist die Voraussetzung dafür, dass Lotse nach dem
+/// Anlegen überhaupt nachsehen kann, ob dort etwas zum neuen Vorhaben steht.
+const META_KALENDER_VORRAT: &str = "kalender_vorrat";
+
+fn kalender_vorrat_lesen(s: &mut Sitzung) -> lotse_core::Result<Vec<String>> {
+    Ok(s.store
+        .meta_get(META_KALENDER_VORRAT)?
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|z| !z.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+#[tauri::command]
+fn kalender_vorrat(state: State<AppState>) -> R<Vec<String>> {
+    mit(&state, kalender_vorrat_lesen)
+}
+
+/// Schreibt die Vorratsliste. Was keine Kalenderadresse ist, wird abgewiesen statt
+/// stillschweigend übernommen – sonst steht später eine Adresse in der Liste, die niemals
+/// einen Termin liefert, und niemand weiß, warum.
+#[tauri::command]
+fn kalender_vorrat_setzen(state: State<AppState>, quellen: Vec<String>) -> R<Vec<String>> {
+    let mut sauber: Vec<String> = Vec::new();
+    for q in quellen {
+        let z = q.trim().to_string();
+        if z.is_empty() {
+            continue;
+        }
+        if !lotse_core::kalender::ist_kalender(&z) {
+            return Err(format!(
+                "»{z}« ist keine Kalenderadresse. Erwartet wird etwas, das auf .ics endet \
+                 oder mit webcal:// beginnt."
+            ));
+        }
+        if !sauber.contains(&z) {
+            sauber.push(z);
+        }
+    }
+    let inhalt = sauber.join("\n");
+    mit(&state, |s| {
+        s.store.meta_set(META_KALENDER_VORRAT, &inhalt)?;
+        Ok(())
+    })?;
+    Ok(sauber)
+}
+
+/// Ein Kalender aus dem Vorrat und was dort zum Vorhaben passt.
+#[derive(Serialize)]
+struct KalenderTreffer {
+    quelle: String,
+    /// Wie viele Termine passen – auch die, die unten nicht aufgeführt sind.
+    anzahl: usize,
+    /// Die nächsten davon, zum Ansehen. Kann leer sein, obwohl `anzahl` größer als null
+    /// ist: dann liegen alle passenden Termine hinter uns. Das ist immer noch ein Hinweis,
+    /// dass der Kalender zum Vorhaben gehört – nur eben keiner auf einen nächsten Schritt.
+    termine: Vec<TerminAnzeige>,
+}
+
+#[derive(Serialize)]
+struct KalenderVorschlag {
+    /// Nach welchen Begriffen gesucht wurde. Muss dastehen: sonst rät man, warum etwas
+    /// fehlt.
+    begriffe: Vec<String>,
+    /// Kalender mit Treffern, die noch nicht am Vorhaben hängen.
+    treffer: Vec<KalenderTreffer>,
+    /// Kalender aus dem Vorrat, in denen nichts Passendes stand.
+    ohne_treffer: Vec<String>,
+    fehler: Vec<String>,
+}
+
+/// Sucht in den Kalendern des Vorrats nach Terminen, die zum Vorhaben passen.
+///
+/// **Nur auf Klick.** Das holt fremde Kalender für ein Vorhaben, das sie noch nicht
+/// angefordert hat; von allein zu laufen wäre Verkehr, den niemand bestellt hat.
+#[tauri::command]
+fn kalender_vorschlag(state: State<AppState>, projekt_id: String) -> R<KalenderVorschlag> {
+    let id = ulid(&projekt_id)?;
+    let (titel, schon, vorrat) = mit(&state, |s| {
+        let p = s
+            .store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?;
+        let schon: Vec<String> = s
+            .store
+            .referenzen(id)?
+            .into_iter()
+            .filter(|r| lotse_core::kalender::ist_kalender(&r.ziel))
+            .map(|r| r.ziel)
+            .collect();
+        let vorrat = kalender_vorrat_lesen(s)?;
+        Ok((p.titel, schon, vorrat))
+    })?;
+
+    let begriffe = lotse_core::kalender::begriffe(&titel);
+    let mut vorschlag = KalenderVorschlag {
+        begriffe: begriffe.clone(),
+        treffer: Vec::new(),
+        ohne_treffer: Vec::new(),
+        fehler: Vec::new(),
+    };
+    if begriffe.is_empty() {
+        return Ok(vorschlag);
+    }
+
+    let von = heute();
+    let bis = lotse_core::kalender::tage_spaeter(&von, 365);
+    for quelle in vorrat.iter().filter(|q| !schon.contains(q)) {
+        let ics = match kalender_holen(&state, quelle) {
+            Ok(i) => i,
+            Err(e) => {
+                vorschlag.fehler.push(format!("{quelle}: {e}"));
+                continue;
+            }
+        };
+        let alle = lotse_core::kalender::lesen(&ics);
+        let passend: Vec<lotse_core::kalender::Termin> =
+            lotse_core::kalender::passende(&alle, &titel)
+                .into_iter()
+                .cloned()
+                .collect();
+        // Erst zuordnen, dann das Fenster anwenden: ein Termin, der sich wiederholt,
+        // gehört zum Vorhaben, auch wenn sein erstes Vorkommen lange her ist.
+        let kommend = lotse_core::kalender::kommende(&passend, &von, &bis, 5);
+        if passend.is_empty() {
+            vorschlag.ohne_treffer.push(quelle.clone());
+            continue;
+        }
+        vorschlag.treffer.push(KalenderTreffer {
+            quelle: quelle.clone(),
+            anzahl: passend.len(),
+            termine: kommend.into_iter().map(termin_anzeige).collect(),
+        });
+    }
+    Ok(vorschlag)
+}
+
+/// Hängt einen Kalender aus dem Vorrat an ein Vorhaben. Ab dann wird er dort gelesen –
+/// das ist die Zuordnung, die die Vorratsliste absichtlich nicht ist.
+#[tauri::command]
+fn kalender_anhaengen(state: State<AppState>, projekt_id: String, quelle: String) -> R<Referenz> {
+    let id = ulid(&projekt_id)?;
+    let ziel = quelle.trim().to_string();
+    if !lotse_core::kalender::ist_kalender(&ziel) {
+        return Err(format!("»{ziel}« ist keine Kalenderadresse."));
+    }
+    mit(&state, |s| {
+        if let Some(r) = s.store.referenzen(id)?.into_iter().find(|r| r.ziel == ziel) {
+            return Ok(r);
+        }
+        let r = Referenz::neu(id, ReferenzTyp::Url, &ziel, Rolle::Doku);
+        s.store.referenz_speichern(&r)?;
+        Ok(r)
+    })
 }
 
 /// Anstehende Termine eines Projekts aus seinen Kalender-Referenzen.
@@ -2597,15 +2771,7 @@ fn kalender_termine(
 
     let termine = lotse_core::kalender::kommende(&alle, &von, &bis, 20)
         .into_iter()
-        .map(|t| TerminAnzeige {
-            titel: t.titel,
-            datum: t.datum,
-            uhrzeit: t.uhrzeit,
-            utc: t.utc,
-            ort: t.ort,
-            wiederholt: t.wiederholung.is_some(),
-            ungenau: t.wiederholung.is_some_and(|r| !r.genau),
-        })
+        .map(termin_anzeige)
         .collect();
 
     Ok(KalenderErgebnis {
@@ -2908,6 +3074,10 @@ pub fn run() {
             datei_auszug,
             datei_referenzen,
             kalender_termine,
+            kalender_vorrat,
+            kalender_vorrat_setzen,
+            kalender_vorschlag,
+            kalender_anhaengen,
             update_pruefen,
             update_installieren,
             update_automatisch_setzen,

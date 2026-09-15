@@ -504,13 +504,44 @@ export interface KalenderErgebnis {
   fehler: string[];
 }
 
+export interface KalenderTreffer {
+  quelle: string;
+  /** Wie viele Termine passen – auch die, die unten nicht aufgeführt sind. */
+  anzahl: number;
+  /**
+   * Die nächsten davon. Kann leer sein, obwohl `anzahl` größer als null ist: dann liegen
+   * alle passenden Termine hinter uns.
+   */
+  termine: Termin[];
+}
+
+export interface KalenderVorschlag {
+  /** Wonach gesucht wurde. Muss dastehen, sonst rät man, warum etwas fehlt. */
+  begriffe: string[];
+  treffer: KalenderTreffer[];
+  ohne_treffer: string[];
+  fehler: string[];
+}
+
 /**
  * Kalender lesend: was für ein Projekt ansteht. Lotse schreibt keine Termine und
  * kopiert sie nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
+ *
+ * `vorrat` ist die Liste der Kalender, die dieser Mensch besitzt – **keine Zuordnung**.
+ * Gelesen wird ein Kalender nur dort, wo er als Referenz an einem Vorhaben hängt. Die
+ * Liste erspart das Abtippen derselben langen Adresse für jedes Vorhaben und macht
+ * `vorschlag` möglich.
  */
 export const kalender = {
   termine: (projektId: string, tage?: number) =>
     invoke<KalenderErgebnis>('kalender_termine', { projektId, tage: tage ?? null }),
+  vorrat: () => invoke<string[]>('kalender_vorrat'),
+  vorratSetzen: (quellen: string[]) => invoke<string[]>('kalender_vorrat_setzen', { quellen }),
+  /** Sucht im Vorrat nach Terminen zum Vorhaben. Nur auf Klick – das geht übers Netz. */
+  vorschlag: (projektId: string) => invoke<KalenderVorschlag>('kalender_vorschlag', { projektId }),
+  /** Hängt einen Kalender an das Vorhaben. Ab dann wird er dort gelesen. */
+  anhaengen: async (projektId: string, quelle: string): Promise<Referenz> =>
+    referenz(await invoke<RohReferenz>('kalender_anhaengen', { projektId, quelle })),
 };
 
 export interface McpStatus {

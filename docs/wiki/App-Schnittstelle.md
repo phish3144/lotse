@@ -184,6 +184,10 @@ Siehe [[Tresor]].
 | `forge_projekt` | `projekt_id` | Das Repo eines Vorhabens, für die Projektseite. |
 | `forge_abfragen` | `projekt_id` | Von Hand angestoßen; ohne Angabe alle mit erkanntem Repo. |
 | `kalender_termine` | `projekt_id`, `tage` | Anstehende Termine aus den Kalender-Referenzen. |
+| `kalender_vorrat` | – | Die Kalender, die dieser Mensch besitzt. Ein **Vorrat, keine Zuordnung** – gelesen wird ein Kalender nur, wo er als Referenz an einem Vorhaben hängt. |
+| `kalender_vorrat_setzen` | `quellen` | Schreibt den Vorrat. Was keine Kalenderadresse ist, wird abgewiesen statt stillschweigend übernommen. |
+| `kalender_vorschlag` | `projekt_id` | Sucht im Vorrat nach Terminen, die zum Titel des Vorhabens passen, und nennt die Suchbegriffe mit. **Nur auf Klick**: es holt Kalender, die dieses Vorhaben noch nicht angefordert hat. |
+| `kalender_anhaengen` | `projekt_id`, `quelle` | Legt die Referenz an. Das ist die Zuordnung, die der Vorrat absichtlich nicht ist. |
 
 Siehe [[Gegenseite]] und [[Kalender]].
 

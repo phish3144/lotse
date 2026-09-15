@@ -7,6 +7,7 @@
     beobachter,
     exportieren,
     forge,
+    kalender,
     ki,
     KI_ZIELE,
     konto,
@@ -318,6 +319,35 @@
     }
   }
 
+  // --- Kalender-Vorrat ------------------------------------------------------
+  // Eine Liste der Kalender, die dieser Mensch besitzt. Keine Zuordnung: gelesen wird ein
+  // Kalender nur, wo er als Referenz an einem Vorhaben hängt. Die Liste erspart bloß das
+  // Abtippen derselben langen Adresse für jedes Vorhaben – und macht es möglich, nach dem
+  // Anlegen nachzusehen, ob dort etwas zum neuen Vorhaben steht.
+  let kalVorrat: string[] = $state([]);
+  let kalEingabe = $state('');
+  let kalLaeuft = $state(false);
+
+  async function kalVorratSchreiben(neu: string[]) {
+    kalLaeuft = true;
+    try {
+      kalVorrat = await kalender.vorratSetzen(neu);
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      kalLaeuft = false;
+    }
+  }
+
+  async function kalHinzufuegen(e: Event) {
+    e.preventDefault();
+    const z = kalEingabe.trim();
+    if (!z) return;
+    await kalVorratSchreiben([...kalVorrat, z]);
+    // Nur leeren, wenn die Adresse angenommen wurde – sonst muss man sie neu tippen.
+    if (kalVorrat.includes(z)) kalEingabe = '';
+  }
+
   // --- Was die KI bisher gesendet hat ---------------------------------------
   let kiVerbrauch: KiVerbrauch | null = $state(null);
 
@@ -348,6 +378,7 @@
     try {
       sysBericht = await systemeintrag.anlegen();
       sysStand = await systemeintrag.stand();
+      kalVorrat = await kalender.vorrat();
       meldungen.zeigen('Menüeintrag angelegt.');
     } catch (e) {
       meldungen.fehler(e);
@@ -1028,6 +1059,42 @@
     jeder gängige Dienst gibt so eine Adresse aus. Auf der Projektseite steht dann unter <em>Was ansteht</em>, was in
     den nächsten 90 Tagen kommt. Termine wandern nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
   </p>
+  {#if echteDaten}
+    <h3>Meine Kalender</h3>
+    <p class="hinweis">
+      Ein Vorrat, <strong>keine Zuordnung</strong>: gelesen wird ein Kalender nur dort, wo er als Referenz an einem
+      Vorhaben hängt. Die Liste erspart das Abtippen derselben langen Adresse für jedes Vorhaben – und sie ist die
+      Voraussetzung dafür, dass Lotse auf einer Projektseite nachsehen kann, ob hier etwas zum Vorhaben steht.
+    </p>
+    {#if kalVorrat.length > 0}
+      <ul class="kal-liste">
+        {#each kalVorrat as q (q)}
+          <li>
+            <code>{q}</code>
+            <button
+              type="button"
+              class="schlicht"
+              disabled={kalLaeuft}
+              onclick={() => kalVorratSchreiben(kalVorrat.filter((x) => x !== q))}
+            >
+              Entfernen
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="hinweis klein">Noch kein Kalender hinterlegt.</p>
+    {/if}
+    <form class="zeile" onsubmit={kalHinzufuegen}>
+      <input bind:value={kalEingabe} type="text" placeholder="https://kalender.example.org/feeds/bau.ics" />
+      <button type="submit" disabled={kalLaeuft || !kalEingabe.trim()}>Hinzufügen</button>
+    </form>
+    <p class="hinweis klein">
+      Diese Adressen sind <strong>Geheimnisse</strong>: wer sie hat, liest deinen Kalender. Sie stehen im Klartext in
+      der verschlüsselten Datenbank – derselbe Schutz wie für alles andere dort, aber ohne die zusätzliche Hülle des
+      Tresors.
+    </p>
+  {/if}
   <p class="hinweis klein">
     Geholt wird der Kalender, wenn du die Projektseite öffnest, und danach höchstens alle 15 Minuten neu.
     Uhrzeiten zeigt Lotse so, wie sie im Kalender stehen; ohne Zeitzonendatenbank wäre jede Umrechnung geraten.
@@ -1469,6 +1536,24 @@
   .zeile input {
     flex: 1;
     min-width: 15rem;
+  }
+  .kal-liste {
+    list-style: none;
+    margin: 0.6rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .kal-liste li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .kal-liste code {
+    font-size: 0.78rem;
+    word-break: break-all;
   }
   .protokoll {
     list-style: none;
