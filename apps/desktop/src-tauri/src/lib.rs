@@ -2205,6 +2205,82 @@ fn selbst_austauschbar() -> (bool, Option<String>) {
     (true, None)
 }
 
+// ------------------------------------------------------------ Systemeintrag
+
+/// Ist die Frage schon gestellt worden? Ein Nein bleibt ein Nein – sonst wäre »später«
+/// nur ein anderes Wort für »bei jedem Start noch einmal«.
+const META_SYSTEMEINTRAG_GEFRAGT: &str = "systemeintrag_gefragt";
+
+/// Das Programmsymbol, mitgebracht statt im entpackten AppImage gesucht: unter
+/// `/tmp/.mount_…` liegt es nur, solange das Programm läuft, und der Pfad wechselt.
+const ICON_128: &[u8] = include_bytes!("../icons/128x128.png");
+
+#[derive(Serialize)]
+struct SystemeintragStand {
+    #[serde(flatten)]
+    stand: lotse_core::systemeintrag::Stand,
+    /// Schon einmal gefragt worden? Die Oberfläche fragt dann nicht von selbst, der
+    /// Knopf in den Einstellungen bleibt.
+    gefragt: bool,
+}
+
+#[tauri::command]
+fn systemeintrag_stand(state: State<AppState>) -> R<SystemeintragStand> {
+    let gefragt = mit(&state, |s| {
+        Ok(s.store.meta_get(META_SYSTEMEINTRAG_GEFRAGT)?.is_some())
+    })?;
+    Ok(SystemeintragStand {
+        stand: lotse_core::systemeintrag::stand(),
+        gefragt,
+    })
+}
+
+/// Legt Lotse an seinen Platz und schreibt den Menüeintrag. Nur auf ausdrücklichen Klick.
+#[tauri::command]
+fn systemeintrag_anlegen(state: State<AppState>) -> R<lotse_core::systemeintrag::Bericht> {
+    let bericht = lotse_core::systemeintrag::einrichten(ICON_128).map_err(fehler)?;
+    systemeintrag_gefragt_merken(&state)?;
+    Ok(bericht)
+}
+
+/// Nimmt den Menüeintrag wieder weg.
+#[tauri::command]
+fn systemeintrag_entfernen(state: State<AppState>) -> R<()> {
+    lotse_core::systemeintrag::entfernen().map_err(fehler)?;
+    systemeintrag_gefragt_merken(&state)
+}
+
+/// Merkt, dass gefragt wurde – auch bei »nein, danke«.
+#[tauri::command]
+fn systemeintrag_gefragt(state: State<AppState>) -> R<()> {
+    systemeintrag_gefragt_merken(&state)
+}
+
+fn systemeintrag_gefragt_merken(state: &State<AppState>) -> R<()> {
+    mit(state, |s| {
+        s.store.meta_set(META_SYSTEMEINTRAG_GEFRAGT, "1")
+    })
+}
+
+/// Startet die Fassung an ihrem Platz und beendet diese hier.
+///
+/// Nach dem Einrichten läuft noch die heruntergeladene Datei. Ohne diesen Schritt würde
+/// der Selbsttausch weiter an ihr arbeiten, und der Menüeintrag zeigte auf eine Fassung,
+/// die niemand benutzt. Vorher wird gesperrt – der Schlüssel überlebt den Wechsel nicht.
+#[tauri::command]
+fn systemeintrag_neu_starten(app: tauri::AppHandle, state: State<AppState>, ziel: String) -> R<()> {
+    let pfad = PathBuf::from(&ziel);
+    if !pfad.is_file() {
+        return Err(format!("Es gibt keine Datei {ziel}."));
+    }
+    sperren(state)?;
+    std::process::Command::new(&pfad)
+        .spawn()
+        .map_err(|e| format!("Start von {ziel} fehlgeschlagen: {e}"))?;
+    app.exit(0);
+    Ok(())
+}
+
 #[derive(Clone, Serialize)]
 struct UpdateFortschritt {
     geladen: u64,
@@ -2733,6 +2809,11 @@ pub fn run() {
             update_pruefen,
             update_installieren,
             update_automatisch_setzen,
+            systemeintrag_stand,
+            systemeintrag_anlegen,
+            systemeintrag_entfernen,
+            systemeintrag_gefragt,
+            systemeintrag_neu_starten,
             oeffnen,
             tresor_liste,
             tresor_anlegen,

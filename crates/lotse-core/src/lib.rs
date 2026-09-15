@@ -39,6 +39,8 @@ pub mod netz;
 #[cfg(feature = "native")]
 pub mod store;
 #[cfg(feature = "native")]
+pub mod systemeintrag;
+#[cfg(feature = "native")]
 pub mod update;
 #[cfg(feature = "native")]
 pub mod watcher;

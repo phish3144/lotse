@@ -47,7 +47,10 @@ zu überschreiben würde deren Buchführung zerreißen. Lotse merkt das am fehle
 `APPIMAGE` in der Umgebung, versucht es gar nicht erst und zeigt stattdessen den
 Download-Weg samt Begründung.
 
-Wer Updates aus der App will, nimmt unter Linux das **AppImage**.
+Wer Updates aus der App will, nimmt unter Linux das **AppImage** – und lässt es sich
+einmal einrichten (*Einstellungen → Version → Platz im System*). Sonst hängt das
+Selbst-Update an dem Ordner, in dem der Browser die Datei abgelegt hat, und der Dateiname
+nennt nach dem ersten Tausch die alte Version. Siehe [[Installation]].
 
 ## Nachsehen, ohne zu installieren
 

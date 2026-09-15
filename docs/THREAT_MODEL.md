@@ -132,8 +132,8 @@ innerhalb des Ciphertexts.)
 
 Der Tresor ist ein eigenes Modul in `lotse-core` (`vault`). Folgende Module haben
 **keinen** Import-Pfad dorthin, geprüft von `scripts/modulgrenzen.sh` bei jedem
-CI-Lauf: `watcher`, `detect`, `dokument`, `mcp` (samt `mcp::dienst`), `ai`, `forge`, `git`,
-`kalender`, `netz`, `update`, `export::spiegel`. Die Prüfung folgt einem Modul, das auf
+CI-Lauf: `watcher`, `detect`, `deuten`, `dokument`, `mcp` (samt `mcp::dienst`), `ai`,
+`forge`, `git`, `kalender`, `netz`, `systemeintrag`, `update`, `export::spiegel`. Die Prüfung folgt einem Modul, das auf
 mehrere Dateien aufgeteilt wird, und schlägt an, wenn ein Name aus der Liste verschwindet –
 sonst verschwände die Regel unbemerkt mit ihm. Token und Zugangsdaten für Fremddienste reicht die Hülle herein; die
 Module holen sie nie selbst.

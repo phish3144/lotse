@@ -52,13 +52,26 @@ Dateiinhalte liest Lotse dabei nicht.
 
 Details: **[[Beobachter und Erkennung|Beobachter-und-Erkennung]]**
 
-### Von Hand anlegen
+### Anlegen: erst die Herkunft, dann der Befund
 
-Hafen → *Neues Projekt*. Titel und ein Satz dazu, worum es geht.
+Hafen → *Neues Projekt*. Gefragt wird zuerst nur eines: **woher kommt es?** Ein Ordner,
+eine Adresse, ein paar Dateien – oder nichts davon.
 
-Dieser Satz ist der **Kurs**. Nimm ihn ernst: er ist die eine Zeile, die dir in drei
-Monaten sagt, was du eigentlich wolltest. Nicht „Gartenhaus“, sondern *„Fundament bis
-Oktober, danach Winterpause, Aufbau im Frühjahr.“*
+Dann zeigt Lotse einen **Befund**: Titel, Kurs und Vorlage schon ausgefüllt, dazu was es
+gefunden hat – die Gegenseite auf GitHub oder GitLab, eigene Vorhaben in Unterordnern,
+lesbare Dokumente. Alles vorangekreuzt, alles abwählbar. Das ist keine zweite Fragerunde:
+Lotse fragt nicht, was es selbst nachsehen kann. Wer mit einer GitHub-Adresse anfängt,
+wird nicht gefragt, ob er von GitHub importieren will.
+
+Liegt in dem Ordner schon eine Kennung von Lotse, entsteht kein zweites Vorhaben – dann
+kommt das Abgehakte zum vorhandenen dazu.
+
+Der Weg zurück, wenn der Befund zu weit ging: das einzelne Vorhaben löschen. Das gibt den
+Ordner auch wieder frei.
+
+Den **Kurs** darf man ernst nehmen, auch wenn er vorgeschlagen ist: er ist die eine Zeile,
+die dir in drei Monaten sagt, was du eigentlich wolltest. Nicht „Gartenhaus“, sondern
+*„Fundament bis Oktober, danach Winterpause, Aufbau im Frühjahr.“*
 
 ### Einfach schreiben
 
