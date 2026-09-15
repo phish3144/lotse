@@ -139,6 +139,31 @@ Aufrufer herein; wer es holt, ist die Oberfläche oder die Kommandozeile. Siehe
 
 ---
 
+## Beim Anlegen
+
+Fügt man eine Repo-Adresse in das Feld *Was gibt's?* ein – oder wählt einen Ordner, dessen
+Git-Remote dorthin zeigt –, fragt Lotse einmal nach dem **Steckbrief** des Repos und füllt
+damit den Befund:
+
+| Von dort | Wird hier zu |
+|---|---|
+| Beschreibung | Der Kurs |
+| README, erste brauchbare Zeile | Der Kurs, falls keine Beschreibung da ist |
+| Themen / Topics | Tags |
+| Projektseite (`homepage`) | Eine Referenz mit Rolle *Doku* |
+| »archiviert« | Ein Hinweis im Befund |
+
+Ohne diesen Schritt bestünde ein Befund aus einer eingefügten GitHub-Adresse nur aus Name
+und Link. Was Lotse aus deinen eigenen Dateien gelesen hat, wird dabei **nicht**
+überschrieben: eine README auf der Platte kennt das Vorhaben besser.
+
+Ein Token braucht es dafür nicht – öffentliche Repos antworten auch ohne, nur knapper
+(GitHub: 60 Anfragen je Stunde und Adresse). Für private Repos schon. Schlägt die Abfrage
+fehl, steht das im Befund und das Anlegen geht trotzdem: wer eine Adresse einfügt, will
+ein Vorhaben und keinen Netzwerkfehler.
+
+---
+
 ## Wenn es nicht geht
 
 | Meldung | Ursache |

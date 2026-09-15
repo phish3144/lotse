@@ -14,7 +14,7 @@
 //!    dauerhaft auf der Nicht-Liste; eine verdichtete Zeile pro Tag ist das Muster,
 //!    das sich beim Ordner-Beobachter bewährt hat.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::model::{Art, Notiz, Quelle};
@@ -292,6 +292,92 @@ pub(crate) fn hole<T: serde::de::DeserializeOwned>(
     }
 }
 
+// ------------------------------------------------------ Steckbrief eines Repos
+
+/// Was ein Repo über sich selbst sagt.
+///
+/// Gedacht für den Moment, in dem ein Vorhaben entsteht: was davon hilft, Titel, Kurs und
+/// Tags zu setzen, statt sie zu erfragen. Sterne und Forks stehen hier bewusst **nicht** –
+/// sie ändern nichts an dem, was man tun würde.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Steckbrief {
+    /// Der Einzeiler, den die Gegenseite führt. Als Kurs meist besser als jede README-Zeile:
+    /// er ist genau dafür geschrieben.
+    pub beschreibung: Option<String>,
+    /// Themen bzw. Topics. Werden Tags.
+    pub themen: Vec<String>,
+    /// Projektseite, falls eine eingetragen ist. Wird eine Referenz.
+    pub startseite: Option<String>,
+    pub standard_branch: Option<String>,
+    /// Archiviert heißt: dort passiert nichts mehr. Das gehört in den Befund, nicht
+    /// verschwiegen – sonst wartet jemand auf Bewegung, die nicht kommt.
+    pub archiviert: bool,
+    /// Privat. Steht drin, weil es die Antwort auf »hat mein Token gegriffen?« ist.
+    pub privat: bool,
+    /// Die README im Rohtext, gekürzt. `None`, wenn es keine gibt.
+    pub readme: Option<String>,
+}
+
+/// So viel README wird geholt. Der Kurs steht am Anfang; alles danach ist Bauanleitung.
+const README_ZEICHEN: usize = 4_000;
+
+/// Kürzere Geduld als bei `abfragen`: das hier läuft, während ein Dialog wartet.
+fn dialog_agent() -> ureq::Agent {
+    crate::netz::agent(std::time::Duration::from_secs(8))
+}
+
+/// Holt den Steckbrief eines Repos. `token` darf fehlen – öffentliche Repos gehen ohne,
+/// nur knapper: GitHub lässt ohne Anmeldung 60 Anfragen je Stunde und Adresse zu.
+pub fn steckbrief(z: &RepoZeiger, token: Option<&str>) -> Result<Steckbrief> {
+    let a = dialog_agent();
+    match z.anbieter {
+        Anbieter::GitHub => github::steckbrief(&a, z, token),
+        Anbieter::GitLab => gitlab::steckbrief(&a, z, token),
+    }
+}
+
+/// Ein GET, das Text liefert statt JSON – für READMEs. `Ok(None)` bei 404: kein Fehler,
+/// sondern die Antwort »gibt es nicht«.
+pub(crate) fn hole_text(
+    agent: &ureq::Agent,
+    url: &str,
+    anbieter: Anbieter,
+    token: Option<&str>,
+    accept: &str,
+) -> Result<Option<String>> {
+    let mut r = agent.get(url).header("Accept", accept);
+    if let Some(t) = token {
+        r = match anbieter {
+            Anbieter::GitHub => r.header("Authorization", &format!("Bearer {t}")),
+            Anbieter::GitLab => r.header("PRIVATE-TOKEN", t),
+        };
+    }
+    let mut resp = r
+        .call()
+        .map_err(|e| crate::netz::fehler(e, anbieter.as_str()))?;
+    let status = resp.status().as_u16();
+    if status == 404 {
+        return Ok(None);
+    }
+    if !(200..=299).contains(&status) {
+        return Err(Error::Netz(format!(
+            "{} antwortete {status}",
+            anbieter.as_str()
+        )));
+    }
+    let text = resp
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| Error::Other(e.to_string()))?;
+    Ok(Some(text.chars().take(README_ZEICHEN).collect()))
+}
+
+/// Räumt auf, was die Gegenseite als Beschreibung führt: leere Zeichenketten sind ein
+/// fehlendes Feld, nicht eine leere Beschreibung.
+fn gefuellt(s: Option<String>) -> Option<String> {
+    s.map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+}
+
 // ------------------------------------------------------- Zugang, wenn er fehlt
 
 /// Steckt hinter dem Fehler ein Zugangsproblem – oder nur ein Netz, das gerade nicht da
@@ -387,6 +473,53 @@ mod github {
             ci,
             standard_branch: repo.default_branch,
         }
+    }
+
+    /// Nur die Felder, die beim Anlegen eines Vorhabens etwas ändern. `serde(default)`
+    /// durchgehend: GitHub lässt Felder weg, und ein fehlendes `description` darf keine
+    /// Abfrage scheitern lassen.
+    #[derive(Deserialize, Default)]
+    pub struct SteckbriefWire {
+        #[serde(default)]
+        pub description: Option<String>,
+        #[serde(default)]
+        pub topics: Vec<String>,
+        #[serde(default)]
+        pub homepage: Option<String>,
+        #[serde(default)]
+        pub default_branch: Option<String>,
+        #[serde(default)]
+        pub archived: bool,
+        #[serde(default)]
+        pub private: bool,
+    }
+
+    pub fn steckbrief_aus(w: SteckbriefWire, readme: Option<String>) -> Steckbrief {
+        Steckbrief {
+            beschreibung: gefuellt(w.description),
+            themen: w.topics,
+            startseite: gefuellt(w.homepage),
+            standard_branch: gefuellt(w.default_branch),
+            archiviert: w.archived,
+            privat: w.private,
+            readme,
+        }
+    }
+
+    pub fn steckbrief(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Steckbrief> {
+        let basis = format!("https://api.github.com/repos/{}/{}", z.owner, z.repo);
+        let w: SteckbriefWire = hole(a, &basis, Anbieter::GitHub, token)?;
+        // Die README kostet einen zweiten Aufruf und darf scheitern: sie ist die
+        // Rückfallebene für den Kurs, nicht die Hauptsache.
+        let readme = hole_text(
+            a,
+            &format!("{basis}/readme"),
+            Anbieter::GitHub,
+            token,
+            "application/vnd.github.raw",
+        )
+        .unwrap_or(None);
+        Ok(steckbrief_aus(w, readme))
     }
 
     pub fn abfragen(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
@@ -493,6 +626,67 @@ mod gitlab {
             ci,
             standard_branch: projekt.default_branch,
         }
+    }
+
+    #[derive(Deserialize, Default)]
+    pub struct SteckbriefWire {
+        #[serde(default)]
+        pub description: Option<String>,
+        /// GitLab nennt sie `topics`; älterer Name `tag_list` kommt in beiden Feldern.
+        #[serde(default)]
+        pub topics: Vec<String>,
+        #[serde(default)]
+        pub default_branch: Option<String>,
+        #[serde(default)]
+        pub archived: bool,
+        /// `private`, `internal` oder `public`.
+        #[serde(default)]
+        pub visibility: Option<String>,
+        /// Zeigt auf die README im Weboberflächen-Pfad – daraus wird ihr Dateiname.
+        #[serde(default)]
+        pub readme_url: Option<String>,
+    }
+
+    /// Der Dateiname der README aus `readme_url`. GitLab nennt die Datei nicht direkt,
+    /// aber die Adresse endet darauf – und Raten wäre ein Fehlversuch je Kandidat.
+    pub fn readme_name(readme_url: &str) -> Option<String> {
+        let name = readme_url.rsplit('/').next()?.trim();
+        (!name.is_empty() && name.to_ascii_uppercase().starts_with("README"))
+            .then(|| name.to_string())
+    }
+
+    pub fn steckbrief_aus(w: SteckbriefWire, readme: Option<String>) -> Steckbrief {
+        Steckbrief {
+            beschreibung: gefuellt(w.description),
+            themen: w.topics,
+            // GitLab führt keine eigene Projektseite; `web_url` ist das Repo selbst und
+            // damit schon der Remote-Fund. Zweimal dasselbe anzuhängen hilft niemandem.
+            startseite: None,
+            standard_branch: gefuellt(w.default_branch),
+            archiviert: w.archived,
+            privat: w.visibility.as_deref() != Some("public"),
+            readme,
+        }
+    }
+
+    pub fn steckbrief(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Steckbrief> {
+        let basis = format!("https://gitlab.com/api/v4/projects/{}", pfad(z));
+        let w: SteckbriefWire = hole(a, &basis, Anbieter::GitLab, token)?;
+        let readme = match (
+            w.readme_url.as_deref().and_then(readme_name),
+            w.default_branch.as_deref(),
+        ) {
+            (Some(name), Some(branch)) => hole_text(
+                a,
+                &format!("{basis}/repository/files/{name}/raw?ref={branch}"),
+                Anbieter::GitLab,
+                token,
+                "text/plain",
+            )
+            .unwrap_or(None),
+            _ => None,
+        };
+        Ok(steckbrief_aus(w, readme))
     }
 
     pub fn abfragen(a: &ureq::Agent, z: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
@@ -1135,6 +1329,39 @@ mod live {
         assert!(!stand.standard_branch.is_empty());
     }
 
+    /// Zeigt, was beim Anlegen eines Vorhabens aus einer Adresse wirklich herauskommt.
+    /// Mit `--ignored` laufen zu lassen, wenn sich an der Abfrage etwas ändert.
+    #[test]
+    #[ignore]
+    fn steckbrief_live() {
+        for ziel in [
+            "https://github.com/phish3144/lotse",
+            "https://gitlab.com/gitlab-org/gitlab-runner",
+        ] {
+            let z = RepoZeiger::erkennen(ziel).unwrap();
+            let token = std::env::var(match z.anbieter {
+                Anbieter::GitHub => "LOTSE_GITHUB_TOKEN",
+                Anbieter::GitLab => "LOTSE_GITLAB_TOKEN",
+            })
+            .ok();
+            let sb = steckbrief(&z, token.as_deref()).expect("Steckbrief");
+            println!("--- {} ({}) ---", z.anzeige(), z.anbieter.as_str());
+            println!("  Beschreibung: {:?}", sb.beschreibung);
+            println!("  Themen:       {:?}", sb.themen);
+            println!("  Startseite:   {:?}", sb.startseite);
+            println!("  Branch:       {:?}", sb.standard_branch);
+            println!("  archiviert:   {}  privat: {}", sb.archiviert, sb.privat);
+            println!(
+                "  README:       {} Zeichen, Anfang: {:?}",
+                sb.readme.as_deref().map(str::len).unwrap_or(0),
+                sb.readme
+                    .as_deref()
+                    .map(|r| r.chars().take(70).collect::<String>())
+            );
+            assert!(sb.standard_branch.is_some(), "Standard-Branch muss kommen");
+        }
+    }
+
     #[test]
     #[ignore]
     fn forge_live_gegen_echtes_repo() {
@@ -1213,6 +1440,97 @@ mod verdichtung_tests {
         ];
         let l = letzte_maschinelle(&notizen, Quelle::Git).expect("Git-Notiz");
         assert_eq!(l.text, "maschinell");
+    }
+}
+
+#[cfg(test)]
+mod steckbrief_tests {
+    use super::*;
+
+    fn daten(name: &str) -> String {
+        std::fs::read_to_string(format!("{}/tests/daten/{name}", env!("CARGO_MANIFEST_DIR")))
+            .unwrap_or_else(|e| panic!("{name}: {e}"))
+    }
+
+    #[test]
+    fn liest_den_steckbrief_aus_einer_echten_github_antwort() {
+        let w: github::SteckbriefWire = serde_json::from_str(&daten("gh_repo.json")).unwrap();
+        let sb = github::steckbrief_aus(w, Some("# Lotse\n\nDas Logbuch.\n".into()));
+        assert_eq!(
+            sb.beschreibung.as_deref(),
+            Some("Projektverwaltungssoftware")
+        );
+        assert_eq!(
+            sb.startseite.as_deref(),
+            Some("https://phish3144.github.io/lotse/")
+        );
+        assert!(!sb.archiviert);
+        assert!(!sb.privat);
+        assert!(sb.standard_branch.is_some());
+        assert!(sb.readme.unwrap().contains("Das Logbuch"));
+    }
+
+    #[test]
+    fn liest_den_steckbrief_aus_einer_echten_gitlab_antwort() {
+        let w: gitlab::SteckbriefWire = serde_json::from_str(&daten("gl_projekt.json")).unwrap();
+        let sb = gitlab::steckbrief_aus(w, None);
+        assert!(sb.beschreibung.unwrap().contains("CI/CD"));
+        assert_eq!(
+            sb.themen,
+            vec!["golang".to_string(), "hacktoberfest".to_string()]
+        );
+        // Bei GitLab ist `web_url` das Repo selbst – als Startseite wäre es derselbe Link
+        // zweimal.
+        assert_eq!(sb.startseite, None);
+        assert!(!sb.privat, "das aufgenommene Projekt ist öffentlich");
+    }
+
+    #[test]
+    fn eine_leere_beschreibung_ist_keine_beschreibung() {
+        let w = github::SteckbriefWire {
+            description: Some("   ".into()),
+            homepage: Some(String::new()),
+            ..Default::default()
+        };
+        let sb = github::steckbrief_aus(w, None);
+        assert_eq!(sb.beschreibung, None);
+        assert_eq!(sb.startseite, None);
+    }
+
+    #[test]
+    fn fehlende_felder_lassen_den_steckbrief_nicht_scheitern() {
+        // GitHub lässt Felder weg, und ein Repo ohne Beschreibung ist der Normalfall.
+        let w: github::SteckbriefWire = serde_json::from_str("{}").unwrap();
+        let sb = github::steckbrief_aus(w, None);
+        assert_eq!(sb, Steckbrief::default());
+    }
+
+    #[test]
+    fn nicht_oeffentlich_heisst_privat() {
+        for (sicht, privat) in [("public", false), ("private", true), ("internal", true)] {
+            let w = gitlab::SteckbriefWire {
+                visibility: Some(sicht.into()),
+                ..Default::default()
+            };
+            assert_eq!(gitlab::steckbrief_aus(w, None).privat, privat, "{sicht}");
+        }
+        // Fehlt die Angabe, ist »nicht öffentlich« die vorsichtigere Annahme.
+        assert!(gitlab::steckbrief_aus(gitlab::SteckbriefWire::default(), None).privat);
+    }
+
+    #[test]
+    fn readme_name_kommt_aus_der_adresse() {
+        assert_eq!(
+            gitlab::readme_name("https://gitlab.com/o/r/-/blob/main/README.md").as_deref(),
+            Some("README.md")
+        );
+        assert_eq!(
+            gitlab::readme_name("https://gitlab.com/o/r/-/blob/main/readme.rst").as_deref(),
+            Some("readme.rst")
+        );
+        // Kein README am Ende: dann wird auch nicht geholt, statt zu raten.
+        assert_eq!(gitlab::readme_name("https://gitlab.com/o/r"), None);
+        assert_eq!(gitlab::readme_name(""), None);
     }
 }
 

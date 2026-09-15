@@ -150,15 +150,41 @@ vorangekreuzt**; was nicht gefunden wurde, taucht nicht auf:
 |---|---|
 | `schon_bekannt` | Der Ordner trägt schon eine Kennung. Dann entsteht kein zweites Vorhaben; `bekannt` nennt das Projekt, und was abgehakt bleibt, kommt dort dazu. |
 | `remote` | Eine Gegenseite, aus `git remote` gelesen. `dienst` ist „GitHub" oder „GitLab", wenn die Adresse eine bekannte ist. |
+| `startseite` | Die Projektseite, die das Repo selbst angibt. Wird eine Referenz mit Rolle *Doku*. |
 | `unterprojekt` | Ein eigenes Vorhaben im Ordner. Jedes abgehakte wird ein eigenes Projekt ([[Erkennungsregeln]]). |
 | `dokument` | Eine lesbare Datei. Wird eine Referenz. |
 
 Dazu `angesehen` (wie viele Ordner die Suche gesehen hat), `abgebrochen` (die Suche hat an
-ihrer Grenze aufgehört – das muss dastehen, sonst hält man die Liste für vollständig) und
-`weitere_dokumente` (nicht aufgeführte, aber gezählte Dateien).
+ihrer Grenze aufgehört – das muss dastehen, sonst hält man die Liste für vollständig),
+`weitere_dokumente` (nicht aufgeführte, aber gezählte Dateien), `archiviert` (die
+Gegenseite sagt, dort passiere nichts mehr) und `gegenseite_fehler` (sie war nicht
+erreichbar – der Befund gilt trotzdem).
 
-`auftrag` hat die Felder `titel`, `kurs`, `vorlage`, `ordner`, `remote`, `unterprojekte`,
-`dokumente` und `an_projekt`. Ist `an_projekt` gesetzt, wird angehängt statt angelegt.
+### Was die Gegenseite beisteuert
+
+Steht im Befund ein `remote`, holt die Hülle den **Steckbrief** des Repos und trägt ihn
+ein (`forge::steckbrief`, zusammengeführt von `deuten::anreichern`). Ohne das bestünde ein
+Befund aus einer eingefügten GitHub-Adresse nur aus Name und Link.
+
+| Von der Gegenseite | Wird zu |
+|---|---|
+| `description` | Der **Kurs** – sie ist als Einzeiler geschrieben, eine README nicht. |
+| README (erste brauchbare Zeile) | Der Kurs, wenn es keine Beschreibung gibt. |
+| `topics` | Tags, zu denen der Vorlage dazu. |
+| `homepage` | Ein `startseite`-Fund, außer sie zeigt auf dasselbe wie der Remote. |
+| `archived` | `archiviert` im Befund. |
+
+**Was schon dasteht, bleibt stehen**: eine README auf der Platte kennt das Vorhaben besser
+als ein Einzeiler auf GitHub. Der Kurs wird nur gefüllt, wenn er leer ist.
+
+Die Abfrage ist **bestmöglich, nie fatal**. Wer eine Adresse einfügt, will ein Vorhaben
+anlegen und keinen Netzwerkfehler; geht sie schief, steht das als `gegenseite_fehler` im
+Befund und der Rest gilt weiter. Ein Token braucht es nicht – öffentliche Repos antworten
+auch ohne, nur knapper (GitHub: 60 Anfragen je Stunde und Adresse). Das Token kommt aus dem
+Tresor und wird hereingereicht; `deuten` und `forge` kommen selbst nicht an ihn heran.
+
+`auftrag` hat die Felder `titel`, `kurs`, `vorlage`, `tags`, `ordner`, `remote`,
+`startseite`, `unterprojekte`, `dokumente` und `an_projekt`. Ist `an_projekt` gesetzt, wird angehängt statt angelegt.
 Angelegt werden: das Vorhaben, die Ordner-Referenz samt Markerdatei, die verdichtete
 Git-Historie, die Gegenseite und die Dokumente als Referenzen, jedes abgehakte
 Unterprojekt als eigenes Vorhaben – und ein Logbucheintrag, der nennt, was gedeutet wurde.
