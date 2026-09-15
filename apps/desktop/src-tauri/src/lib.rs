@@ -501,10 +501,26 @@ fn postkorb(state: State<AppState>) -> R<Projekt> {
     mit(&state, |s| s.store.postkorb())
 }
 
+/// Löscht ein Projekt – samt der Marker in seinen Ordnern.
+///
+/// Ohne das Aufräumen wäre Löschen keine Rücknahme: der Ordner bliebe »gehört schon zu
+/// einem Projekt«, ließe sich also nie wieder anlegen. Und genau das Einzelne wieder
+/// loszuwerden ist der Weg zurück aus einem Befund, den man zu weit abgehakt hat.
 #[tauri::command]
 fn projekt_loeschen(state: State<AppState>, id: String) -> R<()> {
     let id = ulid(&id)?;
-    mit(&state, |s| s.store.projekt_loeschen(id))
+    mit(&state, |s| {
+        for r in s.store.referenzen(id)? {
+            if matches!(r.typ, ReferenzTyp::Ordner | ReferenzTyp::GitRepo) {
+                let pfad = std::path::Path::new(&r.ziel);
+                // Nur den eigenen Marker: ein fremder gehört einem anderen Projekt.
+                if lotse_core::detect::marker_lesen(pfad) == Some(id) {
+                    lotse_core::detect::marker_entfernen(pfad);
+                }
+            }
+        }
+        s.store.projekt_loeschen(id)
+    })
 }
 
 #[tauri::command]
@@ -705,6 +721,270 @@ fn scan(state: State<AppState>, wurzeln: Vec<String>) -> R<Vec<Kandidat>> {
         s.store.kandidaten_merken(&neu)?;
         Ok(neu)
     })
+}
+
+// ------------------------------------------------------------------ Deuten
+
+/// Woher gedeutet werden soll. Ein einziger Eingang für alles, was man anhängen kann –
+/// Ordner, Adresse, Dateien. Die Oberfläche fragt nach der Herkunft, nicht nach Feldern.
+#[derive(Deserialize)]
+#[serde(tag = "art", rename_all = "snake_case")]
+enum QuelleEingabe {
+    Ordner { pfad: String },
+    Adresse { url: String },
+    Dateien { pfade: Vec<String> },
+}
+
+/// Der Befund plus die Antwort auf die eine Frage, die der Kern nicht beantworten kann:
+/// Gibt es das Projekt, auf das der Marker zeigt, überhaupt noch?
+#[derive(Serialize)]
+struct Deutung {
+    befund: lotse_core::deuten::Befund,
+    /// Gesetzt, wenn die Quelle schon zu einem Projekt gehört. Dann wird nichts angelegt,
+    /// sondern angehängt.
+    bekannt: Option<Projekt>,
+}
+
+/// Deutet eine Quelle und liefert Feststellungen, keine Fragen. Schreibt nichts – außer
+/// einem Marker, der ins Leere zeigt, wegzuräumen.
+#[tauri::command]
+fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
+    use lotse_core::deuten::{deuten, Fund, Quelle as DeutQuelle};
+
+    let q = match quelle {
+        QuelleEingabe::Ordner { pfad } => DeutQuelle::Ordner(PathBuf::from(pfad)),
+        QuelleEingabe::Adresse { url } => DeutQuelle::Adresse(url.trim().to_string()),
+        QuelleEingabe::Dateien { pfade } => {
+            DeutQuelle::Dateien(pfade.into_iter().map(PathBuf::from).collect())
+        }
+    };
+    let opt = lotse_core::detect::ScanOptionen::default();
+    let befund = deuten(&q, &opt).map_err(fehler)?;
+
+    let schon = befund.funde.iter().find_map(|f| match f {
+        Fund::SchonBekannt { id, pfad } => Some((*id, pfad.clone())),
+        _ => None,
+    });
+    let Some((id, pfad)) = schon else {
+        return Ok(Deutung {
+            befund,
+            bekannt: None,
+        });
+    };
+    if let Some(p) = mit(&state, |s| s.store.projekt(id))? {
+        return Ok(Deutung {
+            befund,
+            bekannt: Some(p),
+        });
+    }
+    // Der Marker zeigt auf ein gelöschtes Projekt. Der Ordner ist frei; ihn weiter als
+    // bekannt zu melden hiesse, ihn für immer zu sperren.
+    lotse_core::detect::marker_entfernen(std::path::Path::new(&pfad));
+    Ok(Deutung {
+        befund: deuten(&q, &opt).map_err(fehler)?,
+        bekannt: None,
+    })
+}
+
+/// Was aus dem Befund werden soll. Die Oberfläche schickt, was abgehakt geblieben ist;
+/// hier wird nichts mehr entschieden und nichts mehr erraten.
+#[derive(Deserialize)]
+struct AnlegenAuftrag {
+    titel: String,
+    kurs: Option<String>,
+    vorlage: String,
+    /// Der gedeutete Ordner: wird Referenz, bekommt den Marker, liefert die Git-Historie.
+    ordner: Option<String>,
+    /// Adresse der Gegenseite, als Referenz.
+    remote: Option<String>,
+    /// Abgehakte Unterprojekte – je ein eigenes Projekt.
+    unterprojekte: Vec<String>,
+    /// Abgehakte Dokumente – Referenzen am Hauptprojekt.
+    dokumente: Vec<String>,
+    /// Statt anzulegen an dieses Projekt anhängen.
+    an_projekt: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AnlegeBilanz {
+    /// Das Haupt-Projekt – neu angelegt oder das, an das angehängt wurde.
+    projekt: Projekt,
+    unterprojekte: Vec<Projekt>,
+    referenzen: usize,
+}
+
+/// Satz für das Logbuch: was gedeutet wurde. Leer, wenn es nichts zu erzählen gibt –
+/// ein von Hand angelegtes Projekt braucht keinen Eintrag über seine Herkunft.
+fn deutung_satz(a: &AnlegenAuftrag, unterprojekte: usize) -> Option<String> {
+    let mut teile = Vec::new();
+    if let Some(o) = a.ordner.as_deref() {
+        teile.push(format!("Ordner {o}"));
+    }
+    if let Some(r) = a.remote.as_deref() {
+        teile.push(format!("Gegenseite {r}"));
+    }
+    if unterprojekte > 0 {
+        teile.push(format!("{unterprojekte} Unterprojekt(e)"));
+    }
+    if !a.dokumente.is_empty() {
+        teile.push(format!("{} Dokument(e)", a.dokumente.len()));
+    }
+    if teile.is_empty() {
+        return None;
+    }
+    Some(format!("Gedeutet: {}.", teile.join(", ")))
+}
+
+/// Legt an, was im Befund abgehakt geblieben ist. Ein Aufruf, ein Ergebnis – wer hier
+/// abbricht, hinterlässt kein halbes Projekt, weil alles über denselben Speicher läuft.
+#[tauri::command]
+fn aus_befund_anlegen(state: State<AppState>, auftrag: AnlegenAuftrag) -> R<AnlegeBilanz> {
+    let an = match auftrag.an_projekt.as_deref() {
+        Some(s) => Some(ulid(s)?),
+        None => None,
+    };
+    let vorlage = Vorlage::parse(&auftrag.vorlage).unwrap_or(Vorlage::Generisch);
+    let titel = auftrag.titel.trim().to_string();
+    if an.is_none() && titel.is_empty() {
+        return Err("Ohne Titel kein Projekt".into());
+    }
+
+    mit(&state, |s| {
+        let mut ts = now_ms();
+        let mut naechster = || {
+            ts += 1;
+            ts
+        };
+        let mut referenzen = 0usize;
+
+        let projekt = match an {
+            Some(id) => s
+                .store
+                .projekt(id)?
+                .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?,
+            None => {
+                let mut p = Projekt::neu(&titel, vorlage, naechster());
+                p.kurs = auftrag.kurs.as_deref().unwrap_or_default().trim().to_string();
+                s.store.projekt_speichern(&p)?;
+                if p.kurs.is_empty() {
+                    s.store.notiz_speichern(&Notiz::neu(
+                        p.id,
+                        Quelle::Import,
+                        Art::Offen,
+                        "Kurs festlegen: worum geht es, was ist das Ziel?",
+                        naechster(),
+                    ))?;
+                }
+                p
+            }
+        };
+
+        if let Some(pfad) = auftrag.ordner.as_deref().filter(|p| !p.trim().is_empty()) {
+            let pf = std::path::Path::new(pfad);
+            let hat_git = pf.join(".git").is_dir();
+            let typ = if hat_git {
+                ReferenzTyp::GitRepo
+            } else {
+                ReferenzTyp::Ordner
+            };
+            s.store
+                .referenz_speichern(&Referenz::neu(projekt.id, typ, pfad, Rolle::Material))?;
+            referenzen += 1;
+            if hat_git {
+                let commits = lotse_core::git::log(pf, None, 500)?;
+                for n in lotse_core::git::verdichten(projekt.id, &commits, Quelle::Import) {
+                    s.store.notiz_speichern(&n)?;
+                }
+            }
+            // Der Marker macht den Ordner wiedererkennbar: beim nächsten Deuten steht
+            // »gehört schon dazu« da, statt dass ein zweites Projekt entsteht.
+            lotse_core::detect::marker_schreiben(pf, projekt.id).ok();
+        }
+
+        if let Some(url) = auftrag.remote.as_deref().filter(|u| !u.trim().is_empty()) {
+            s.store.referenz_speichern(&Referenz::neu(
+                projekt.id,
+                ReferenzTyp::Url,
+                url.trim(),
+                Rolle::Material,
+            ))?;
+            referenzen += 1;
+        }
+
+        for d in auftrag.dokumente.iter().filter(|d| !d.trim().is_empty()) {
+            s.store.referenz_speichern(&Referenz::neu(
+                projekt.id,
+                ReferenzTyp::Datei,
+                d.as_str(),
+                Rolle::Material,
+            ))?;
+            referenzen += 1;
+        }
+
+        let mut unterprojekte = Vec::new();
+        for pfad in &auftrag.unterprojekte {
+            let pf = std::path::Path::new(pfad);
+            // Zwischen Befund und Häkchen kann etwas dazugekommen sein.
+            let schon = lotse_core::detect::marker_lesen(pf)
+                .and_then(|id| s.store.projekt(id).ok().flatten())
+                .is_some();
+            if schon {
+                continue;
+            }
+            let Some(k) = lotse_core::detect::erkenne(pf) else {
+                continue;
+            };
+            let up = lotse_core::detect::uebernehmen(&mut s.store, &k)?;
+            s.store.notiz_speichern(&Notiz::neu(
+                up.id,
+                Quelle::Import,
+                Art::Log,
+                format!("Beim Deuten von »{}« gefunden.", projekt.titel),
+                naechster(),
+            ))?;
+            unterprojekte.push(up);
+        }
+
+        if let Some(satz) = deutung_satz(&auftrag, unterprojekte.len()) {
+            s.store.notiz_speichern(&Notiz::neu(
+                projekt.id,
+                Quelle::Import,
+                Art::Log,
+                satz,
+                naechster(),
+            ))?;
+        }
+
+        Ok(AnlegeBilanz {
+            projekt,
+            unterprojekte,
+            referenzen,
+        })
+    })
+}
+
+/// Systemdialog für mehrere Dateien. Gefiltert auf das, was Lotse lesen kann – ein
+/// Dialog, der alles anbietet und danach die Hälfte verwirft, ist keine Hilfe.
+#[tauri::command]
+async fn dateien_waehlen(app: tauri::AppHandle) -> R<Vec<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .add_filter(
+            "Lesbare Dateien",
+            &["pdf", "md", "markdown", "txt", "text", "log", "csv", "tsv", "json"],
+        )
+        .pick_files(move |pfade| {
+            let _ = tx.send(pfade);
+        });
+    let gewaehlt = rx.recv().map_err(|_| "Auswahl abgebrochen".to_string())?;
+    Ok(gewaehlt
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string())
+        .collect())
 }
 
 /// Systemdialog zur Ordnerwahl. Spart das Abtippen von Pfaden beim ersten Scan.
@@ -2419,8 +2699,11 @@ pub fn run() {
             rechnername,
             zuruecksetzen,
             scan,
+            quelle_deuten,
+            aus_befund_anlegen,
             ordner_waehlen,
             datei_waehlen,
+            dateien_waehlen,
             export_spiegel,
             export_bundle,
             beobachter_status,

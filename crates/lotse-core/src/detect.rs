@@ -394,6 +394,17 @@ pub fn marker_schreiben(dir: &Path, id: Ulid) -> Result<()> {
     Ok(())
 }
 
+/// Entfernt die Marker-Datei – an beiden Orten, alte Fassungen eingeschlossen.
+///
+/// Nötig, wenn das Projekt gelöscht wurde: ein Marker, der auf nichts mehr zeigt, würde
+/// den Ordner für immer als »gehört schon zu einem Projekt« ausgeben. Dann liesse er sich
+/// nie wieder anlegen, und die Rücknahme »Projekt löschen« wäre keine.
+pub fn marker_entfernen(dir: &Path) {
+    for p in [marker_pfad(dir), dir.join(MARKER)] {
+        let _ = fs::remove_file(p);
+    }
+}
+
 /// Kurzer Kurs-Vorschlag aus der README: erste nicht-leere Nicht-Überschrift-Zeile.
 pub fn kurs_vorschlag(readme: &str) -> Option<String> {
     readme
@@ -475,5 +486,18 @@ mod tests {
         assert_eq!(marker_lesen(t.path()), Some(id));
         mk(t.path(), &["Cargo.toml"]);
         assert_eq!(erkenne(t.path()).unwrap().bekannte_id, Some(id));
+    }
+
+    #[test]
+    fn marker_entfernen_gibt_den_ordner_frei() {
+        // Ohne das wäre »Projekt löschen« keine Rücknahme: der Ordner bliebe bekannt.
+        let t = tempfile::tempdir().unwrap();
+        marker_schreiben(t.path(), Ulid::new()).unwrap();
+        // Auch ein Marker aus älteren Fassungen muss weg.
+        fs::write(t.path().join(MARKER), format!("{}\n", Ulid::new())).unwrap();
+        marker_entfernen(t.path());
+        assert_eq!(marker_lesen(t.path()), None);
+        // Zweimal entfernen ist kein Fehler.
+        marker_entfernen(t.path());
     }
 }
