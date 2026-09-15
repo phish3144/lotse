@@ -197,7 +197,8 @@ Siehe [[Gegenseite]] und [[Kalender]].
 | `ki_ziel_setzen` | `basis_url`, `modell`, `schluessel_eintrag`, `schluessel_feld` | Der Schlüssel liegt im Tresor; hier steht nur der Zeiger. |
 | `ki_modelle` | `basis_url` | Modelle eines Ziels, damit niemand einen Namen abtippen muss. |
 | `ki_anfrage_text` | `projekt_id` | **Genau der Text, der gesendet würde** – die Oberfläche zeigt ihn, bevor etwas das Gerät verlässt. |
-| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. |
+| `ki_kurs_text` | `projekt_id` | Dasselbe für den Kurs-Vorschlag: Name, Erkennungsmarken, README und Dateinamen des angehängten Ordners. **Keine Dateiinhalte außer der README.** Fehlt der Ordner, ist das ein Fehler und kein leerer Text – ein Kurs aus dem Titel allein wäre geraten. |
+| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. `zweck` ist `brief_verdichten`, `datei_deuten` oder `kurs_vorschlagen`. |
 | `ki_verbrauch` | – | Zähler und die letzten Protokolleinträge. |
 | `ki_verbrauch_loeschen` | – | Was Lotse über den eigenen Gebrauch führt, muss man auch loswerden können. |
 | `datei_auszug` | `pfad` | Macht **eine** ausdrücklich gewählte Datei auf. Gespeichert wird dabei nichts. |

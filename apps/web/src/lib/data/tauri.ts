@@ -211,6 +211,13 @@ export const ki = {
   modelle: (basisUrl: string) => invoke<string[]>('ki_modelle', { basisUrl }),
   verbrauch: () => invoke<KiVerbrauch>('ki_verbrauch'),
   verbrauchLoeschen: () => invoke<void>('ki_verbrauch_loeschen'),
+  /**
+   * Genau der Text, aus dem ein Kurs-Vorschlag würde: Name des Vorhabens,
+   * Erkennungsmarken, README und Dateinamen des angehängten Ordners. Keine
+   * Dateiinhalte außer der README. Gesendet wird hier nichts – erst
+   * `provider.kiVerdichten(text, 'kurs_vorschlagen')`.
+   */
+  kursText: (projektId: string) => invoke<string>('ki_kurs_text', { projektId }),
 };
 
 export interface KiProtokollEintrag {

@@ -4,7 +4,16 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { datei, forge, kalender, system, type DateiAuszug, type ForgeProjekt, type Termin } from '../lib/data/tauri';
+  import {
+    datei,
+    forge,
+    kalender,
+    ki,
+    system,
+    type DateiAuszug,
+    type ForgeProjekt,
+    type Termin,
+  } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -471,6 +480,54 @@
     kiErgebnis = null;
   }
 
+  // --- Kurs vorschlagen -----------------------------------------------------
+  // Die eigentliche Aufgabe für ein Modell: Titel und Vorlage liest die Erkennung aus
+  // Marken, aber den einen Satz, der in drei Monaten sagt, was man wollte, kann keine
+  // Regel schreiben. Die erste Zeile einer README ist meist eine Überschrift.
+  //
+  // Derselbe Ablauf wie beim Brief: erst zeigen, was gesendet würde, dann senden, dann
+  // übernehmen – und übernehmen heißt hier, das Feld zu füllen, nicht zu speichern.
+  let kursText: string | null = $state(null);
+  let kursVorschlag: string | null = $state(null);
+  let kursLaeuft = $state(false);
+
+  async function kursVorbereiten() {
+    kursLaeuft = true;
+    kursVorschlag = null;
+    try {
+      kursText = await ki.kursText(id);
+    } catch (e) {
+      melde(e);
+    } finally {
+      kursLaeuft = false;
+    }
+  }
+
+  async function kursSenden() {
+    if (!kursText) return;
+    kursLaeuft = true;
+    try {
+      kursVorschlag = await provider.kiVerdichten(kursText, 'kurs_vorschlagen');
+    } catch (e) {
+      melde(e);
+    } finally {
+      kursLaeuft = false;
+    }
+  }
+
+  function kursUebernehmen() {
+    if (!kursVorschlag) return;
+    eKurs = kursVorschlag.trim();
+    kursText = null;
+    kursVorschlag = null;
+    meldungen.zeigen('Übernommen. Noch nicht gespeichert – lies ihn erst.');
+  }
+
+  function kursVerwerfen() {
+    kursText = null;
+    kursVorschlag = null;
+  }
+
   // --- Tresor ---------------------------------------------------------------
   let tresorOffen = $state(false);
 
@@ -585,6 +642,34 @@
           <span>Kurs – worum geht es, was ist das Ziel?</span>
           <textarea bind:value={eKurs} rows="3"></textarea>
         </label>
+        <!-- Nur wenn ein Ordner dranhängt: ohne Unterlagen wäre ein Kurs geraten. -->
+        {#if echteDaten && referenzen.some((r) => r.typ === 'ordner' || r.typ === 'git_repo')}
+          {#if !kursText}
+            <button type="button" class="schlicht ki-knopf" onclick={kursVorbereiten} disabled={kursLaeuft}>
+              {kursLaeuft ? 'Moment …' : 'Kurs von der KI vorschlagen lassen'}
+            </button>
+          {:else}
+            <div class="ki">
+              <strong>Das würde gesendet:</strong>
+              <pre class="ki-text">{kursText}</pre>
+              {#if kursVorschlag}
+                <strong>Vorschlag:</strong>
+                <div class="ki-antwort"><NoteText text={kursVorschlag} /></div>
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kursVerwerfen}>Verwerfen</button>
+                  <button type="button" class="primaer" onclick={kursUebernehmen}>Ins Feld übernehmen</button>
+                </div>
+              {:else}
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kursVerwerfen}>Abbrechen</button>
+                  <button type="button" class="primaer" onclick={kursSenden} disabled={kursLaeuft}>
+                    {kursLaeuft ? 'Frage …' : 'Senden'}
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        {/if}
         <div class="feld-paar">
           <label>
             <span>Ruhig für (Tage)</span>

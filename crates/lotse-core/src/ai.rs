@@ -80,20 +80,34 @@ pub enum Zweck {
     BriefVerdichten,
     /// Eine einzelne, ausdrücklich hergegebene Datei deuten.
     DateiDeuten,
+    /// Aus dem, was in einem Projektordner liegt, den Kurs formulieren.
+    ///
+    /// Das ist die Aufgabe, für die es ein Modell braucht: Titel und Vorlage liest
+    /// `detect` aus Erkennungsmarken, und die erste Zeile einer README ist als Kurs
+    /// meistens eine Überschrift, kein Ziel. Den einen Satz, der in drei Monaten sagt,
+    /// was man eigentlich wollte, kann keine Regel schreiben.
+    KursVorschlagen,
 }
 
 impl Zweck {
+    /// Alle Zwecke. `parse` läuft darüber – eine Liste, die von Hand nachgezogen werden
+    /// muss, hat schon einmal dazu geführt, dass ein Zweck nicht mehr ankam.
+    pub const ALLE: [Zweck; 3] = [
+        Zweck::BriefVerdichten,
+        Zweck::DateiDeuten,
+        Zweck::KursVorschlagen,
+    ];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Zweck::BriefVerdichten => "brief_verdichten",
             Zweck::DateiDeuten => "datei_deuten",
+            Zweck::KursVorschlagen => "kurs_vorschlagen",
         }
     }
 
     pub fn parse(s: &str) -> Option<Zweck> {
-        [Zweck::BriefVerdichten]
-            .into_iter()
-            .find(|z| z.as_str() == s)
+        Zweck::ALLE.into_iter().find(|z| z.as_str() == s)
     }
 
     /// Wie der Zweck in der Oberfläche und im Protokoll heißt.
@@ -101,6 +115,7 @@ impl Zweck {
         match self {
             Zweck::BriefVerdichten => "Brief verdichten",
             Zweck::DateiDeuten => "Datei deuten",
+            Zweck::KursVorschlagen => "Kurs vorschlagen",
         }
     }
 
@@ -120,6 +135,14 @@ impl Zweck {
                  was daraus zu tun wäre. Höchstens zehn Sätze. Nenne nur, was im Text \
                  steht; wenn etwas fehlt oder unklar ist, sage das, statt es zu ergänzen. \
                  Keine Anrede, keine Überschrift."
+            }
+            Zweck::KursVorschlagen => {
+                "Du schreibst den »Kurs« eines Vorhabens: einen einzigen Satz auf Deutsch, \
+                 der sagt, worum es geht und was das Ziel ist. Er soll einer Person, die in \
+                 drei Monaten zurückkommt, sagen, was sie eigentlich wollte. Höchstens 200 \
+                 Zeichen. Kein Marketing, keine Aufzählung, keine Überschrift, keine \
+                 Anrede. Nenne nur, was in der Eingabe steht. Nennt sie kein Ziel, schreibe \
+                 nur, worum es geht – erfinde keines."
             }
         }
     }
@@ -163,6 +186,59 @@ pub fn anfrage_text(brief: &str, offene_faeden: &[String], titel: &str) -> Strin
             s.push_str("- ");
             s.push_str(f.trim());
             s.push('\n');
+        }
+    }
+    s.trim_end().to_string()
+}
+
+/// Wie viel von einer README mitgeht. Mehr hilft nicht: der Kurs steht, wenn überhaupt,
+/// am Anfang – und alles danach ist Bauanleitung.
+pub const KURS_README_ZEICHEN: usize = 3_000;
+/// So viele Dateinamen. Sie sind ein Hinweis auf die Art des Vorhabens, keine Inhaltsangabe.
+pub const KURS_DATEIEN: usize = 40;
+
+/// Baut den Text für den Kurs-Vorschlag. Getrennt vom Senden, damit die Oberfläche ihn
+/// zeigen kann, bevor etwas das Gerät verlässt.
+///
+/// Was mitgeht: der Name des Ordners, die Erkennungsmarken, die Anfangszeichen der README
+/// und Dateinamen – **keine Dateiinhalte** außer der README. Wer mehr senden will, deutet
+/// die Datei ausdrücklich (`Zweck::DateiDeuten`); das ist dann eine eigene Entscheidung.
+pub fn kurs_anfrage_text(
+    titel: &str,
+    marken: &[String],
+    readme: Option<&str>,
+    dateien: &[String],
+) -> String {
+    let mut s = format!("Vorhaben: {titel}\n");
+    if !marken.is_empty() {
+        s.push_str(&format!("Erkannt an: {}\n", marken.join(", ")));
+    }
+    s.push('\n');
+    match readme.map(str::trim).filter(|r| !r.is_empty()) {
+        Some(r) => {
+            s.push_str("README:\n");
+            let gekuerzt: String = r.chars().take(KURS_README_ZEICHEN).collect();
+            s.push_str(&gekuerzt);
+            if r.chars().count() > KURS_README_ZEICHEN {
+                s.push_str("\n[…]");
+            }
+            s.push_str("\n\n");
+        }
+        None => s.push_str("Keine README vorhanden.\n\n"),
+    }
+    let sichtbar: Vec<&String> = dateien.iter().take(KURS_DATEIEN).collect();
+    if !sichtbar.is_empty() {
+        s.push_str("Dateien im Ordner:\n");
+        for d in sichtbar {
+            s.push_str("- ");
+            s.push_str(d);
+            s.push('\n');
+        }
+        if dateien.len() > KURS_DATEIEN {
+            s.push_str(&format!(
+                "- […] und {} weitere\n",
+                dateien.len() - KURS_DATEIEN
+            ));
         }
     }
     s.trim_end().to_string()
@@ -443,6 +519,61 @@ mod tests {
         assert_eq!(Zweck::parse("erfunden"), None);
         assert!(Zweck::BriefVerdichten.anweisung().contains("fünf Sätze"));
         assert_eq!(Zweck::BriefVerdichten.anzeige(), "Brief verdichten");
+    }
+
+    #[test]
+    fn jeder_zweck_kommt_auch_an() {
+        // `parse` lief einmal über eine handgeschriebene Liste mit einem Eintrag. Damit
+        // scheiterte »Datei deuten« an einem »Unbekannter Zweck«, obwohl die Oberfläche
+        // ihn korrekt schickte. Deshalb hier alle Varianten, nicht eine.
+        for z in Zweck::ALLE {
+            assert_eq!(
+                Zweck::parse(z.as_str()),
+                Some(z),
+                "{} kommt nicht an",
+                z.as_str()
+            );
+            assert!(!z.anzeige().is_empty());
+            assert!(
+                z.anweisung().len() > 40,
+                "{} hat keine Anweisung",
+                z.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn kurs_anfrage_nennt_nur_das_uebergebene() {
+        let t = kurs_anfrage_text(
+            "Gartenhaus",
+            &["README.md".into()],
+            Some("# Gartenhaus\n\nFundament bis Oktober.\n"),
+            &["plan.pdf".into(), "statik.pdf".into()],
+        );
+        assert!(t.starts_with("Vorhaben: Gartenhaus"));
+        assert!(t.contains("Erkannt an: README.md"));
+        assert!(t.contains("Fundament bis Oktober."));
+        assert!(t.contains("- plan.pdf"));
+        assert!(t.contains("- statik.pdf"));
+    }
+
+    #[test]
+    fn kurs_anfrage_sagt_wenn_die_readme_fehlt() {
+        // Schweigen wäre schlimmer: das Modell würde sich etwas zusammenreimen.
+        let t = kurs_anfrage_text("Nichts", &[], None, &[]);
+        assert!(t.contains("Keine README vorhanden."));
+        assert!(!t.contains("Dateien im Ordner"));
+    }
+
+    #[test]
+    fn kurs_anfrage_kuerzt_und_sagt_es() {
+        let lang = "x".repeat(KURS_README_ZEICHEN + 500);
+        let viele: Vec<String> = (0..KURS_DATEIEN + 7).map(|i| format!("d{i}.txt")).collect();
+        let t = kurs_anfrage_text("Groß", &[], Some(&lang), &viele);
+        assert!(t.contains("[…]"), "die Kürzung muss dastehen");
+        assert!(t.contains("und 7 weitere"));
+        // Der Deckel gilt: gekürzt wird vor dem Senden, nicht erst beim Ziel.
+        assert!(t.chars().count() < KURS_README_ZEICHEN + 2_000);
     }
 
     #[test]

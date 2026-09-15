@@ -1537,6 +1537,74 @@ fn ki_modelle(state: State<AppState>, basis_url: String) -> R<Vec<String>> {
     lotse_core::ai::modelle(&ziel).map_err(fehler)
 }
 
+/// Baut den Text für den Kurs-Vorschlag: der eine Satz, den keine Regel schreiben kann.
+///
+/// Gelesen wird der Ordner, der als Referenz am Vorhaben hängt – Name, Erkennungsmarken,
+/// README und Dateinamen. **Keine Dateiinhalte** außer der README. Gesendet wird hier
+/// nichts: das Ergebnis geht an die Oberfläche, die es zeigt, bevor jemand auf Senden
+/// drückt (`ki_verdichten` mit Zweck `kurs_vorschlagen`).
+#[tauri::command]
+fn ki_kurs_text(state: State<AppState>, projekt_id: String) -> R<String> {
+    let id = ulid(&projekt_id)?;
+    let (titel, ordner) = mit(&state, |s| {
+        let p = s
+            .store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?;
+        let ordner = s
+            .store
+            .referenzen(id)?
+            .into_iter()
+            .find(|r| matches!(r.typ, ReferenzTyp::Ordner | ReferenzTyp::GitRepo))
+            .map(|r| r.ziel);
+        Ok((p.titel, ordner))
+    })?;
+
+    let Some(ordner) = ordner else {
+        return Err("An diesem Vorhaben hängt kein Ordner. Ohne Unterlagen gibt es nichts \
+                    zu deuten – ein Kurs aus dem Titel allein wäre geraten."
+            .into());
+    };
+    let pfad = PathBuf::from(&ordner);
+    if !pfad.is_dir() {
+        return Err(format!("Den Ordner {ordner} gibt es nicht (mehr)."));
+    }
+
+    // Ohne Sperre lesen: das geht auf die Platte und kann dauern.
+    let erkannt = lotse_core::detect::erkenne(&pfad);
+    let marken = erkannt.as_ref().map(|k| k.marken.clone()).unwrap_or_default();
+    let readme = erkannt.as_ref().and_then(|k| k.readme.clone());
+    let dateien = ordner_dateinamen(&pfad);
+
+    Ok(lotse_core::ai::kurs_anfrage_text(
+        &titel,
+        &marken,
+        readme.as_deref(),
+        &dateien,
+    ))
+}
+
+/// Dateinamen der obersten Ebene, sortiert. Versteckte Dateien und die üblichen
+/// Werkzeugordner bleiben draußen: `node_modules` sagt nichts über ein Vorhaben.
+fn ordner_dateinamen(dir: &std::path::Path) -> Vec<String> {
+    let Ok(eintraege) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut namen: Vec<String> = eintraege
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') || lotse_core::detect::nie_lesen(&name) {
+                return None;
+            }
+            let ordner = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            Some(if ordner { format!("{name}/") } else { name })
+        })
+        .collect();
+    namen.sort();
+    namen
+}
+
 /// Genau der Text, der gesendet würde. Die Oberfläche zeigt ihn, bevor etwas das
 /// Gerät verlässt – so verlangt es das Konzept.
 #[tauri::command]
@@ -2826,6 +2894,7 @@ pub fn run() {
             ki_ziel_setzen,
             ki_modelle,
             ki_anfrage_text,
+            ki_kurs_text,
             ki_verdichten,
             ki_verbrauch,
             ki_verbrauch_loeschen,
