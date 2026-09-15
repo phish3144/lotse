@@ -1,51 +1,51 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "notes": "Frühe Fassung. Die Installer sind **nicht code-signiert**: Windows SmartScreen\nund macOS Gatekeeper warnen beim ersten Start. Prüfsummen liegen als\n`.sha256`-Dateien bei.\n\nAb dieser Fassung aktualisiert sich Lotse selbst: es lädt die neue Fassung,\nprüft ihre Signatur gegen den eingebauten öffentlichen Schlüssel und tauscht\nsich aus. Aus einem `.deb` oder `.rpm` heraus nicht – dort aktualisiert die\nPaketverwaltung.\n\nDer Wiederherstellungscode und der Desktop-Schlüssel werden beim Einrichten\ngenau einmal angezeigt.",
-  "pub_date": "2026-09-15T15:46:20.467Z",
+  "pub_date": "2026-09-15T17:27:57.072Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3lwYzFSZGFUdG5lT1QxUzZpckVKVWpvWVN0Q2E0R204UnBXVnprTXlPcDB6NGh3UWVaWlBGb1FKNFJwaWNFM1RZWitnbGNoOUE5cE9mUFU2YVVsOEFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2ODc0CWZpbGU6TG90c2UuYXBwLnRhci5negpNWXdHNzVDMlVNNDRUbElUaUhSd3ZSajZUWGg3R20xeFhTM2VMK0UxRmpDcnB5d3BBMVdPM3JPOTZ1cWJseHlaalliQUVpRTZIUVQzVFBQUUZoT0hBdz09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3cyMVR5L3EwNnhwT2MzS01SSFY5eEpWeWxGQlZuZGJPNmtWRHY5RUduUmNRSjZOY0YvZWl2TFBtSHN0UTdjNG1KeWp5cmZQaDdjNXoxL25KUDZqQndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMTMzCWZpbGU6TG90c2UuYXBwLnRhci5negpGTkwrVGovczNWSHZvVlFoMFpJTW9PSXkvcWFyajdNd0NFaDBvRS90MnFPRFJWZDlSdTExU0UxWjNETGVXZ0MrTHhOQ2pwSjlzV29XbGhzRnpscGxDdz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_aarch64.app.tar.gz"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3lwYzFSZGFUdG5lT1QxUzZpckVKVWpvWVN0Q2E0R204UnBXVnprTXlPcDB6NGh3UWVaWlBGb1FKNFJwaWNFM1RZWitnbGNoOUE5cE9mUFU2YVVsOEFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2ODc0CWZpbGU6TG90c2UuYXBwLnRhci5negpNWXdHNzVDMlVNNDRUbElUaUhSd3ZSajZUWGg3R20xeFhTM2VMK0UxRmpDcnB5d3BBMVdPM3JPOTZ1cWJseHlaalliQUVpRTZIUVQzVFBQUUZoT0hBdz09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_aarch64.app.tar.gz"
-    },
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzdyZGFkbGh0Nll0NU5aa2ZOTXJCQldjSVlhOXEwcnZQUWtCdkJsNGpNd21Sd3NtcndoeFlVakUyTG5IeTNzcFFJK09GL0JjM01udXlud3VEZjFjUUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTQ4CWZpbGU6TG90c2VfMC43LjBfeDY0LXNldHVwLmV4ZQo1VG1OOStLdHpmNUU3L2R4RDBUSk9sVWFEenJocWJLSjZ0UWgwS09xMTlaZGtrUE5uMXZmOTBPaCt1QkpQM3VINHp6WGQrWFAyRW1uUjVVVE00M2hCZz09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_x64-setup.exe"
-    },
-    "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzdyZGFkbGh0Nll0NU5aa2ZOTXJCQldjSVlhOXEwcnZQUWtCdkJsNGpNd21Sd3NtcndoeFlVakUyTG5IeTNzcFFJK09GL0JjM01udXlud3VEZjFjUUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTQ4CWZpbGU6TG90c2VfMC43LjBfeDY0LXNldHVwLmV4ZQo1VG1OOStLdHpmNUU3L2R4RDBUSk9sVWFEenJocWJLSjZ0UWgwS09xMTlaZGtrUE5uMXZmOTBPaCt1QkpQM3VINHp6WGQrWFAyRW1uUjVVVE00M2hCZz09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_x64-setup.exe"
-    },
-    "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3lDb09VajVZSWN2R3JnaW9hRUx3QjMrTjhMbU9rRGtHV2Vxc1Q5alpnbHlQZm9JNHpjcWRXNjg1aVZCRWFpaDRtaktJS3crV3hZNkxvVC9JaTZsZUE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTQ4CWZpbGU6TG90c2VfMC43LjBfeDY0X2VuLVVTLm1zaQoyMjVqbndBdDhRMmlQOWR2Q3Fib1E1MFhYd1JCTzNCK2hpMEQyOGp2Qjk5NkZ3Wk9UZXhGdWV4Z2Y2OXBSRHVGQWtIUFlWWURvQkhEVmR5Y1VFZUlCQT09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_x64_en-US.msi"
-    },
-    "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3h4NHc3cUw3WVRWNm5kZXc0VnVKaXN6S3F0azNZbVB1SmN4ckt0U2tLeU5rbUM3b1gyM2w4UXNwQWRFL3ZxQ1lUY1RqZnlMV1JKd0ltZzlFb1BqdXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTk1CWZpbGU6TG90c2VfMC43LjBfYW1kNjQuQXBwSW1hZ2UKZCt0ajNUNGdLYnRtanVvc2QrcHkveC8wWTdyWnQ0cEVHSk50WittTTFZRkJSTmVjQ3JjbXJZak5Nb1QxalQyL0dnYkpDSnM0SXpjZGdtbWlGNDJPRFE9PQo=",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_amd64.AppImage"
-    },
-    "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3h4NHc3cUw3WVRWNm5kZXc0VnVKaXN6S3F0azNZbVB1SmN4ckt0U2tLeU5rbUM3b1gyM2w4UXNwQWRFL3ZxQ1lUY1RqZnlMV1JKd0ltZzlFb1BqdXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTk1CWZpbGU6TG90c2VfMC43LjBfYW1kNjQuQXBwSW1hZ2UKZCt0ajNUNGdLYnRtanVvc2QrcHkveC8wWTdyWnQ0cEVHSk50WittTTFZRkJSTmVjQ3JjbXJZak5Nb1QxalQyL0dnYkpDSnM0SXpjZGdtbWlGNDJPRFE9PQo=",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_amd64.AppImage"
-    },
-    "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3lKYVR3ZVM3bnNIT1g0OTVkS3FEcGhCTStVcU0yd0hmM2hOYlpjOG0vTkQrQlZvMHdncWU1eWZscXpHQUZNay8vVnIwSU11aHZBRXBaVnpTMExaa3dRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTk1CWZpbGU6TG90c2VfMC43LjBfYW1kNjQuZGViCkYxQXdpNXBkUE0xaGIxV3pucXdQMG5KREsxdDNpRFFUWGxxYjFjR1JobFpMM3g1RzNLT2ZneGF4YmRyV2JieC9HVzgyQU5xcCtyOGFCZWdBYysvU0RRPT0K",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_0.7.0_amd64.deb"
-    },
-    "linux-x86_64-rpm": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzB3cVhwR2FXV0QrbUdjUXkxL2pLR245K3pRM2FkRXgzZHIxcENLTmRjelJVNzdtMG5maVJhTzgrR1F0aTRyRDNreXlZRisxTkhmZytvS2ZGR1JGNFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg2OTk1CWZpbGU6TG90c2UtMC43LjAtMS54ODZfNjQucnBtCk05a0ZZMDVMNWM2d1NwSFd6eEF2WWI5eFYrTG1EdStPNUhrVndmSWJrNTlESVdjUGYzK2NuR3BQaTJlM042MmJpcW5SeHNLVXdGaHZ6OHZvZ3NiQkRRPT0K",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse-0.7.0-1.x86_64.rpm"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3cyMVR5L3EwNnhwT2MzS01SSFY5eEpWeWxGQlZuZGJPNmtWRHY5RUduUmNRSjZOY0YvZWl2TFBtSHN0UTdjNG1KeWp5cmZQaDdjNXoxL25KUDZqQndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMTMzCWZpbGU6TG90c2UuYXBwLnRhci5negpGTkwrVGovczNWSHZvVlFoMFpJTW9PSXkvcWFyajdNd0NFaDBvRS90MnFPRFJWZDlSdTExU0UxWjNETGVXZ0MrTHhOQ2pwSjlzV29XbGhzRnpscGxDdz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_aarch64.app.tar.gz"
     },
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzN6TVdvU0dNYmRXVU5Gb1NoYldvYTFKWENmR0RMTnc0VmQ2TmhMMUlYWTlZT2t4ekFPTVBLZnEyajlBOEZBNCtCWm1TVjl6VVNVZC83MVV6N0RoQmdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg3MTc2CWZpbGU6TG90c2UuYXBwLnRhci5nego2aWZYUkVISnozZjZUVkRBZHFpYXBHVnpUQ3ZXNU9hNDZpYytrUEFjeitkQnB2M3l5ZG1TN3lpaVdFditoZ2d2ZzFLR1hQcEszMmM1TWp6dXJia3FEQT09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_x64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzdCUEhkaUdwSFJHRStEMnNsNGZ5cFlUakZ0QlV6b24vQVlqbVRoM1d5WUp1KzdLOWJHL1k5aTdYenNlNXhDdFhSRVZNOURQeXNuOFR4WmtwODM2Q0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMTYwCWZpbGU6TG90c2UuYXBwLnRhci5negpBVU1yU2JlRGk1ZEdGbE43aU1IUFlpZm5YVExJNFgraERJMEU0eXVjZUh2RUNZcDRwSnA0ZUo3ZnluZ3ZCOE9aM1pURTRxY2Ewd0RUdklKa2xrY0VEZz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_x64.app.tar.gz"
     },
     "darwin-x86_64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzN6TVdvU0dNYmRXVU5Gb1NoYldvYTFKWENmR0RMTnc0VmQ2TmhMMUlYWTlZT2t4ekFPTVBLZnEyajlBOEZBNCtCWm1TVjl6VVNVZC83MVV6N0RoQmdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDg3MTc2CWZpbGU6TG90c2UuYXBwLnRhci5nego2aWZYUkVISnozZjZUVkRBZHFpYXBHVnpUQ3ZXNU9hNDZpYytrUEFjeitkQnB2M3l5ZG1TN3lpaVdFditoZ2d2ZzFLR1hQcEszMmM1TWp6dXJia3FEQT09Cg==",
-      "url": "https://github.com/phish3144/lotse/releases/download/v0.7.0/Lotse_x64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzdCUEhkaUdwSFJHRStEMnNsNGZ5cFlUakZ0QlV6b24vQVlqbVRoM1d5WUp1KzdLOWJHL1k5aTdYenNlNXhDdFhSRVZNOURQeXNuOFR4WmtwODM2Q0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMTYwCWZpbGU6TG90c2UuYXBwLnRhci5negpBVU1yU2JlRGk1ZEdGbE43aU1IUFlpZm5YVExJNFgraERJMEU0eXVjZUh2RUNZcDRwSnA0ZUo3ZnluZ3ZCOE9aM1pURTRxY2Ewd0RUdklKa2xrY0VEZz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_x64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzBXVmVKZmd6VzRDYnNwaVR1dHI3em4wSHhRWHJoVWRaa0tOTWpSaFMraVhtZElpRkJzZmUyLzRlQU5haEhNUzBPbVNHWElkYjNZWmFlUjZLVmhua0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjQ4CWZpbGU6TG90c2VfMC44LjBfeDY0LXNldHVwLmV4ZQpOZWhUNXE1MzhJcTdrNDhXdk1QcUpFUjFrM3hvRFMwR0puMzFvbzdxZDFzZW9VdmNBTXd5Z05xQjdZYVpjWmRKRDd3MFRZTGN6bTh6TEs1L1l1dWpDdz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzBXVmVKZmd6VzRDYnNwaVR1dHI3em4wSHhRWHJoVWRaa0tOTWpSaFMraVhtZElpRkJzZmUyLzRlQU5haEhNUzBPbVNHWElkYjNZWmFlUjZLVmhua0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjQ4CWZpbGU6TG90c2VfMC44LjBfeDY0LXNldHVwLmV4ZQpOZWhUNXE1MzhJcTdrNDhXdk1QcUpFUjFrM3hvRFMwR0puMzFvbzdxZDFzZW9VdmNBTXd5Z05xQjdZYVpjWmRKRDd3MFRZTGN6bTh6TEs1L1l1dWpDdz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_x64-setup.exe"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3hORjZCRHRzUm12b3ovZWJtdG9BV09EeS9GckE2eXlUR2QrM05xU21KWnJOV011dEpsQzFHYkV5Q2pmeFZ1UTFlUTNWbGFnTys1U243N3liMTBPcEFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjQ3CWZpbGU6TG90c2VfMC44LjBfeDY0X2VuLVVTLm1zaQoyMDdndmtEaHRUcG1Sa3ZHZEIwTzI1blFPai83QVNzZVQ5N2pzYko5WHNjdGFnRDJsUW9OZXhpWWFnQzRubXVHUjA3dEcrNUZCQUgxSlF3OTU3NnJEZz09Cg==",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_x64_en-US.msi"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzArcVRISlRLU2xZOEJhTHFaR09ydVlnUVdGMlVZQ2picFlkMkQzZVNBNTF6YXByZGVpTDMwQWV0VVdBVk96bWxvRm83UmNlREVra1hpd0U2RWxpUFFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjY5CWZpbGU6TG90c2VfMC44LjBfYW1kNjQuQXBwSW1hZ2UKRUxyWkxLSmVpYTJ1RWhFeUoyRVgvT2dQWEp6QmRueTVaa3lNUVhmYmVNU1VJbXNOeEpLQVdTUWVsbFJRUnZPWGlQOW54MUlWY0c1Ny85VzhjNjBGREE9PQo=",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkUzArcVRISlRLU2xZOEJhTHFaR09ydVlnUVdGMlVZQ2picFlkMkQzZVNBNTF6YXByZGVpTDMwQWV0VVdBVk96bWxvRm83UmNlREVra1hpd0U2RWxpUFFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjY5CWZpbGU6TG90c2VfMC44LjBfYW1kNjQuQXBwSW1hZ2UKRUxyWkxLSmVpYTJ1RWhFeUoyRVgvT2dQWEp6QmRueTVaa3lNUVhmYmVNU1VJbXNOeEpLQVdTUWVsbFJRUnZPWGlQOW54MUlWY0c1Ny85VzhjNjBGREE9PQo=",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3owU2NtR3BldFNwRHRPL0ppKzdKdnV2V2NLUXBDbkJLVEsvKyt6LzdEeURUKzhoTTExM2tuVm8veTdpUXltWHpHblpIa2ZFbVV1Z0lOVkk0M3dYN3c4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjY5CWZpbGU6TG90c2VfMC44LjBfYW1kNjQuZGViCjdqOUZCRjN1Uk83Q3ZhcDNOT3BvTGgra0ppSzQyakNCNzBVRG5pNU5PN3hWTTJvaXh2WUR0cm5XOEJybDM0N1BmSU5WcExQMVZHN2w4TlNnbHRmekRBPT0K",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse_0.8.0_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSbjNwVlJ1K0hkU3huaHlPb0QrRnlDWkpCb0RpZkMvTXBrRHUrYnRGRXdZQlZzZlFXT1A1WUgrdW9WcmZLUUlObjVERU1scjcwcUhYWTYwWm9kNnpUWFAxYThhcjNHa0FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDkzMjY5CWZpbGU6TG90c2UtMC44LjAtMS54ODZfNjQucnBtCmhNdG04MWxqd3NrTGZlUk5SbXlQblRGMmVhenVuaU00ZVFkd3FmcW1yRXk4T21XU08xN1Vkc1NETW4rSEVsb2pGQWVWN3ZtbEFWNWlkYnpPUVlMdkRRPT0K",
+      "url": "https://github.com/phish3144/lotse/releases/download/v0.8.0/Lotse-0.8.0-1.x86_64.rpm"
     }
   }
 }
