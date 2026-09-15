@@ -406,7 +406,21 @@ export interface AnlegeBilanz {
   referenzen: number;
 }
 
+/**
+ * Was in dem einen Feld stand: getippt oder hineingezogen. Die Einordnung – Adresse,
+ * Ordner, Datei oder Titel – macht der Kern, nicht die Oberfläche: dort wäre sie
+ * ungetestet, und sie muss auf dem Dateisystem nachsehen.
+ */
+export type Eingabe = { art: 'text'; text: string } | { art: 'pfade'; pfade: string[] };
+
 export const deuten = {
+  /** Ein Eingang für alles. Der Fehlerfall ist gesprächig: ein Pfad mit Tippfehler
+   *  bekommt nicht stillschweigend ein Vorhaben. */
+  eingabe: async (eingabe: Eingabe): Promise<Deutung> => {
+    const d = await invoke<{ befund: Befund; bekannt?: RohProjekt }>('eingabe_deuten', { eingabe });
+    return { befund: d.befund, bekannt: d.bekannt ? projekt(d.bekannt) : undefined };
+  },
+  /** Für die Systemdialoge, wo die Art schon feststeht. */
   quelle: async (quelle: DeutQuelle): Promise<Deutung> => {
     const d = await invoke<{ befund: Befund; bekannt?: RohProjekt }>('quelle_deuten', { quelle });
     return { befund: d.befund, bekannt: d.bekannt ? projekt(d.bekannt) : undefined };

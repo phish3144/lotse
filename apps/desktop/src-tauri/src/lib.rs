@@ -745,11 +745,67 @@ struct Deutung {
     bekannt: Option<Projekt>,
 }
 
+/// Was in dem einen Feld stand – getippt oder hineingezogen.
+#[derive(Deserialize)]
+#[serde(tag = "art", rename_all = "snake_case")]
+enum EingabeRoh {
+    Text { text: String },
+    Pfade { pfade: Vec<String> },
+}
+
+/// Deutet, was jemand in das Feld geworfen hat: Adresse, Ordner, Datei oder Titel.
+///
+/// Die Einordnung macht der Kern (`deuten::einordnen`) und nicht die Oberfläche – dort
+/// wäre sie ungetestet, und sie muss auf dem Dateisystem nachsehen.
+#[tauri::command]
+fn eingabe_deuten(state: State<AppState>, eingabe: EingabeRoh) -> R<Deutung> {
+    let q = match eingabe {
+        EingabeRoh::Text { text } => lotse_core::deuten::einordnen(&text).map_err(fehler)?,
+        EingabeRoh::Pfade { pfade } => pfade_einordnen(pfade)?,
+    };
+    deutung_bauen(&state, q)
+}
+
+/// Mehrere fallengelassene Pfade zu einer Quelle machen.
+///
+/// Ein Pfad wird eingeordnet wie getippter Text. Mehrere Dateien sind eine Liste. Mehrere
+/// Ordner auf einmal gehen nicht – daraus würden mehrere Vorhaben, und dafür gibt es schon
+/// einen Weg: den übergeordneten Ordner hineinziehen, dann stehen sie als Unterprojekte im
+/// Befund. Das zu sagen ist hilfreicher, als eines davon zu raten.
+fn pfade_einordnen(pfade: Vec<String>) -> R<lotse_core::deuten::Quelle> {
+    use lotse_core::deuten::Quelle as DeutQuelle;
+    let pfade: Vec<PathBuf> = pfade
+        .into_iter()
+        .map(PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty())
+        .collect();
+    match pfade.as_slice() {
+        [] => Err("Nichts angekommen.".into()),
+        [eins] => Ok(if eins.is_dir() {
+            DeutQuelle::Ordner(eins.clone())
+        } else {
+            DeutQuelle::Dateien(vec![eins.clone()])
+        }),
+        viele => {
+            let ordner: Vec<&PathBuf> = viele.iter().filter(|p| p.is_dir()).collect();
+            match ordner.as_slice() {
+                [] => Ok(DeutQuelle::Dateien(viele.to_vec())),
+                [einer] => Ok(DeutQuelle::Ordner((*einer).clone())),
+                _ => Err(format!(
+                    "{} Ordner auf einmal gehen nicht. Zieh den übergeordneten Ordner \
+                     hinein – dann stehen sie als Unterprojekte im Befund.",
+                    ordner.len()
+                )),
+            }
+        }
+    }
+}
+
 /// Deutet eine Quelle und liefert Feststellungen, keine Fragen. Schreibt nichts – außer
 /// einem Marker, der ins Leere zeigt, wegzuräumen.
 #[tauri::command]
 fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
-    use lotse_core::deuten::{deuten, Fund, Quelle as DeutQuelle};
+    use lotse_core::deuten::Quelle as DeutQuelle;
 
     let q = match quelle {
         QuelleEingabe::Ordner { pfad } => DeutQuelle::Ordner(PathBuf::from(pfad)),
@@ -758,6 +814,12 @@ fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
             DeutQuelle::Dateien(pfade.into_iter().map(PathBuf::from).collect())
         }
     };
+    deutung_bauen(&state, q)
+}
+
+fn deutung_bauen(state: &State<AppState>, q: lotse_core::deuten::Quelle) -> R<Deutung> {
+    use lotse_core::deuten::{deuten, Fund};
+
     let opt = lotse_core::detect::ScanOptionen::default();
     let befund = deuten(&q, &opt).map_err(fehler)?;
 
@@ -771,7 +833,7 @@ fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
             bekannt: None,
         });
     };
-    if let Some(p) = mit(&state, |s| s.store.projekt(id))? {
+    if let Some(p) = mit(state, |s| s.store.projekt(id))? {
         return Ok(Deutung {
             befund,
             bekannt: Some(p),
@@ -3043,6 +3105,7 @@ pub fn run() {
             zuruecksetzen,
             scan,
             quelle_deuten,
+            eingabe_deuten,
             aus_befund_anlegen,
             ordner_waehlen,
             datei_waehlen,

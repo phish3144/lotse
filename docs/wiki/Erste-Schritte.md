@@ -52,15 +52,25 @@ Dateiinhalte liest Lotse dabei nicht.
 
 Details: **[[Beobachter und Erkennung|Beobachter-und-Erkennung]]**
 
-### Anlegen: erst die Herkunft, dann der Befund
+### Anlegen: ein Feld, eine Frage
 
-Hafen → *Neues Projekt*. Gefragt wird zuerst nur eines: **woher kommt es?** Ein Ordner,
-eine Adresse, ein paar Dateien – oder nichts davon.
+Hafen → *Neues Projekt*. Es fragt **Was gibt's?** und wartet auf eine Zeile. Die nimmt
+alles:
+
+| Was du hineinschreibst | Was Lotse daraus macht |
+|---|---|
+| `/home/ich/Gartenhaus` | Den Ordner, mit allem darin |
+| `https://github.com/ich/lotse` | Das Repo als Gegenseite |
+| `~/Downloads/angebot.pdf` | Die Datei als Referenz |
+| `Gartenhaus` | Genau das: ein Vorhaben mit diesem Namen |
+
+Ordner und Dateien kannst du auch einfach in das Fenster ziehen, oder über *Durchsuchen*
+wählen. Einen zweiten Weg gibt es nicht, weil es keinen braucht.
 
 Dann zeigt Lotse einen **Befund**: Titel, Kurs und Vorlage schon ausgefüllt, dazu was es
 gefunden hat – die Gegenseite auf GitHub oder GitLab, eigene Vorhaben in Unterordnern,
 lesbare Dokumente. Alles vorangekreuzt, alles abwählbar. Das ist keine zweite Fragerunde:
-Lotse fragt nicht, was es selbst nachsehen kann. Wer mit einer GitHub-Adresse anfängt,
+Lotse fragt nicht, was es selbst nachsehen kann. Wer eine GitHub-Adresse hineinschreibt,
 wird nicht gefragt, ob er von GitHub importieren will.
 
 Liegt in dem Ordner schon eine Kennung von Lotse, entsteht kein zweites Vorhaben – dann
