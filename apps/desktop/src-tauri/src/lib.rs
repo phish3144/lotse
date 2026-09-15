@@ -818,37 +818,14 @@ fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
 }
 
 fn deutung_bauen(state: &State<AppState>, q: lotse_core::deuten::Quelle) -> R<Deutung> {
-    use lotse_core::deuten::{deuten, Fund};
-
     let opt = lotse_core::detect::ScanOptionen::default();
-    let mut befund = deuten(&q, &opt).map_err(fehler)?;
+    // Deuten und die Marker-Prüfung macht der Kern – die Kommandozeile braucht genau
+    // dasselbe, und zweimal dieselbe Regel ist einmal zu viel.
+    let (mut befund, bekannt) = mit(state, |s| {
+        lotse_core::deuten::deuten_und_pruefen(&mut s.store, &q, &opt)
+    })?;
     gegenseite_anreichern(state, &mut befund);
-
-    let schon = befund.funde.iter().find_map(|f| match f {
-        Fund::SchonBekannt { id, pfad } => Some((*id, pfad.clone())),
-        _ => None,
-    });
-    let Some((id, pfad)) = schon else {
-        return Ok(Deutung {
-            befund,
-            bekannt: None,
-        });
-    };
-    if let Some(p) = mit(state, |s| s.store.projekt(id))? {
-        return Ok(Deutung {
-            befund,
-            bekannt: Some(p),
-        });
-    }
-    // Der Marker zeigt auf ein gelöschtes Projekt. Der Ordner ist frei; ihn weiter als
-    // bekannt zu melden hiesse, ihn für immer zu sperren.
-    lotse_core::detect::marker_entfernen(std::path::Path::new(&pfad));
-    let mut noch_einmal = deuten(&q, &opt).map_err(fehler)?;
-    gegenseite_anreichern(state, &mut noch_einmal);
-    Ok(Deutung {
-        befund: noch_einmal,
-        bekannt: None,
-    })
+    Ok(Deutung { befund, bekannt })
 }
 
 /// Holt, was das Repo über sich selbst sagt, und trägt es in den Befund ein.
@@ -880,208 +857,50 @@ fn gegenseite_anreichern(state: &State<AppState>, befund: &mut lotse_core::deute
     }
 }
 
-/// Was aus dem Befund werden soll. Die Oberfläche schickt, was abgehakt geblieben ist;
-/// hier wird nichts mehr entschieden und nichts mehr erraten.
+/// Legt an, was im Befund abgehakt geblieben ist.
+///
+/// Die Arbeit macht `deuten::anlegen` im Kern – dort ist sie geprüft, und die
+/// Kommandozeile tut damit genau dasselbe statt es abzuschreiben. Hier bleibt nur, was
+/// zur Hülle gehört: die ID aus der Oberfläche in eine ULID zu verwandeln.
+#[tauri::command]
+fn aus_befund_anlegen(
+    state: State<AppState>,
+    auftrag: AnlegenAuftrag,
+) -> R<lotse_core::deuten::Bilanz> {
+    let an = match auftrag.an_projekt.as_deref() {
+        Some(s) => Some(ulid(s)?),
+        None => None,
+    };
+    let kern = lotse_core::deuten::Auftrag {
+        titel: auftrag.titel,
+        kurs: auftrag.kurs,
+        vorlage: Vorlage::parse(&auftrag.vorlage).unwrap_or_default(),
+        ordner: auftrag.ordner,
+        remote: auftrag.remote,
+        startseite: auftrag.startseite,
+        tags: auftrag.tags,
+        unterprojekte: auftrag.unterprojekte,
+        dokumente: auftrag.dokumente,
+        an_projekt: an,
+    };
+    mit(&state, |s| lotse_core::deuten::anlegen(&mut s.store, &kern))
+}
+
+/// Wie die Oberfläche den Auftrag schickt: `an_projekt` als Zeichenkette, `vorlage` als
+/// Name. Der Kern nimmt ULID und Aufzählung.
 #[derive(Deserialize)]
 struct AnlegenAuftrag {
     titel: String,
     kurs: Option<String>,
     vorlage: String,
-    /// Der gedeutete Ordner: wird Referenz, bekommt den Marker, liefert die Git-Historie.
     ordner: Option<String>,
-    /// Adresse der Gegenseite, als Referenz.
     remote: Option<String>,
-    /// Projektseite, die das Repo angibt – als eigene Referenz.
     startseite: Option<String>,
-    /// Tags, die aus den Themen des Repos kommen. Zu denen der Vorlage dazu.
     #[serde(default)]
     tags: Vec<String>,
-    /// Abgehakte Unterprojekte – je ein eigenes Projekt.
     unterprojekte: Vec<String>,
-    /// Abgehakte Dokumente – Referenzen am Hauptprojekt.
     dokumente: Vec<String>,
-    /// Statt anzulegen an dieses Projekt anhängen.
     an_projekt: Option<String>,
-}
-
-#[derive(Serialize)]
-struct AnlegeBilanz {
-    /// Das Haupt-Projekt – neu angelegt oder das, an das angehängt wurde.
-    projekt: Projekt,
-    unterprojekte: Vec<Projekt>,
-    referenzen: usize,
-}
-
-/// Satz für das Logbuch: was gedeutet wurde. Leer, wenn es nichts zu erzählen gibt –
-/// ein von Hand angelegtes Projekt braucht keinen Eintrag über seine Herkunft.
-fn deutung_satz(a: &AnlegenAuftrag, unterprojekte: usize) -> Option<String> {
-    let mut teile = Vec::new();
-    if let Some(o) = a.ordner.as_deref() {
-        teile.push(format!("Ordner {o}"));
-    }
-    if let Some(r) = a.remote.as_deref() {
-        teile.push(format!("Gegenseite {r}"));
-    }
-    if a.startseite.is_some() {
-        teile.push("Projektseite".to_string());
-    }
-    if unterprojekte > 0 {
-        teile.push(format!("{unterprojekte} Unterprojekt(e)"));
-    }
-    if !a.dokumente.is_empty() {
-        teile.push(format!("{} Dokument(e)", a.dokumente.len()));
-    }
-    if teile.is_empty() {
-        return None;
-    }
-    Some(format!("Gedeutet: {}.", teile.join(", ")))
-}
-
-/// Legt an, was im Befund abgehakt geblieben ist. Ein Aufruf, ein Ergebnis – wer hier
-/// abbricht, hinterlässt kein halbes Projekt, weil alles über denselben Speicher läuft.
-#[tauri::command]
-fn aus_befund_anlegen(state: State<AppState>, auftrag: AnlegenAuftrag) -> R<AnlegeBilanz> {
-    let an = match auftrag.an_projekt.as_deref() {
-        Some(s) => Some(ulid(s)?),
-        None => None,
-    };
-    let vorlage = Vorlage::parse(&auftrag.vorlage).unwrap_or(Vorlage::Generisch);
-    let titel = auftrag.titel.trim().to_string();
-    if an.is_none() && titel.is_empty() {
-        return Err("Ohne Titel kein Projekt".into());
-    }
-
-    mit(&state, |s| {
-        let mut ts = now_ms();
-        let mut naechster = || {
-            ts += 1;
-            ts
-        };
-        let mut referenzen = 0usize;
-
-        let projekt = match an {
-            Some(id) => s
-                .store
-                .projekt(id)?
-                .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?,
-            None => {
-                let mut p = Projekt::neu(&titel, vorlage, naechster());
-                p.kurs = auftrag.kurs.as_deref().unwrap_or_default().trim().to_string();
-                // Themen der Gegenseite zu den Tags der Vorlage – ohne Dubletten und
-                // ohne Rücksicht auf Groß- und Kleinschreibung.
-                for t in auftrag.tags.iter().map(|t| t.trim()).filter(|t| !t.is_empty()) {
-                    if !p.tags.iter().any(|x| x.eq_ignore_ascii_case(t)) {
-                        p.tags.push(t.to_string());
-                    }
-                }
-                s.store.projekt_speichern(&p)?;
-                if p.kurs.is_empty() {
-                    s.store.notiz_speichern(&Notiz::neu(
-                        p.id,
-                        Quelle::Import,
-                        Art::Offen,
-                        "Kurs festlegen: worum geht es, was ist das Ziel?",
-                        naechster(),
-                    ))?;
-                }
-                p
-            }
-        };
-
-        if let Some(pfad) = auftrag.ordner.as_deref().filter(|p| !p.trim().is_empty()) {
-            let pf = std::path::Path::new(pfad);
-            let hat_git = pf.join(".git").is_dir();
-            let typ = if hat_git {
-                ReferenzTyp::GitRepo
-            } else {
-                ReferenzTyp::Ordner
-            };
-            s.store
-                .referenz_speichern(&Referenz::neu(projekt.id, typ, pfad, Rolle::Material))?;
-            referenzen += 1;
-            if hat_git {
-                let commits = lotse_core::git::log(pf, None, 500)?;
-                for n in lotse_core::git::verdichten(projekt.id, &commits, Quelle::Import) {
-                    s.store.notiz_speichern(&n)?;
-                }
-            }
-            // Der Marker macht den Ordner wiedererkennbar: beim nächsten Deuten steht
-            // »gehört schon dazu« da, statt dass ein zweites Projekt entsteht.
-            lotse_core::detect::marker_schreiben(pf, projekt.id).ok();
-        }
-
-        if let Some(url) = auftrag.remote.as_deref().filter(|u| !u.trim().is_empty()) {
-            s.store.referenz_speichern(&Referenz::neu(
-                projekt.id,
-                ReferenzTyp::Url,
-                url.trim(),
-                Rolle::Material,
-            ))?;
-            referenzen += 1;
-        }
-
-        // Die Projektseite ist Doku, nicht Material: dort steht, was das Vorhaben nach
-        // außen sagt, nicht das, woraus es gebaut wird.
-        if let Some(url) = auftrag.startseite.as_deref().filter(|u| !u.trim().is_empty()) {
-            s.store.referenz_speichern(&Referenz::neu(
-                projekt.id,
-                ReferenzTyp::Url,
-                url.trim(),
-                Rolle::Doku,
-            ))?;
-            referenzen += 1;
-        }
-
-        for d in auftrag.dokumente.iter().filter(|d| !d.trim().is_empty()) {
-            s.store.referenz_speichern(&Referenz::neu(
-                projekt.id,
-                ReferenzTyp::Datei,
-                d.as_str(),
-                Rolle::Material,
-            ))?;
-            referenzen += 1;
-        }
-
-        let mut unterprojekte = Vec::new();
-        for pfad in &auftrag.unterprojekte {
-            let pf = std::path::Path::new(pfad);
-            // Zwischen Befund und Häkchen kann etwas dazugekommen sein.
-            let schon = lotse_core::detect::marker_lesen(pf)
-                .and_then(|id| s.store.projekt(id).ok().flatten())
-                .is_some();
-            if schon {
-                continue;
-            }
-            let Some(k) = lotse_core::detect::erkenne(pf) else {
-                continue;
-            };
-            let up = lotse_core::detect::uebernehmen(&mut s.store, &k)?;
-            s.store.notiz_speichern(&Notiz::neu(
-                up.id,
-                Quelle::Import,
-                Art::Log,
-                format!("Beim Deuten von »{}« gefunden.", projekt.titel),
-                naechster(),
-            ))?;
-            unterprojekte.push(up);
-        }
-
-        if let Some(satz) = deutung_satz(&auftrag, unterprojekte.len()) {
-            s.store.notiz_speichern(&Notiz::neu(
-                projekt.id,
-                Quelle::Import,
-                Art::Log,
-                satz,
-                naechster(),
-            ))?;
-        }
-
-        Ok(AnlegeBilanz {
-            projekt,
-            unterprojekte,
-            referenzen,
-        })
-    })
 }
 
 /// Systemdialog für mehrere Dateien. Gefiltert auf das, was Lotse lesen kann – ein

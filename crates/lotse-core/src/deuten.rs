@@ -9,11 +9,13 @@
 //! Derselbe Baustein trägt beide Fälle: ein Projekt anlegen und an ein bestehendes
 //! anhängen. Der Unterschied liegt danach, nicht hier.
 //!
-//! Dieses Modul liest nur und schreibt nichts. Es kennt weder Store noch Tresor.
+//! `deuten` liest, `anlegen` schreibt. Beides gehört zusammen, weil der Auftrag die
+//! Gestalt des Befunds spiegelt – lag das Anlegen in einer Hülle, müsste die andere es
+//! abschreiben. Den Tresor kennt dieses Modul nicht (`CLAUDE.md`).
 
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 use walkdir::WalkDir;
 
@@ -21,8 +23,11 @@ use crate::detect::{self, ScanOptionen};
 use crate::dokument;
 use crate::forge::RepoZeiger;
 use crate::git;
-use crate::model::Vorlage;
-use crate::Result;
+use crate::model::{
+    Art, Notiz, Projekt, Quelle as NotizQuelle, Referenz, ReferenzTyp, Rolle, Vorlage,
+};
+use crate::store::Store;
+use crate::{Error, Result};
 
 /// Mehr Dokumente als das zeigt keine Liste sinnvoll an; der Rest wird gezählt und
 /// genannt, nicht verschwiegen.
@@ -307,22 +312,14 @@ fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
     let quelle = dir.to_string_lossy().to_string();
     let mut funde = Vec::new();
 
-    // Gehört der Ordner schon zu einem Projekt, ist alles Weitere hinfällig: es gibt
-    // nichts anzulegen, nur etwas anzuhängen.
-    if let Some(id) = detect::marker_lesen(dir) {
+    // Gehört der Ordner schon zu einem Vorhaben, gibt es nichts **anzulegen** – aber
+    // sehr wohl etwas anzuhängen: Unterprojekte und Dokumente, die seit dem letzten Mal
+    // dazugekommen sind. Deshalb wird weitergesucht, nur ohne Vorschlag.
+    let schon = detect::marker_lesen(dir);
+    if let Some(id) = schon {
         funde.push(Fund::SchonBekannt {
             id,
             pfad: quelle.clone(),
-        });
-        return Ok(Befund {
-            quelle,
-            vorschlag: None,
-            funde,
-            angesehen: 1,
-            abgebrochen: false,
-            weitere_dokumente: 0,
-            archiviert: false,
-            gegenseite_fehler: None,
         });
     }
 
@@ -348,7 +345,8 @@ fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
     let (dok, weitere) = dokumente_suchen(dir, opt);
     funde.extend(dok);
 
-    let vorschlag = Some(Vorschlag {
+    // Kein Vorschlag für einen Ordner, der schon dazugehört: der Titel steht dann fest.
+    let vorschlag = schon.is_none().then(|| Vorschlag {
         titel: selbst
             .as_ref()
             .map(|k| k.name.clone())
@@ -505,6 +503,324 @@ fn letzter_teil(a: &str) -> String {
         .to_string()
 }
 
+// ------------------------------------------------- Aus dem Befund wird ein Vorhaben
+
+/// Was aus dem Befund werden soll: das, was abgehakt geblieben ist.
+///
+/// Die Gestalt spiegelt den Befund – deshalb steht das hier und nicht in einer Hülle.
+/// Vorher lag es in der Tauri-Hülle, war ungetestet, und die Kommandozeile hätte es
+/// abschreiben müssen. Zwei Abschriften derselben Regel sind eine zu viel.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Auftrag {
+    pub titel: String,
+    pub kurs: Option<String>,
+    pub vorlage: Vorlage,
+    /// Der gedeutete Ordner: wird Referenz, bekommt den Marker, liefert die Git-Historie.
+    pub ordner: Option<String>,
+    /// Adresse der Gegenseite, als Referenz.
+    pub remote: Option<String>,
+    /// Projektseite, die das Repo angibt – als eigene Referenz.
+    pub startseite: Option<String>,
+    /// Tags, etwa aus den Themen des Repos. Zu denen der Vorlage dazu.
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Abgehakte Unterprojekte – je ein eigenes Vorhaben.
+    #[serde(default)]
+    pub unterprojekte: Vec<String>,
+    /// Abgehakte Dokumente – Referenzen am Hauptvorhaben.
+    #[serde(default)]
+    pub dokumente: Vec<String>,
+    /// Statt anzulegen an dieses Vorhaben anhängen.
+    pub an_projekt: Option<Ulid>,
+}
+
+/// Was angelegt wurde.
+#[derive(Debug, Clone, Serialize)]
+pub struct Bilanz {
+    /// Das Hauptvorhaben – neu angelegt oder das, an das angehängt wurde.
+    pub projekt: Projekt,
+    pub unterprojekte: Vec<Projekt>,
+    pub referenzen: usize,
+}
+
+impl Auftrag {
+    /// Ein Auftrag, der genau den Befund übernimmt – alles, was darin steht.
+    ///
+    /// Der Ausgangspunkt für beide Oberflächen: die eine nimmt Häkchen weg, die andere
+    /// Nummern. Was übrig bleibt, geht so hier hinein.
+    pub fn aus_befund(befund: &Befund) -> Auftrag {
+        let v = befund.vorschlag.as_ref();
+        Auftrag {
+            titel: v.map(|v| v.titel.clone()).unwrap_or_default(),
+            kurs: v.and_then(|v| v.kurs.clone()),
+            vorlage: v.map(|v| v.vorlage).unwrap_or(Vorlage::Generisch),
+            ordner: befund.ordner().map(str::to_string),
+            remote: befund.funde.iter().find_map(|f| match f {
+                Fund::Remote { url, .. } => Some(url.clone()),
+                _ => None,
+            }),
+            startseite: befund.funde.iter().find_map(|f| match f {
+                Fund::Startseite { url } => Some(url.clone()),
+                _ => None,
+            }),
+            tags: v.map(|v| v.tags.clone()).unwrap_or_default(),
+            unterprojekte: befund
+                .funde
+                .iter()
+                .filter_map(|f| match f {
+                    Fund::Unterprojekt { pfad, .. } => Some(pfad.clone()),
+                    _ => None,
+                })
+                .collect(),
+            dokumente: befund
+                .funde
+                .iter()
+                .filter_map(|f| match f {
+                    Fund::Dokument { pfad, .. } => Some(pfad.clone()),
+                    _ => None,
+                })
+                .collect(),
+            an_projekt: None,
+        }
+    }
+}
+
+impl Befund {
+    /// Der Ordner, auf den sich dieser Befund bezieht – falls die Quelle einer war.
+    ///
+    /// `quelle` trägt ihn dann als lesbaren Pfad. Bei einer Adresse oder einer Handvoll
+    /// Dateien steht dort etwas anderes, und dann gibt es nichts zu markieren.
+    pub fn ordner(&self) -> Option<&str> {
+        let bekannt = self.funde.iter().find_map(|f| match f {
+            Fund::SchonBekannt { pfad, .. } => Some(pfad.as_str()),
+            _ => None,
+        });
+        if bekannt.is_some() {
+            return bekannt;
+        }
+        Path::new(&self.quelle).is_dir().then_some(&self.quelle[..])
+    }
+}
+
+/// Deutet und beantwortet dabei die Frage, die der Befund allein nicht kann: gibt es das
+/// Vorhaben, auf das ein Marker zeigt, überhaupt noch?
+///
+/// Zeigt er ins Leere – das Vorhaben wurde gelöscht –, wird der Marker weggeräumt und neu
+/// gedeutet. Sonst bliebe der Ordner für immer »schon bekannt« und ließe sich nie wieder
+/// anlegen; »Vorhaben löschen« wäre damit keine Rücknahme.
+///
+/// Beide Oberflächen brauchen genau das. Vorher stand es nur in der Tauri-Hülle.
+pub fn deuten_und_pruefen(
+    store: &mut Store,
+    quelle: &Quelle,
+    opt: &ScanOptionen,
+) -> Result<(Befund, Option<Projekt>)> {
+    let befund = deuten(quelle, opt)?;
+    let schon = befund.funde.iter().find_map(|f| match f {
+        Fund::SchonBekannt { id, pfad } => Some((*id, pfad.clone())),
+        _ => None,
+    });
+    let Some((id, pfad)) = schon else {
+        return Ok((befund, None));
+    };
+    if let Some(p) = store.projekt(id)? {
+        return Ok((befund, Some(p)));
+    }
+    detect::marker_entfernen(Path::new(&pfad));
+    Ok((deuten(quelle, opt)?, None))
+}
+
+/// Legt an, was im Auftrag steht. Ein Aufruf, ein Ergebnis.
+///
+/// Angelegt werden: das Vorhaben, die Ordner-Referenz samt Markerdatei, die verdichtete
+/// Git-Historie, Gegenseite, Projektseite und Dokumente als Referenzen, jedes genannte
+/// Unterprojekt als eigenes Vorhaben – und ein Logbucheintrag, der nennt, was gedeutet
+/// wurde. Letzterer, damit das nicht nur in einem Dialog stand, den man gleich zumacht.
+pub fn anlegen(store: &mut Store, auftrag: &Auftrag) -> Result<Bilanz> {
+    let titel = auftrag.titel.trim();
+    if auftrag.an_projekt.is_none() && titel.is_empty() {
+        return Err(Error::Invalid("Ohne Titel kein Vorhaben".into()));
+    }
+
+    let mut ts = crate::now_ms();
+    let mut naechster = || {
+        ts += 1;
+        ts
+    };
+    let mut referenzen = 0usize;
+
+    let projekt = match auftrag.an_projekt {
+        Some(id) => store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?,
+        None => {
+            let mut p = Projekt::neu(titel, auftrag.vorlage, naechster());
+            p.kurs = auftrag
+                .kurs
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            // Fremde Tags zu denen der Vorlage – ohne Dubletten und ohne Rücksicht auf
+            // Groß- und Kleinschreibung.
+            for t in auftrag
+                .tags
+                .iter()
+                .map(|t| t.trim())
+                .filter(|t| !t.is_empty())
+            {
+                if !p.tags.iter().any(|x| x.eq_ignore_ascii_case(t)) {
+                    p.tags.push(t.to_string());
+                }
+            }
+            store.projekt_speichern(&p)?;
+            if p.kurs.is_empty() {
+                store.notiz_speichern(&Notiz::neu(
+                    p.id,
+                    NotizQuelle::Import,
+                    Art::Offen,
+                    "Kurs festlegen: worum geht es, was ist das Ziel?",
+                    naechster(),
+                ))?;
+            }
+            p
+        }
+    };
+
+    // Was schon am Vorhaben hängt, wird nicht ein zweites Mal angelegt. Beim Anhängen an
+    // ein bekanntes Vorhaben lag der Ordner sonst jedes Mal erneut darin.
+    let vorhanden: Vec<(ReferenzTyp, String)> = store
+        .referenzen(projekt.id)?
+        .into_iter()
+        .map(|r| (r.typ, r.ziel))
+        .collect();
+    let neu_ist =
+        |typ: ReferenzTyp, ziel: &str| !vorhanden.iter().any(|(t, z)| *t == typ && z == ziel);
+
+    if let Some(pfad) = auftrag
+        .ordner
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+    {
+        let pf = Path::new(pfad);
+        let hat_git = pf.join(".git").is_dir();
+        let typ = if hat_git {
+            ReferenzTyp::GitRepo
+        } else {
+            ReferenzTyp::Ordner
+        };
+        if neu_ist(typ, pfad) {
+            store.referenz_speichern(&Referenz::neu(projekt.id, typ, pfad, Rolle::Material))?;
+            referenzen += 1;
+        }
+        if hat_git {
+            let commits = crate::git::log(pf, None, 500)?;
+            for n in crate::git::verdichten(projekt.id, &commits, NotizQuelle::Import) {
+                store.notiz_speichern(&n)?;
+            }
+        }
+        // Der Marker macht den Ordner wiedererkennbar: beim nächsten Deuten steht
+        // »gehört schon dazu« da, statt dass ein zweites Vorhaben entsteht.
+        detect::marker_schreiben(pf, projekt.id).ok();
+    }
+
+    for (url, rolle) in [
+        (auftrag.remote.as_deref(), Rolle::Material),
+        // Die Projektseite ist Doku, nicht Material: dort steht, was das Vorhaben nach
+        // außen sagt, nicht das, woraus es gebaut wird.
+        (auftrag.startseite.as_deref(), Rolle::Doku),
+    ] {
+        if let Some(u) = url
+            .map(str::trim)
+            .filter(|u| !u.is_empty() && neu_ist(ReferenzTyp::Url, u))
+        {
+            store.referenz_speichern(&Referenz::neu(projekt.id, ReferenzTyp::Url, u, rolle))?;
+            referenzen += 1;
+        }
+    }
+
+    for d in auftrag
+        .dokumente
+        .iter()
+        .map(|d| d.trim())
+        .filter(|d| !d.is_empty() && neu_ist(ReferenzTyp::Datei, d))
+    {
+        store.referenz_speichern(&Referenz::neu(
+            projekt.id,
+            ReferenzTyp::Datei,
+            d,
+            Rolle::Material,
+        ))?;
+        referenzen += 1;
+    }
+
+    let mut unterprojekte = Vec::new();
+    for pfad in &auftrag.unterprojekte {
+        let pf = Path::new(pfad);
+        // Zwischen Befund und Zusage kann etwas dazugekommen sein.
+        let schon = detect::marker_lesen(pf)
+            .and_then(|id| store.projekt(id).ok().flatten())
+            .is_some();
+        if schon {
+            continue;
+        }
+        let Some(k) = detect::erkenne(pf) else {
+            continue;
+        };
+        let up = detect::uebernehmen(store, &k)?;
+        store.notiz_speichern(&Notiz::neu(
+            up.id,
+            NotizQuelle::Import,
+            Art::Log,
+            format!("Beim Deuten von »{}« gefunden.", projekt.titel),
+            naechster(),
+        ))?;
+        unterprojekte.push(up);
+    }
+
+    if let Some(satz) = deutung_satz(auftrag, unterprojekte.len()) {
+        store.notiz_speichern(&Notiz::neu(
+            projekt.id,
+            NotizQuelle::Import,
+            Art::Log,
+            satz,
+            naechster(),
+        ))?;
+    }
+
+    Ok(Bilanz {
+        projekt,
+        unterprojekte,
+        referenzen,
+    })
+}
+
+/// Satz für das Logbuch: was gedeutet wurde. `None`, wenn es nichts zu erzählen gibt –
+/// ein von Hand angelegtes Vorhaben braucht keinen Eintrag über seine Herkunft.
+fn deutung_satz(a: &Auftrag, unterprojekte: usize) -> Option<String> {
+    let mut teile = Vec::new();
+    if let Some(o) = a.ordner.as_deref() {
+        teile.push(format!("Ordner {o}"));
+    }
+    if let Some(r) = a.remote.as_deref() {
+        teile.push(format!("Gegenseite {r}"));
+    }
+    if a.startseite.is_some() {
+        teile.push("Projektseite".to_string());
+    }
+    if unterprojekte > 0 {
+        teile.push(format!("{unterprojekte} Unterprojekt(e)"));
+    }
+    if !a.dokumente.is_empty() {
+        teile.push(format!("{} Dokument(e)", a.dokumente.len()));
+    }
+    if teile.is_empty() {
+        return None;
+    }
+    Some(format!("Gedeutet: {}.", teile.join(", ")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,6 +832,294 @@ mod tests {
             .args(args)
             .output()
             .expect("git");
+    }
+
+    // ------------------------------------------- Aus dem Befund wird etwas
+
+    fn leerer_store() -> Store {
+        let ak = crate::crypto::Key32::random().unwrap();
+        Store::open_in_memory(&ak, Ulid::new()).unwrap()
+    }
+
+    /// Ein Ordner mit README, Git-Remote, einem Unterprojekt und einem Dokument.
+    fn beispielordner(t: &std::path::Path) -> std::path::PathBuf {
+        let dir = t.join("Gartenhaus");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("README.md"),
+            "# Gartenhaus\n\nFundament bis Oktober.\n",
+        )
+        .unwrap();
+        fs::write(dir.join("angebot.pdf"), b"%PDF-1.4").unwrap();
+        let unter = dir.join("statik");
+        fs::create_dir_all(&unter).unwrap();
+        fs::write(unter.join("Cargo.toml"), "[package]\nname = \"statik\"\n").unwrap();
+        git(&dir, &["init", "-q"]);
+        git(
+            &dir,
+            &["remote", "add", "origin", "https://github.com/o/r.git"],
+        );
+        dir
+    }
+
+    #[test]
+    fn aus_einem_befund_entsteht_alles_auf_einmal() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let befund = deuten(&Quelle::Ordner(dir.clone()), &ScanOptionen::default()).unwrap();
+
+        let mut store = leerer_store();
+        let auftrag = Auftrag::aus_befund(&befund);
+        let b = anlegen(&mut store, &auftrag).unwrap();
+
+        assert_eq!(b.projekt.titel, "Gartenhaus");
+        assert_eq!(b.projekt.kurs, "Fundament bis Oktober.");
+        assert_eq!(b.unterprojekte.len(), 1, "statik muss ein eigenes werden");
+
+        // Ordner als Git-Repo, Gegenseite als Adresse, das PDF als Datei.
+        let refs = store.referenzen(b.projekt.id).unwrap();
+        assert!(refs.iter().any(|r| r.typ == ReferenzTyp::GitRepo));
+        assert!(refs
+            .iter()
+            .any(|r| r.typ == ReferenzTyp::Url && r.ziel.contains("github")));
+        assert!(refs
+            .iter()
+            .any(|r| r.typ == ReferenzTyp::Datei && r.ziel.ends_with("angebot.pdf")));
+        assert_eq!(b.referenzen, refs.len());
+
+        // Der Marker macht den Ordner wiedererkennbar.
+        assert_eq!(detect::marker_lesen(&dir), Some(b.projekt.id));
+
+        // Und im Logbuch steht, was gedeutet wurde – nicht nur in einem Dialog.
+        let notizen = store.notizen(b.projekt.id).unwrap();
+        assert!(
+            notizen.iter().any(|n| n.text.starts_with("Gedeutet:")),
+            "{:?}",
+            notizen.iter().map(|n| &n.text).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn ein_marker_der_ins_leere_zeigt_gibt_den_ordner_frei() {
+        // »Vorhaben löschen« muss eine Rücknahme sein: sonst bliebe der Ordner für immer
+        // »schon bekannt«.
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let mut store = leerer_store();
+        let q = Quelle::Ordner(dir.clone());
+
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Gartenhaus".into(),
+                ordner: Some(dir.to_string_lossy().to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let (_, bekannt) = deuten_und_pruefen(&mut store, &q, &ScanOptionen::default()).unwrap();
+        assert_eq!(bekannt.map(|p| p.id), Some(b.projekt.id), "erst bekannt");
+
+        store.projekt_loeschen(b.projekt.id).unwrap();
+        let (frisch, bekannt) =
+            deuten_und_pruefen(&mut store, &q, &ScanOptionen::default()).unwrap();
+        assert!(bekannt.is_none(), "nach dem Löschen wieder frei");
+        assert!(
+            frisch.vorschlag.is_some(),
+            "und es gibt wieder etwas vorzuschlagen"
+        );
+        assert_eq!(detect::marker_lesen(&dir), None, "der Marker ist weg");
+    }
+
+    #[test]
+    fn ein_bekannter_ordner_wird_weiter_durchsucht() {
+        // Sonst gäbe es beim Anhängen nichts anzuhängen: Unterprojekte und Dokumente, die
+        // seit dem letzten Mal dazugekommen sind, wären unsichtbar.
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        detect::marker_schreiben(&dir, Ulid::new()).unwrap();
+
+        let b = deuten(&Quelle::Ordner(dir), &ScanOptionen::default()).unwrap();
+        assert!(
+            b.vorschlag.is_none(),
+            "kein Vorschlag – der Titel steht fest"
+        );
+        assert!(b
+            .funde
+            .iter()
+            .any(|f| matches!(f, Fund::SchonBekannt { .. })));
+        assert!(
+            b.funde
+                .iter()
+                .any(|f| matches!(f, Fund::Unterprojekt { .. })),
+            "das Unterprojekt muss trotzdem auftauchen"
+        );
+        assert!(b.funde.iter().any(|f| matches!(f, Fund::Dokument { .. })));
+    }
+
+    #[test]
+    fn dieselbe_referenz_kommt_beim_anhaengen_nicht_zweimal() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let mut store = leerer_store();
+        let q = Quelle::Ordner(dir.clone());
+
+        let befund = deuten(&q, &ScanOptionen::default()).unwrap();
+        let erst = anlegen(&mut store, &Auftrag::aus_befund(&befund)).unwrap();
+        let vorher = store.referenzen(erst.projekt.id).unwrap().len();
+
+        // Noch einmal denselben Ordner anhängen – etwa weil jemand `lotse deuten` zweimal
+        // aufruft.
+        let (befund, bekannt) =
+            deuten_und_pruefen(&mut store, &q, &ScanOptionen::default()).unwrap();
+        assert_eq!(bekannt.map(|p| p.id), Some(erst.projekt.id));
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                an_projekt: Some(erst.projekt.id),
+                ..Auftrag::aus_befund(&befund)
+            },
+        )
+        .unwrap();
+
+        assert_eq!(b.referenzen, 0, "nichts Neues war dabei");
+        assert_eq!(
+            store.referenzen(erst.projekt.id).unwrap().len(),
+            vorher,
+            "und es liegt nichts doppelt da"
+        );
+    }
+
+    #[test]
+    fn ohne_titel_wird_nichts_angelegt() {
+        let mut store = leerer_store();
+        let e = anlegen(&mut store, &Auftrag::default()).unwrap_err();
+        assert!(e.to_string().contains("Ohne Titel"), "{e}");
+        assert!(store.projekte().unwrap().is_empty());
+    }
+
+    #[test]
+    fn ein_leerer_kurs_wird_ein_offener_faden() {
+        // Sonst steht ein Vorhaben ohne Kurs da und niemand merkt es.
+        let mut store = leerer_store();
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Ohne alles".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let faeden = store.notizen(b.projekt.id).unwrap();
+        assert!(faeden
+            .iter()
+            .any(|n| n.art == Art::Offen && n.text.contains("Kurs festlegen")));
+        // Ohne Quelle gibt es auch nichts zu erzählen.
+        assert!(!faeden.iter().any(|n| n.text.starts_with("Gedeutet:")));
+    }
+
+    #[test]
+    fn tags_kommen_zu_denen_der_vorlage_ohne_dubletten() {
+        let mut store = leerer_store();
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Lotse".into(),
+                vorlage: Vorlage::Software,
+                tags: vec!["rust".into(), "RUST".into(), "  ".into(), "tauri".into()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let rust = b
+            .projekt
+            .tags
+            .iter()
+            .filter(|t| t.eq_ignore_ascii_case("rust"))
+            .count();
+        assert_eq!(rust, 1, "einmal genügt: {:?}", b.projekt.tags);
+        assert!(b.projekt.tags.iter().any(|t| t == "tauri"));
+    }
+
+    #[test]
+    fn anhaengen_legt_kein_zweites_vorhaben_an() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let mut store = leerer_store();
+
+        let erst = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Haus".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let befund = deuten(&Quelle::Ordner(dir), &ScanOptionen::default()).unwrap();
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                an_projekt: Some(erst.projekt.id),
+                ..Auftrag::aus_befund(&befund)
+            },
+        )
+        .unwrap();
+
+        assert_eq!(b.projekt.id, erst.projekt.id);
+        // Nur das Unterprojekt ist neu dazugekommen, kein zweites Hauptvorhaben.
+        assert_eq!(store.projekte().unwrap().len(), 2);
+        assert!(store.referenzen(erst.projekt.id).unwrap().len() >= 2);
+    }
+
+    #[test]
+    fn ein_unterprojekt_das_schon_dazugehoert_wird_uebersprungen() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let mut store = leerer_store();
+        let befund = deuten(&Quelle::Ordner(dir.clone()), &ScanOptionen::default()).unwrap();
+        let auftrag = Auftrag::aus_befund(&befund);
+
+        let erst = anlegen(&mut store, &auftrag).unwrap();
+        assert_eq!(erst.unterprojekte.len(), 1);
+
+        // Derselbe Auftrag ein zweites Mal: das Unterprojekt trägt jetzt einen Marker.
+        let noch = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Zweiter Versuch".into(),
+                ..auftrag
+            },
+        )
+        .unwrap();
+        assert!(
+            noch.unterprojekte.is_empty(),
+            "was schon dazugehört, wird nicht doppelt angelegt"
+        );
+    }
+
+    #[test]
+    fn der_auftrag_uebernimmt_den_ganzen_befund() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = beispielordner(t.path());
+        let befund = deuten(&Quelle::Ordner(dir.clone()), &ScanOptionen::default()).unwrap();
+        let a = Auftrag::aus_befund(&befund);
+        assert_eq!(a.titel, "Gartenhaus");
+        assert_eq!(a.ordner.as_deref(), Some(dir.to_string_lossy().as_ref()));
+        assert!(a.remote.unwrap().contains("github.com/o/r"));
+        assert_eq!(a.unterprojekte.len(), 1);
+        assert_eq!(a.dokumente.len(), 2, "README und PDF sind beide lesbar");
+    }
+
+    #[test]
+    fn eine_adresse_hat_keinen_ordner_zu_markieren() {
+        let b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        assert_eq!(b.ordner(), None);
+        assert_eq!(Auftrag::aus_befund(&b).ordner, None);
     }
 
     // ------------------------------------------- Ein Feld nimmt alles

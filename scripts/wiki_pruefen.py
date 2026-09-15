@@ -49,12 +49,27 @@ class Befund:
 
     def verlange(self, nadel: str, heu: str, wo: str, was: str) -> None:
         self.geprueft += 1
-        if nadel not in heu:
+        if not _steht_drin(nadel, heu):
             self.fehler.append(f"{wo}: {was} »{nadel}« ist nirgends beschrieben.")
 
     def verlange_alle(self, nadeln, heu: str, wo: str, was: str) -> None:
         for n in sorted(set(nadeln)):
             self.verlange(n, heu, wo, was)
+
+
+def _steht_drin(nadel: str, heu: str) -> bool:
+    """Steht die Nadel als eigenes Wort im Heu?
+
+    Reine Teilzeichenkettensuche hat einmal `deuten` für beschrieben gehalten, weil auf
+    einer Seite »Was die Fehlermeldungen bedeuten« stand. Die Prüfung war damit grün und
+    das Kommando undokumentiert – also an Wortgrenzen suchen.
+
+    Als Wortzeichen gelten Buchstaben, Ziffern, `_` und `-`: `sync-jetzt` ist ein Name,
+    und `forge_token_feld` soll nicht auf `token` anschlagen.
+    """
+    wort = r"[^0-9A-Za-zÄÖÜäöüß_-]"
+    muster = f"(?:^|{wort}){re.escape(nadel)}(?:{wort}|$)"
+    return re.search(muster, heu) is not None
 
 
 # --------------------------------------------------------------- Ablesen
@@ -193,7 +208,37 @@ def verweise() -> list[tuple[str, str]]:
 
 # --------------------------------------------------------------- Prüfen
 
+def selbsttest() -> None:
+    """Prüft den Prüfer – genauer: seinen Matcher.
+
+    Der hat einmal `deuten` für dokumentiert gehalten, weil irgendwo »Fehlermeldungen
+    bedeuten« stand: grüne Prüfung, undokumentiertes Kommando. Ein Werkzeug, das das
+    Vergessen unmöglich machen soll, muss selbst geprüft sein.
+    """
+    faelle = [
+        # (Nadel, Heu, soll gefunden werden)
+        ("deuten", "Was die Fehlermeldungen bedeuten.", False),
+        ("deuten", "### `lotse deuten [EINGABE]…`", True),
+        ("deuten", "Beim deuten passiert etwas.", True),
+        ("deuten", "deuten", True),
+        ("token", "`forge_token_feld` steht hier.", False),
+        ("forge_token_feld", "`forge_token_feld` steht hier.", True),
+        ("sync-jetzt", "| `sync-jetzt` | Abgleichen |", True),
+        ("sync", "`sync-jetzt` allein genügt nicht.", False),
+        ("log", "Das Logbuch ist kein `log`.", True),
+        ("log", "Das Logbuch allein.", False),
+        ("kurs", "Der Kurs, groß geschrieben, zählt nicht.", False),
+    ]
+    for nadel, heu, soll in faelle:
+        ist = _steht_drin(nadel, heu)
+        if ist != soll:
+            raise SystemExit(
+                f"Selbsttest gescheitert: »{nadel}« in »{heu}« → {ist}, erwartet {soll}"
+            )
+
+
 def main() -> int:
+    selbsttest()
     b = Befund()
     ganz = alles()
 

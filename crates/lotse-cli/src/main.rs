@@ -89,6 +89,33 @@ enum Cmd {
     Ref(RefCmd),
     #[command(subcommand)]
     Tresor(TresorCmd),
+    /// Aus einer Quelle ein Vorhaben machen: Ordner, Adresse, Datei – oder einfach ein
+    /// Titel. Zeigt den Befund und fragt einmal, bevor etwas angelegt wird.
+    Deuten {
+        /// Ordner, Adresse, Datei oder Titel. Mehrere Wörter werden zu einem Titel.
+        eingabe: Vec<String>,
+        /// Nur den Befund zeigen, nichts anlegen
+        #[arg(long)]
+        trocken: bool,
+        /// Nicht fragen, alles übernehmen (für Skripte)
+        #[arg(long)]
+        ja: bool,
+        /// Fundnummern weglassen, etwa `--ohne 2,4`
+        #[arg(long, value_delimiter = ',')]
+        ohne: Vec<usize>,
+        /// Titelvorschlag überstimmen
+        #[arg(long)]
+        titel: Option<String>,
+        /// Kursvorschlag überstimmen
+        #[arg(long)]
+        kurs: Option<String>,
+        /// Vorlage überstimmen
+        #[arg(long, value_enum)]
+        vorlage: Option<VorlageArg>,
+        /// An ein bestehendes Vorhaben anhängen statt ein neues anzulegen
+        #[arg(long)]
+        an: Option<String>,
+    },
     /// Ordner nach Projekten durchsuchen (Hafeneinfahrt)
     Scan {
         wurzeln: Vec<PathBuf>,
@@ -372,6 +399,30 @@ fn run() -> Result<()> {
         Cmd::Projekt(c) => projekt(&mut store, c),
         Cmd::Ref(c) => referenz(&mut store, c),
         Cmd::Tresor(c) => tresor(&mut store, &ak, konto_daten.geraet_id, c),
+        Cmd::Deuten {
+            eingabe,
+            trocken,
+            ja,
+            ohne,
+            titel,
+            kurs,
+            vorlage,
+            an,
+        } => deuten_cmd(
+            &mut store,
+            &ak,
+            konto_daten.geraet_id,
+            DeutenArgs {
+                eingabe: eingabe.join(" "),
+                trocken,
+                ja,
+                ohne,
+                titel,
+                kurs,
+                vorlage: vorlage.map(Into::into),
+                an,
+            },
+        ),
         Cmd::Scan {
             wurzeln,
             uebernehmen,
@@ -497,6 +548,305 @@ const META_FORGE_EINTRAG: &str = "forge_token_eintrag";
 const META_FORGE_FELD: &str = "forge_token_feld";
 const META_FORGE_EINTRAG_GITLAB: &str = "forge_token_gitlab_eintrag";
 const META_FORGE_FELD_GITLAB: &str = "forge_token_gitlab_feld";
+
+// ------------------------------------------------------------------ Deuten
+
+struct DeutenArgs {
+    eingabe: String,
+    trocken: bool,
+    ja: bool,
+    ohne: Vec<usize>,
+    titel: Option<String>,
+    kurs: Option<String>,
+    vorlage: Option<Vorlage>,
+    an: Option<String>,
+}
+
+/// Aus einer Quelle ein Vorhaben machen: erst den Befund zeigen, dann einmal fragen.
+///
+/// Der Dialog in der App hat Häkchen; hier gibt es Nummern. Dieselbe Sache: **der Befund
+/// ist eine Feststellung, keine Fragerunde** – man nimmt weg, was nicht bleiben soll.
+/// Gedeutet und angelegt wird mit demselben Kern-Code wie in der App.
+fn deuten_cmd(store: &mut Store, ak: &Key32, geraet_id: Ulid, a: DeutenArgs) -> Result<()> {
+    use lotse_core::deuten;
+
+    let quelle = deuten::einordnen(&a.eingabe)?;
+    if matches!(&quelle, deuten::Quelle::Titel(t) if t.is_empty()) {
+        bail!("Nichts angegeben. Ein Ordner, eine Adresse, eine Datei – oder ein Titel.");
+    }
+
+    let opt = detect::ScanOptionen::default();
+    let (mut befund, bekannt) = deuten::deuten_und_pruefen(store, &quelle, &opt)?;
+    steckbrief_holen(store, ak, geraet_id, &mut befund);
+
+    // Anhängen: entweder ausdrücklich per --an, oder weil der Ordner schon dazugehört.
+    let an = match a.an.as_deref() {
+        Some(p) => Some(finde_projekt(store, p)?),
+        None => bekannt,
+    };
+
+    befund_zeigen(&befund, an.as_ref(), &a.ohne);
+
+    if a.trocken {
+        println!("\n--trocken: nichts angelegt.");
+        return Ok(());
+    }
+
+    let weglassen = match zusage_holen(&a, &befund)? {
+        Zusage::Abbruch => {
+            println!("Abgebrochen, nichts angelegt.");
+            return Ok(());
+        }
+        Zusage::Alles => a.ohne.clone(),
+        Zusage::Ohne(mut n) => {
+            n.extend(&a.ohne);
+            n
+        }
+    };
+
+    let mut auftrag = auftrag_bauen(&befund, &weglassen);
+    if let Some(t) = a.titel {
+        auftrag.titel = t;
+    }
+    if let Some(k) = a.kurs {
+        auftrag.kurs = Some(k);
+    }
+    if let Some(v) = a.vorlage {
+        auftrag.vorlage = v;
+    }
+    auftrag.an_projekt = an.as_ref().map(|p| p.id);
+
+    let b = deuten::anlegen(store, &auftrag)?;
+    if an.is_some() {
+        println!("An »{}« angehängt.", b.projekt.titel);
+    } else {
+        println!(
+            "Angelegt: {} ({})  {}",
+            b.projekt.titel,
+            b.projekt.vorlage.anzeigename(),
+            b.projekt.id
+        );
+    }
+    println!(
+        "  {} Referenz(en), {} Unterprojekt(e)",
+        b.referenzen,
+        b.unterprojekte.len()
+    );
+    for up in &b.unterprojekte {
+        println!("  · {} ({})", up.titel, up.vorlage.anzeigename());
+    }
+    Ok(())
+}
+
+/// Holt den Steckbrief der Gegenseite und trägt ihn ein. Bestmöglich: ohne Netz oder ohne
+/// Zugang bleibt der Befund, was er ist – wer eine Adresse angibt, will ein Vorhaben und
+/// keinen Netzwerkfehler.
+fn steckbrief_holen(
+    store: &mut Store,
+    ak: &Key32,
+    geraet_id: Ulid,
+    befund: &mut lotse_core::deuten::Befund,
+) {
+    use lotse_core::deuten::Fund;
+    use lotse_core::forge;
+
+    let Some(url) = befund.funde.iter().find_map(|f| match f {
+        Fund::Remote { url, .. } => Some(url.clone()),
+        _ => None,
+    }) else {
+        return;
+    };
+    let Some(z) = forge::RepoZeiger::erkennen(&url) else {
+        return;
+    };
+    // Ein fehlender Token ist kein Grund, gar nicht zu fragen: öffentliche Repos
+    // antworten auch ohne.
+    let token = forge_token(store, ak, geraet_id, z.anbieter).ok().flatten();
+    match forge::steckbrief(&z, token.as_deref()) {
+        Ok(sb) => lotse_core::deuten::anreichern(befund, &sb),
+        Err(e) => befund.gegenseite_fehler = Some(e.to_string()),
+    }
+}
+
+/// Die Funde mit Nummern – das ist hier die Liste zum Abhaken.
+fn befund_zeigen(befund: &lotse_core::deuten::Befund, an: Option<&Projekt>, ohne: &[usize]) {
+    use lotse_core::deuten::Fund;
+
+    match an {
+        Some(p) => println!("Gehört zu »{}« – was bleibt, kommt dort dazu.\n", p.titel),
+        None => println!("Befund für {}\n", befund.quelle),
+    }
+
+    if an.is_none() {
+        if let Some(v) = &befund.vorschlag {
+            println!("  Titel    {}", v.titel);
+            println!("  Kurs     {}", v.kurs.as_deref().unwrap_or("—"));
+            println!("  Vorlage  {}", v.vorlage.anzeigename());
+            if !v.tags.is_empty() {
+                println!("  Tags     {}", v.tags.join(", "));
+            }
+        }
+    }
+
+    let zeilen: Vec<String> = befund
+        .funde
+        .iter()
+        .filter(|f| !matches!(f, Fund::SchonBekannt { .. }))
+        .map(|f| match f {
+            Fund::Remote { url, dienst } => {
+                format!(
+                    "Gegenseite   {}  {url}",
+                    dienst.as_deref().unwrap_or("Adresse")
+                )
+            }
+            Fund::Startseite { url } => format!("Projektseite {url}"),
+            Fund::Unterprojekt {
+                name,
+                vorlage,
+                marken,
+                ..
+            } => format!(
+                "Unterprojekt {name} ({}{})",
+                // Der Befund trägt den Schnittstellen-Namen; hier soll der lesbare
+                // stehen, derselbe wie überall sonst in der Ausgabe.
+                Vorlage::parse(vorlage).unwrap_or_default().anzeigename(),
+                if marken.is_empty() {
+                    String::new()
+                } else {
+                    format!(", {}", marken.join(" "))
+                }
+            ),
+            Fund::Dokument { name, .. } => format!("Dokument     {name}"),
+            Fund::SchonBekannt { .. } => unreachable!("oben herausgefiltert"),
+        })
+        .collect();
+
+    if zeilen.is_empty() {
+        println!("\n  Nichts weiter gefunden – das ist kein Mangel.");
+    } else {
+        println!();
+        for (i, z) in zeilen.iter().enumerate() {
+            let nr = i + 1;
+            // Weggelassenes bleibt stehen und wird benannt – eine Liste, aus der Zeilen
+            // verschwinden, verwirrt beim zweiten Blick.
+            let weg = if ohne.contains(&nr) {
+                "   (weggelassen)"
+            } else {
+                ""
+            };
+            println!("  {nr:>2}  {z}{weg}");
+        }
+    }
+
+    let mut rand = Vec::new();
+    if befund.angesehen > 0 {
+        rand.push(format!("{} Ordner angesehen", befund.angesehen));
+    }
+    if befund.weitere_dokumente > 0 {
+        rand.push(format!(
+            "{} weitere Dokumente nicht aufgeführt",
+            befund.weitere_dokumente
+        ));
+    }
+    if !rand.is_empty() {
+        println!("\n  {}", rand.join(" · "));
+    }
+    if befund.abgebrochen {
+        println!("\n  Die Suche hat an ihrer Grenze aufgehört – der Ordner ist groß. Was tiefer");
+        println!("  liegt, steht nicht in dieser Liste.");
+    }
+    if befund.archiviert {
+        println!("\n  Das Repo ist archiviert – dort passiert nichts mehr.");
+    }
+    if let Some(e) = &befund.gegenseite_fehler {
+        println!("\n  Von der Gegenseite kam nichts: {e}");
+    }
+}
+
+enum Zusage {
+    Alles,
+    Ohne(Vec<usize>),
+    Abbruch,
+}
+
+/// Einmal fragen. Antworten: Enter oder `j` übernimmt alles, `n` bricht ab, Nummern
+/// lassen die genannten Funde weg – das Gegenstück zum Häkchen in der App.
+fn zusage_holen(a: &DeutenArgs, befund: &lotse_core::deuten::Befund) -> Result<Zusage> {
+    use std::io::IsTerminal;
+
+    if a.ja {
+        return Ok(Zusage::Alles);
+    }
+    if !std::io::stdin().is_terminal() {
+        // Nicht am Terminal: nichts anlegen, ohne dass es jemand gesagt hat.
+        println!(
+            "\nKeine Eingabe möglich (kein Terminal). Mit --ja anlegen, mit --trocken nur zeigen."
+        );
+        return Ok(Zusage::Abbruch);
+    }
+    let anzahl = befund
+        .funde
+        .iter()
+        .filter(|f| !matches!(f, lotse_core::deuten::Fund::SchonBekannt { .. }))
+        .count();
+    let frage = if anzahl > 0 {
+        "\nAnlegen? [Enter = ja, n = nein, Nummern zum Weglassen] "
+    } else {
+        "\nAnlegen? [Enter = ja, n = nein] "
+    };
+    let antwort = zeile_lesen(frage)?;
+    let t = antwort.trim().to_lowercase();
+    if t.is_empty() || t == "j" || t == "ja" {
+        return Ok(Zusage::Alles);
+    }
+    if t == "n" || t == "nein" {
+        return Ok(Zusage::Abbruch);
+    }
+    let mut weg = Vec::new();
+    for stueck in t
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|s| !s.is_empty())
+    {
+        let n: usize = stueck.parse().context("Nummer")?;
+        if n == 0 || n > anzahl {
+            bail!("Es gibt keinen Fund mit der Nummer {n}.");
+        }
+        weg.push(n);
+    }
+    if weg.is_empty() {
+        bail!(
+            "Nicht verstanden: »{}«. Enter, n, oder Nummern.",
+            antwort.trim()
+        );
+    }
+    Ok(Zusage::Ohne(weg))
+}
+
+/// Baut den Auftrag aus dem Befund und lässt die genannten Nummern weg. Die Nummern
+/// zählen dieselbe Liste, die `befund_zeigen` ausgibt.
+fn auftrag_bauen(
+    befund: &lotse_core::deuten::Befund,
+    ohne: &[usize],
+) -> lotse_core::deuten::Auftrag {
+    use lotse_core::deuten::{Auftrag, Fund};
+
+    let mut auftrag = Auftrag::aus_befund(befund);
+    let sichtbar: Vec<&Fund> = befund
+        .funde
+        .iter()
+        .filter(|f| !matches!(f, Fund::SchonBekannt { .. }))
+        .collect();
+    for nr in ohne {
+        match sichtbar.get(nr.saturating_sub(1)) {
+            Some(Fund::Remote { .. }) => auftrag.remote = None,
+            Some(Fund::Startseite { .. }) => auftrag.startseite = None,
+            Some(Fund::Unterprojekt { pfad, .. }) => auftrag.unterprojekte.retain(|p| p != pfad),
+            Some(Fund::Dokument { pfad, .. }) => auftrag.dokumente.retain(|p| p != pfad),
+            Some(Fund::SchonBekannt { .. }) | None => {}
+        }
+    }
+    auftrag
+}
 
 /// Holt den Stand von GitHub oder GitLab. Den Token liefert entweder die Umgebung
 /// (`LOTSE_FORGE_TOKEN`) oder der in der App hinterlegte Tresor-Eintrag.

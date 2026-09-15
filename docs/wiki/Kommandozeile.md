@@ -57,6 +57,24 @@ lotse suche "bewehrung"
 
 ## Vorhaben
 
+Der kürzeste Weg zu einem neuen Vorhaben ist `deuten`. Das Argument nimmt alles – einen
+Ordner, eine Adresse, eine Datei oder einfach einen Namen:
+
+```bash
+lotse deuten ~/Code/gartenhaus          # Ordner, mit allem darin
+lotse deuten https://github.com/ich/x   # Repo samt Beschreibung und Themen
+lotse deuten ~/Downloads/angebot.pdf    # die Datei als Referenz
+lotse deuten Dachboden entrümpeln       # nur ein Name
+lotse deuten ~/Code/x --trocken         # nur zeigen
+lotse deuten ~/Code/x --ja              # nicht fragen (Skripte)
+```
+
+Lotse zeigt den **Befund** mit Nummern und fragt einmal: Enter übernimmt alles, `n` bricht
+ab, Nummern lassen einzelne Funde weg. Ohne Terminal und ohne `--ja` entsteht nichts.
+Einzelheiten: [[Kommandozeile-Referenz]].
+
+Von Hand geht es weiterhin:
+
 ```bash
 lotse projekt neu "Gartenhaus" --vorlage haus_garten --kurs "Fundament bis Oktober."
 lotse projekt liste

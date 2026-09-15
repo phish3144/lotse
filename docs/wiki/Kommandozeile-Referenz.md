@@ -178,6 +178,70 @@ Tresor-Inhalte sind **nie** enthalten – weder Werte noch Titel. Siehe [[Tresor
 
 ## Vorhaben
 
+### `lotse deuten [EINGABE]…`
+
+Der Weg, auf dem ein Vorhaben entsteht. Das Argument nimmt **alles**; die Einordnung macht
+Lotse (derselbe Kern wie in der App, siehe [[App-Schnittstelle]]):
+
+| Eingabe | Was daraus wird |
+|---|---|
+| `/home/ich/Gartenhaus` | Der Ordner, mit allem darin |
+| `https://github.com/ich/lotse` | Das Repo als Gegenseite – samt Beschreibung, Themen und Projektseite ([[Gegenseite]]) |
+| `~/Downloads/angebot.pdf` | Die Datei als Referenz |
+| `Dachboden entrümpeln` | Ein Vorhaben mit diesem Namen |
+
+Ein Pfad mit Anker (`/`, `~/`, `./`), den es nicht gibt, ist ein Fehler und kein Titel.
+Ohne Anker bleibt `Haus/Garten` ein Titel.
+
+Dann zeigt Lotse den **Befund** – Titel, Kurs, Vorlage und was es gefunden hat, durchnummeriert –
+und fragt **einmal**. Antworten:
+
+| Antwort | Wirkung |
+|---|---|
+| Enter oder `j` | Alles übernehmen |
+| `n` | Abbrechen, nichts anlegen |
+| Nummern, etwa `2,4` | Diese Funde weglassen – das Gegenstück zum Häkchen in der App |
+
+| Option | Standard | Bedeutung |
+|---|---|---|
+| `--trocken` | aus | Nur den Befund zeigen. |
+| `--ja` | aus | Nicht fragen, alles übernehmen. Für Skripte. |
+| `--ohne <N,…>` | – | Fundnummern weglassen, ohne zu fragen. Lässt sich mit `--ja` verbinden. |
+| `--titel <T>` | Vorschlag | Titel überstimmen. |
+| `--kurs <K>` | Vorschlag | Kurs überstimmen. |
+| `--vorlage <V>` | Vorschlag | Vorlage überstimmen, Werte wie bei `lotse projekt neu`. |
+| `--an <PROJEKT>` | – | An ein bestehendes Vorhaben anhängen statt ein neues anzulegen. |
+
+Ohne Terminal und ohne `--ja` wird **nichts** angelegt – in einer Pipeline soll nichts
+entstehen, was niemand bestätigt hat.
+
+```
+$ lotse deuten ~/Code/gartenhaus
+Befund für /home/ich/Code/gartenhaus
+
+  Titel    gartenhaus
+  Kurs     Fundament bis Oktober.
+  Vorlage  Software
+
+   1  Gegenseite   GitHub  https://github.com/ich/gartenhaus.git
+   2  Unterprojekt statik (Software, cargo.toml)
+   3  Dokument     README.md
+   4  Projektseite https://ich.github.io/gartenhaus/
+
+  2 Ordner angesehen
+
+Anlegen? [Enter = ja, n = nein, Nummern zum Weglassen] 3
+Angelegt: gartenhaus (Software)  01M2K9CJECDMY408300JQZD02T
+  3 Referenz(en), 1 Unterprojekt(e)
+  · statik (Software)
+```
+
+Gehört der Ordner schon zu einem Vorhaben, entsteht kein zweites: dann wird **angehängt**,
+und zwar nur, was noch nicht dranhängt. Ein zweiter Aufruf nach Wochen findet also genau
+die Unterprojekte und Dokumente, die seitdem dazugekommen sind.
+
+Der Weg zurück ist `lotse projekt loeschen` – das gibt den Ordner auch wieder frei.
+
 ### `lotse projekt neu <TITEL>`
 
 | Option | Standard | Bedeutung |

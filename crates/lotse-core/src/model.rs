@@ -57,7 +57,10 @@ impl Status {
 }
 
 /// Start-Vorlagen. Setzen nur Defaults, das Datenmodell bleibt für alle gleich.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// `Generisch` ist die Voreinstellung: die Vorlage, die sich nichts anmaßt. An fünf
+/// Stellen stand dafür ein `unwrap_or(Vorlage::Generisch)`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Vorlage {
     Software,
@@ -67,6 +70,7 @@ pub enum Vorlage {
     FinanzenVerwaltung,
     LernenForschung,
     ReiseVeranstaltung,
+    #[default]
     Generisch,
 }
 
