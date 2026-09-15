@@ -13,7 +13,32 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.8.1 — laufende Fassung
+## 0.9.0 — laufende Fassung
+
+**Eine Repo-Adresse bringt jetzt etwas mit.** Bisher ergab sie Name und Link, mehr nicht —
+Lotse hat GitHub nie gefragt. Das war kein Fehler, sondern eine nie gebaute Funktion. Jetzt
+holt es den Steckbrief des Repos und füllt damit den Befund:
+
+| Von GitHub oder GitLab | Wird hier zu |
+|---|---|
+| Beschreibung | Der **Kurs** — sie ist als Einzeiler geschrieben, eine README nicht |
+| README, erste brauchbare Zeile | Der Kurs, falls keine Beschreibung da ist |
+| Themen / Topics | Tags, im Befund abwählbar |
+| Projektseite | Eine Referenz mit Rolle *Doku* |
+| »archiviert« | Ein Hinweis: dort passiert nichts mehr |
+
+Das gilt auch für einen **Ordner**, dessen Git-Remote dorthin zeigt — der häufigere Fall.
+Was aus deinen eigenen Dateien gelesen wurde, bleibt dabei stehen: eine README auf der
+Platte kennt das Vorhaben besser als ein Einzeiler auf GitHub.
+
+Ein Token braucht es dafür **nicht**; öffentliche Repos antworten auch ohne, nur knapper
+(GitHub: 60 Anfragen je Stunde und Adresse). Für private schon. Und schlägt die Abfrage
+fehl, steht das im Befund und das Anlegen geht trotzdem: wer eine Adresse einfügt, will ein
+Vorhaben und keinen Netzwerkfehler. Siehe [[Gegenseite]].
+
+---
+
+## 0.8.1
 
 **Das Anlegen in 0.8.0 war kaputt.** Der Dialog sprang nach jedem Klick sofort zurück:
 »Deuten« und »Ohne Quelle« sahen beide aus wie tot. Ursache war ein Effekt in der
