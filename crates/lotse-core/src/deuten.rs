@@ -176,6 +176,10 @@ pub enum Fund {
         pfad: String,
         name: String,
     },
+    /// Projektseite, die das Repo selbst angibt. Wird eine Referenz.
+    Startseite {
+        url: String,
+    },
 }
 
 /// Was Lotse für Titel, Kurs und Vorlage vorschlägt. Alles änderbar – es ist ein
@@ -185,6 +189,9 @@ pub struct Vorschlag {
     pub titel: String,
     pub kurs: Option<String>,
     pub vorlage: Vorlage,
+    /// Vorgeschlagene Tags. Kommen aus der Vorlage und, bei einem Repo, aus seinen Themen.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -200,6 +207,14 @@ pub struct Befund {
     pub abgebrochen: bool,
     /// Dokumente über die aufgeführten hinaus.
     pub weitere_dokumente: usize,
+    /// Die Gegenseite sagt, dort passiere nichts mehr. Gehört in den Befund: sonst
+    /// wartet jemand auf Bewegung, die nicht kommt.
+    #[serde(default)]
+    pub archiviert: bool,
+    /// Die Gegenseite war nicht erreichbar. Kein Abbruch – der Befund gilt trotzdem,
+    /// aber er soll nicht so aussehen, als hätte es dort nichts gegeben.
+    #[serde(default)]
+    pub gegenseite_fehler: Option<String>,
 }
 
 pub fn deuten(quelle: &Quelle, opt: &ScanOptionen) -> Result<Befund> {
@@ -220,12 +235,72 @@ fn nur_titel(titel: &str) -> Befund {
             titel: titel.trim().to_string(),
             kurs: None,
             vorlage: Vorlage::Generisch,
+            tags: Vec::new(),
         }),
         funde: Vec::new(),
         angesehen: 0,
         abgebrochen: false,
         weitere_dokumente: 0,
+        archiviert: false,
+        gegenseite_fehler: None,
     }
+}
+
+/// Trägt in den Befund ein, was die Gegenseite über sich selbst sagt.
+///
+/// **Was schon dasteht, bleibt stehen.** Eine README auf der Platte kennt das Vorhaben
+/// besser als ein Einzeiler auf GitHub, und was von dort kommt, soll nichts überschreiben,
+/// was aus den eigenen Dateien gelesen wurde.
+///
+/// Reine Funktion: das Holen macht die Hülle, weil dafür ein Token aus dem Tresor nötig
+/// sein kann – und der ist für dieses Modul unerreichbar.
+pub fn anreichern(befund: &mut Befund, sb: &crate::forge::Steckbrief) {
+    befund.archiviert = sb.archiviert;
+
+    if let Some(v) = befund.vorschlag.as_mut() {
+        if v.kurs.is_none() {
+            // Die Beschreibung zuerst: sie ist als Einzeiler geschrieben, eine README
+            // nicht. Erst wenn sie fehlt, die erste brauchbare README-Zeile.
+            v.kurs = sb
+                .beschreibung
+                .clone()
+                .or_else(|| sb.readme.as_deref().and_then(detect::kurs_vorschlag));
+        }
+        for thema in &sb.themen {
+            let t = thema.trim();
+            if !t.is_empty() && !v.tags.iter().any(|x| x.eq_ignore_ascii_case(t)) {
+                v.tags.push(t.to_string());
+            }
+        }
+    }
+
+    // Die Startseite nur, wenn sie nicht dasselbe ist wie der Remote – zweimal derselbe
+    // Link hilft niemandem.
+    if let Some(url) = sb.startseite.as_deref() {
+        let schon = befund.funde.iter().any(|f| match f {
+            Fund::Remote { url: u, .. } | Fund::Startseite { url: u } => gleiche_adresse(u, url),
+            _ => false,
+        });
+        if !schon {
+            befund.funde.push(Fund::Startseite {
+                url: url.to_string(),
+            });
+        }
+    }
+}
+
+/// Zwei Adressen, dieselbe Stelle? Schema, `www.` und ein Schlussschrägstrich
+/// unterscheiden nichts.
+fn gleiche_adresse(a: &str, b: &str) -> bool {
+    fn kern(s: &str) -> String {
+        let l = s.trim().trim_end_matches('/').to_ascii_lowercase();
+        let ohne = l
+            .strip_prefix("https://")
+            .or_else(|| l.strip_prefix("http://"))
+            .unwrap_or(&l);
+        ohne.strip_prefix("www.").unwrap_or(ohne).to_string()
+    }
+    kern(a) == kern(b)
 }
 
 fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
@@ -246,6 +321,8 @@ fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
             angesehen: 1,
             abgebrochen: false,
             weitere_dokumente: 0,
+            archiviert: false,
+            gegenseite_fehler: None,
         });
     }
 
@@ -284,6 +361,7 @@ fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
             .as_ref()
             .map(|k| k.vorlage)
             .unwrap_or(Vorlage::Generisch),
+        tags: Vec::new(),
     });
 
     Ok(Befund {
@@ -293,6 +371,8 @@ fn ordner(dir: &Path, opt: &ScanOptionen) -> Result<Befund> {
         angesehen: unten.angesehen,
         abgebrochen: unten.abgebrochen,
         weitere_dokumente: weitere,
+        archiviert: false,
+        gegenseite_fehler: None,
     })
 }
 
@@ -315,6 +395,7 @@ fn adresse(a: &str) -> Result<Befund> {
             } else {
                 Vorlage::Generisch
             },
+            tags: Vec::new(),
         }),
         funde: vec![Fund::Remote {
             url: a.to_string(),
@@ -323,6 +404,8 @@ fn adresse(a: &str) -> Result<Befund> {
         angesehen: 0,
         abgebrochen: false,
         weitere_dokumente: 0,
+        archiviert: false,
+        gegenseite_fehler: None,
     })
 }
 
@@ -347,11 +430,14 @@ fn dateien(pfade: &[PathBuf]) -> Result<Befund> {
             titel,
             kurs: None,
             vorlage: Vorlage::Generisch,
+            tags: Vec::new(),
         }),
         funde,
         angesehen: 0,
         abgebrochen: false,
         weitere_dokumente: pfade.len().saturating_sub(MAX_DOKUMENTE),
+        archiviert: false,
+        gegenseite_fehler: None,
     })
 }
 
@@ -536,6 +622,137 @@ mod tests {
         assert_eq!(v.vorlage, Vorlage::Generisch);
         assert!(b.funde.is_empty());
         assert!(!b.abgebrochen);
+    }
+
+    // --------------------------------------- Was die Gegenseite beisteuert
+
+    fn steckbrief() -> crate::forge::Steckbrief {
+        crate::forge::Steckbrief {
+            beschreibung: Some("Das Logbuch für alle Vorhaben".into()),
+            themen: vec!["rust".into(), "tauri".into()],
+            startseite: Some("https://lotse.sanctora.eu/".into()),
+            standard_branch: Some("main".into()),
+            archiviert: false,
+            privat: false,
+            readme: Some("# Lotse\n\nAus der README.\n".into()),
+        }
+    }
+
+    #[test]
+    fn die_beschreibung_wird_zum_kurs() {
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        assert_eq!(b.vorschlag.as_ref().unwrap().kurs, None, "vorher leer");
+
+        anreichern(&mut b, &steckbrief());
+        let v = b.vorschlag.unwrap();
+        assert_eq!(v.kurs.as_deref(), Some("Das Logbuch für alle Vorhaben"));
+        assert_eq!(v.tags, vec!["rust".to_string(), "tauri".to_string()]);
+    }
+
+    #[test]
+    fn ohne_beschreibung_hilft_die_readme_aus() {
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        let sb = crate::forge::Steckbrief {
+            beschreibung: None,
+            ..steckbrief()
+        };
+        anreichern(&mut b, &sb);
+        // Die Überschrift wird übersprungen, wie bei einer README auf der Platte.
+        assert_eq!(
+            b.vorschlag.unwrap().kurs.as_deref(),
+            Some("Aus der README.")
+        );
+    }
+
+    #[test]
+    fn ein_kurs_von_der_platte_wird_nicht_ueberschrieben() {
+        // Die eigenen Dateien kennen das Vorhaben besser als ein Einzeiler auf GitHub.
+        let t = tempfile::tempdir().unwrap();
+        let dir = t.path().join("Gartenhaus");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("README.md"),
+            "# Gartenhaus\n\nFundament bis Oktober.\n",
+        )
+        .unwrap();
+
+        let mut b = deuten(&Quelle::Ordner(dir), &ScanOptionen::default()).unwrap();
+        anreichern(&mut b, &steckbrief());
+        assert_eq!(
+            b.vorschlag.unwrap().kurs.as_deref(),
+            Some("Fundament bis Oktober.")
+        );
+    }
+
+    #[test]
+    fn die_startseite_wird_ein_fund() {
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        anreichern(&mut b, &steckbrief());
+        assert!(b
+            .funde
+            .iter()
+            .any(|f| matches!(f, Fund::Startseite { url } if url.contains("sanctora"))));
+    }
+
+    #[test]
+    fn dieselbe_adresse_kommt_nicht_zweimal() {
+        // Viele Repos tragen sich selbst als Startseite ein.
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        let sb = crate::forge::Steckbrief {
+            startseite: Some("http://www.GitHub.com/o/r/".into()),
+            ..steckbrief()
+        };
+        anreichern(&mut b, &sb);
+        assert!(
+            !b.funde.iter().any(|f| matches!(f, Fund::Startseite { .. })),
+            "Schema, www. und Schlussschrägstrich unterscheiden nichts"
+        );
+    }
+
+    #[test]
+    fn themen_kommen_nicht_doppelt() {
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        anreichern(&mut b, &steckbrief());
+        anreichern(&mut b, &steckbrief());
+        assert_eq!(b.vorschlag.unwrap().tags.len(), 2);
+    }
+
+    #[test]
+    fn archiviert_steht_im_befund() {
+        let mut b = deuten(
+            &Quelle::Adresse("https://github.com/o/r".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        assert!(!b.archiviert);
+        anreichern(
+            &mut b,
+            &crate::forge::Steckbrief {
+                archiviert: true,
+                ..steckbrief()
+            },
+        );
+        assert!(b.archiviert, "sonst wartet jemand auf Bewegung");
     }
 
     #[test]

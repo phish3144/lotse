@@ -821,7 +821,8 @@ fn deutung_bauen(state: &State<AppState>, q: lotse_core::deuten::Quelle) -> R<De
     use lotse_core::deuten::{deuten, Fund};
 
     let opt = lotse_core::detect::ScanOptionen::default();
-    let befund = deuten(&q, &opt).map_err(fehler)?;
+    let mut befund = deuten(&q, &opt).map_err(fehler)?;
+    gegenseite_anreichern(state, &mut befund);
 
     let schon = befund.funde.iter().find_map(|f| match f {
         Fund::SchonBekannt { id, pfad } => Some((*id, pfad.clone())),
@@ -842,10 +843,41 @@ fn deutung_bauen(state: &State<AppState>, q: lotse_core::deuten::Quelle) -> R<De
     // Der Marker zeigt auf ein gelöschtes Projekt. Der Ordner ist frei; ihn weiter als
     // bekannt zu melden hiesse, ihn für immer zu sperren.
     lotse_core::detect::marker_entfernen(std::path::Path::new(&pfad));
+    let mut noch_einmal = deuten(&q, &opt).map_err(fehler)?;
+    gegenseite_anreichern(state, &mut noch_einmal);
     Ok(Deutung {
-        befund: deuten(&q, &opt).map_err(fehler)?,
+        befund: noch_einmal,
         bekannt: None,
     })
+}
+
+/// Holt, was das Repo über sich selbst sagt, und trägt es in den Befund ein.
+///
+/// **Bestmöglich, nie fatal.** Wer eine Adresse einfügt, will ein Vorhaben anlegen und
+/// keinen Netzwerkfehler; geht die Abfrage schief, steht das als Zeile im Befund und der
+/// Rest gilt weiter. Ohne Token geht es auch – öffentliche Repos antworten, nur knapper:
+/// GitHub lässt ohne Anmeldung 60 Anfragen je Stunde und Adresse zu.
+///
+/// Das Token kommt aus dem Tresor und wird hier hereingereicht. `deuten` und `forge`
+/// kommen selbst nicht an ihn heran, und das soll so bleiben (`CLAUDE.md`).
+fn gegenseite_anreichern(state: &State<AppState>, befund: &mut lotse_core::deuten::Befund) {
+    use lotse_core::deuten::Fund;
+
+    let Some(url) = befund.funde.iter().find_map(|f| match f {
+        Fund::Remote { url, .. } => Some(url.clone()),
+        _ => None,
+    }) else {
+        return;
+    };
+    let Some(zeiger) = lotse_core::forge::RepoZeiger::erkennen(&url) else {
+        return;
+    };
+    // Ein fehlendes Token ist kein Grund, gar nicht zu fragen.
+    let token = forge_token(state, zeiger.anbieter).ok().flatten();
+    match lotse_core::forge::steckbrief(&zeiger, token.as_deref()) {
+        Ok(sb) => lotse_core::deuten::anreichern(befund, &sb),
+        Err(e) => befund.gegenseite_fehler = Some(e.to_string()),
+    }
 }
 
 /// Was aus dem Befund werden soll. Die Oberfläche schickt, was abgehakt geblieben ist;
@@ -859,6 +891,11 @@ struct AnlegenAuftrag {
     ordner: Option<String>,
     /// Adresse der Gegenseite, als Referenz.
     remote: Option<String>,
+    /// Projektseite, die das Repo angibt – als eigene Referenz.
+    startseite: Option<String>,
+    /// Tags, die aus den Themen des Repos kommen. Zu denen der Vorlage dazu.
+    #[serde(default)]
+    tags: Vec<String>,
     /// Abgehakte Unterprojekte – je ein eigenes Projekt.
     unterprojekte: Vec<String>,
     /// Abgehakte Dokumente – Referenzen am Hauptprojekt.
@@ -884,6 +921,9 @@ fn deutung_satz(a: &AnlegenAuftrag, unterprojekte: usize) -> Option<String> {
     }
     if let Some(r) = a.remote.as_deref() {
         teile.push(format!("Gegenseite {r}"));
+    }
+    if a.startseite.is_some() {
+        teile.push("Projektseite".to_string());
     }
     if unterprojekte > 0 {
         teile.push(format!("{unterprojekte} Unterprojekt(e)"));
@@ -927,6 +967,13 @@ fn aus_befund_anlegen(state: State<AppState>, auftrag: AnlegenAuftrag) -> R<Anle
             None => {
                 let mut p = Projekt::neu(&titel, vorlage, naechster());
                 p.kurs = auftrag.kurs.as_deref().unwrap_or_default().trim().to_string();
+                // Themen der Gegenseite zu den Tags der Vorlage – ohne Dubletten und
+                // ohne Rücksicht auf Groß- und Kleinschreibung.
+                for t in auftrag.tags.iter().map(|t| t.trim()).filter(|t| !t.is_empty()) {
+                    if !p.tags.iter().any(|x| x.eq_ignore_ascii_case(t)) {
+                        p.tags.push(t.to_string());
+                    }
+                }
                 s.store.projekt_speichern(&p)?;
                 if p.kurs.is_empty() {
                     s.store.notiz_speichern(&Notiz::neu(
@@ -969,6 +1016,18 @@ fn aus_befund_anlegen(state: State<AppState>, auftrag: AnlegenAuftrag) -> R<Anle
                 ReferenzTyp::Url,
                 url.trim(),
                 Rolle::Material,
+            ))?;
+            referenzen += 1;
+        }
+
+        // Die Projektseite ist Doku, nicht Material: dort steht, was das Vorhaben nach
+        // außen sagt, nicht das, woraus es gebaut wird.
+        if let Some(url) = auftrag.startseite.as_deref().filter(|u| !u.trim().is_empty()) {
+            s.store.referenz_speichern(&Referenz::neu(
+                projekt.id,
+                ReferenzTyp::Url,
+                url.trim(),
+                Rolle::Doku,
             ))?;
             referenzen += 1;
         }

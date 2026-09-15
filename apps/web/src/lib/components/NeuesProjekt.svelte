@@ -23,6 +23,7 @@
     type Fund,
     type FundDokument,
     type FundRemote,
+    type FundStartseite,
     type FundUnterprojekt,
   } from '../data/tauri';
   import { meldungen } from '../meldung.svelte';
@@ -41,6 +42,7 @@
   let titel = $state('');
   let vorlage: VorlagenId = $state('generisch');
   let kurs = $state('');
+  let tags: string[] = $state([]);
   /** Häkchen je Fund, alle vorangekreuzt. */
   let gewaehlt: Record<string, boolean> = $state({});
   let laeuft = $state(false);
@@ -57,6 +59,8 @@
         return `unterprojekt:${f.pfad}`;
       case 'dokument':
         return `dokument:${f.pfad}`;
+      case 'startseite':
+        return `startseite:${f.url}`;
       case 'schon_bekannt':
         return `bekannt:${f.pfad}`;
     }
@@ -71,6 +75,7 @@
     titel = '';
     vorlage = 'generisch';
     kurs = '';
+    tags = [];
     gewaehlt = {};
     fehler = null;
     laeuft = false;
@@ -121,6 +126,7 @@
     titel = v?.titel ?? '';
     vorlage = v?.vorlage ?? 'generisch';
     kurs = v?.kurs ?? '';
+    tags = v?.tags ?? [];
     fehler = null;
   }
 
@@ -144,11 +150,12 @@
     return {
       befund: {
         quelle: text.trim(),
-        vorschlag: { titel: text.trim(), vorlage: 'generisch' },
+        vorschlag: { titel: text.trim(), vorlage: 'generisch', tags: [] },
         funde: [],
         angesehen: 0,
         abgebrochen: false,
         weitere_dokumente: 0,
+        archiviert: false,
       },
     };
   }
@@ -217,6 +224,7 @@
   const remote = $derived.by(() => funde.find((f): f is FundRemote => f.art === 'remote'));
   const unterprojekte = $derived.by(() => funde.filter((f): f is FundUnterprojekt => f.art === 'unterprojekt'));
   const dokumente = $derived.by(() => funde.filter((f): f is FundDokument => f.art === 'dokument'));
+  const startseite = $derived.by(() => funde.find((f): f is FundStartseite => f.art === 'startseite'));
   /** Gehört die Quelle schon zu einem Vorhaben? Dann wird angehängt, nicht angelegt. */
   const bekannt = $derived.by(() => deutung?.bekannt);
   const kannSpeichern = $derived(!!bekannt || titel.trim().length > 0);
@@ -242,6 +250,8 @@
         vorlage,
         ordner: ordnerPfad,
         remote: remote && gewaehlt[schluessel(remote)] ? remote.url : undefined,
+        startseite: startseite && gewaehlt[schluessel(startseite)] ? startseite.url : undefined,
+        tags,
         unterprojekte: gewaehltePfade(unterprojekte),
         dokumente: gewaehltePfade(dokumente),
         an_projekt: bekannt?.id,
@@ -367,6 +377,35 @@
             <span>Kurs <em>(optional)</em></span>
             <textarea bind:value={kurs} rows="2" placeholder="Worum geht es? Was ist das Ziel?"></textarea>
           </label>
+
+          {#if tags.length}
+            <p class="tags">
+              <span class="hinweis klein">Themen von der Gegenseite:</span>
+              {#each tags as t (t)}
+                <button
+                  type="button"
+                  class="tag"
+                  title="Entfernen"
+                  onclick={() => (tags = tags.filter((x) => x !== t))}
+                >
+                  {t} ×
+                </button>
+              {/each}
+            </p>
+          {/if}
+        {/if}
+
+        {#if deutung.befund.archiviert}
+          <p class="hinweis warnung">
+            Das Repo ist <strong>archiviert</strong> – dort passiert nichts mehr. Anlegen kannst du es trotzdem;
+            Lotse wird nur nie Bewegung melden.
+          </p>
+        {/if}
+        {#if deutung.befund.gegenseite_fehler}
+          <p class="hinweis warnung">
+            Von der Gegenseite kam nichts: {deutung.befund.gegenseite_fehler} Titel und Link stehen trotzdem; was
+            dort steht, holt Lotse später nach.
+          </p>
         {/if}
 
         {#if remote}
@@ -380,6 +419,16 @@
               Wird als Referenz angehängt. Damit Lotse dort auch nachsieht, braucht es später einen Zugang – das sagt
               es dann selbst, nicht jetzt.
             </p>
+          </fieldset>
+        {/if}
+
+        {#if startseite}
+          <fieldset>
+            <legend>Projektseite</legend>
+            <label class="haken">
+              <input type="checkbox" bind:checked={gewaehlt[schluessel(startseite)]} />
+              <span><code>{startseite.url}</code></span>
+            </label>
           </fieldset>
         {/if}
 
@@ -606,5 +655,25 @@
     color: var(--farbe-ueberfaellig);
     font-size: 0.85rem;
     margin: 0;
+  }
+  .hinweis.warnung {
+    color: var(--farbe-ueberfaellig);
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    margin: 0;
+  }
+  .tag {
+    font: inherit;
+    font-size: 0.78rem;
+    border: 1px solid var(--rahmen);
+    background: transparent;
+    color: inherit;
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+    cursor: pointer;
   }
 </style>

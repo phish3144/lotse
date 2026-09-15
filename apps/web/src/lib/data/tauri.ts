@@ -361,12 +361,19 @@ export interface FundDokument {
   pfad: string;
   name: string;
 }
-export type Fund = FundSchonBekannt | FundRemote | FundUnterprojekt | FundDokument;
+/** Projektseite, die das Repo selbst angibt. */
+export interface FundStartseite {
+  art: 'startseite';
+  url: string;
+}
+export type Fund = FundSchonBekannt | FundRemote | FundUnterprojekt | FundDokument | FundStartseite;
 
 export interface Vorschlag {
   titel: string;
   kurs?: string;
   vorlage: VorlagenId;
+  /** Aus der Vorlage und, bei einem Repo, aus seinen Themen. */
+  tags: string[];
 }
 
 export interface Befund {
@@ -380,6 +387,10 @@ export interface Befund {
    *  für vollständig. */
   abgebrochen: boolean;
   weitere_dokumente: number;
+  /** Die Gegenseite sagt, dort passiere nichts mehr. */
+  archiviert: boolean;
+  /** Die Gegenseite war nicht erreichbar. Der Befund gilt trotzdem. */
+  gegenseite_fehler?: string;
 }
 
 export interface Deutung {
@@ -394,6 +405,8 @@ export interface AnlegenAuftrag {
   vorlage: VorlagenId;
   ordner?: string;
   remote?: string;
+  startseite?: string;
+  tags: string[];
   unterprojekte: string[];
   dokumente: string[];
   /** Statt anzulegen an dieses Projekt anhängen. */
