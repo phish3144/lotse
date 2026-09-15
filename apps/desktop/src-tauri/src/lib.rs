@@ -692,7 +692,8 @@ fn kandidat_verwerfen(state: State<AppState>, pfad: String) -> R<()> {
 fn scan(state: State<AppState>, wurzeln: Vec<String>) -> R<Vec<Kandidat>> {
     let roots: Vec<PathBuf> = wurzeln.into_iter().map(PathBuf::from).collect();
     mit(&state, |s| {
-        let alle = lotse_core::detect::scan(&roots, &lotse_core::detect::ScanOptionen::default())?;
+        let alle = lotse_core::detect::scan(&roots, &lotse_core::detect::ScanOptionen::default())?
+            .kandidaten;
         let neu: Vec<Kandidat> = alle
             .into_iter()
             .filter(|k| {

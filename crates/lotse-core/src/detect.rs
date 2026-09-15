@@ -7,6 +7,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::Serialize;
 use ulid::Ulid;
 use walkdir::WalkDir;
 
@@ -69,6 +70,12 @@ pub fn nie_lesen(name: &str) -> bool {
 pub struct ScanOptionen {
     pub max_tiefe: usize,
     pub ausschluss: Vec<String>,
+    /// Harte Obergrenze angesehener Ordner. Wer sein Benutzerverzeichnis wählt, soll
+    /// eine Antwort bekommen und keinen hängenden Balken.
+    pub max_ordner: usize,
+    /// Zweite Reißleine für langsame Platten und Netzlaufwerke, wo wenige Ordner
+    /// schon lange dauern.
+    pub max_dauer_ms: u64,
 }
 
 impl Default for ScanOptionen {
@@ -76,14 +83,31 @@ impl Default for ScanOptionen {
         ScanOptionen {
             max_tiefe: 4,
             ausschluss: AUSSCHLUSS.iter().map(|s| s.to_string()).collect(),
+            max_ordner: 20_000,
+            max_dauer_ms: 3_000,
         }
     }
 }
 
 /// Sucht Kandidaten unter den Wurzelordnern. Ein erkannter Projektordner wird nicht
 /// weiter hinabgestiegen (Unterordner eines Projekts sind keine eigenen Projekte).
-pub fn scan(wurzeln: &[PathBuf], opt: &ScanOptionen) -> Result<Vec<Kandidat>> {
-    let mut out = Vec::new();
+/// Was ein Durchlauf gefunden hat – und was er nicht mehr geschafft hat.
+///
+/// `abgebrochen` ist kein Fehler, sondern eine Auskunft: Lotse hat aufgehört zu suchen,
+/// weil die Grenze erreicht war. Wer das verschweigt, lässt den Nutzer glauben, es gäbe
+/// nichts weiter zu finden.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ScanErgebnis {
+    pub kandidaten: Vec<Kandidat>,
+    /// Angesehene Ordner. Nicht die Zahl der Dateien – die liest Lotse gar nicht erst.
+    pub angesehen: usize,
+    pub abgebrochen: bool,
+}
+
+pub fn scan(wurzeln: &[PathBuf], opt: &ScanOptionen) -> Result<ScanErgebnis> {
+    let beginn = std::time::Instant::now();
+    let mut erg = ScanErgebnis::default();
+
     for wurzel in wurzeln {
         if !wurzel.is_dir() {
             continue;
@@ -98,19 +122,31 @@ pub fn scan(wurzeln: &[PathBuf], opt: &ScanOptionen) -> Result<Vec<Kandidat>> {
             if !entry.file_type().is_dir() {
                 continue;
             }
+            erg.angesehen += 1;
+            if erg.angesehen >= opt.max_ordner
+                || beginn.elapsed().as_millis() as u64 >= opt.max_dauer_ms
+            {
+                erg.abgebrochen = true;
+                break;
+            }
             let name = entry.file_name().to_string_lossy();
             if name.starts_with('.') || opt.ausschluss.iter().any(|a| a == name.as_ref()) {
                 it.skip_current_dir();
                 continue;
             }
+            // Beim Treffer nicht weiter hinein: die Wurzel eines Projekts liegt außen,
+            // und ein Repo im Repo ist fast immer eingekauftes Zeug.
             if let Some(k) = erkenne(entry.path()) {
-                out.push(k);
+                erg.kandidaten.push(k);
                 it.skip_current_dir();
             }
         }
+        if erg.abgebrochen {
+            break;
+        }
     }
-    out.sort_by(|a, b| a.pfad.cmp(&b.pfad));
-    Ok(out)
+    erg.kandidaten.sort_by(|a, b| a.pfad.cmp(&b.pfad));
+    Ok(erg)
 }
 
 /// Prüft einen einzelnen Ordner auf Erkennungsmarken.
@@ -323,14 +359,38 @@ pub fn uebernehmen(store: &mut Store, k: &Kandidat) -> Result<Projekt> {
 }
 
 /// Liest die Projekt-ID aus der Marker-Datei, falls vorhanden.
+/// Wohin der Marker gehört.
+///
+/// In einem Git-Repo nach `.git/lotse-projekt`: Git zeigt den Inhalt von `.git/` nie an,
+/// also kein Rauschen in `git status` und kein Eintrag in einer `.gitignore`, die anderen
+/// gehört. Sonst als `.lotse-projekt` neben den Dateien.
+///
+/// Dass ein frischer Klon den Marker nicht mitbringt, ist Absicht: ein anderer Klon ist
+/// ein anderer Pfad, und Pfade gelten nur auf diesem Gerät.
+pub fn marker_pfad(dir: &Path) -> PathBuf {
+    let git = dir.join(".git");
+    if git.is_dir() {
+        git.join("lotse-projekt")
+    } else {
+        dir.join(MARKER)
+    }
+}
+
 pub fn marker_lesen(dir: &Path) -> Option<Ulid> {
-    let s = fs::read_to_string(dir.join(MARKER)).ok()?;
-    Ulid::from_string(s.trim()).ok()
+    // Beide Orte lesen: Marker aus älteren Fassungen liegen noch daneben.
+    for p in [marker_pfad(dir), dir.join(MARKER)] {
+        if let Ok(s) = fs::read_to_string(&p) {
+            if let Ok(id) = Ulid::from_string(s.trim()) {
+                return Some(id);
+            }
+        }
+    }
+    None
 }
 
 /// Schreibt die Marker-Datei. Inhalt ist nur die ULID, damit sie in jedem Repo harmlos ist.
 pub fn marker_schreiben(dir: &Path, id: Ulid) -> Result<()> {
-    fs::write(dir.join(MARKER), format!("{id}\n"))?;
+    fs::write(marker_pfad(dir), format!("{id}\n"))?;
     Ok(())
 }
 
@@ -384,7 +444,9 @@ mod tests {
         )
         .unwrap();
 
-        let ks = scan(&[root.to_path_buf()], &ScanOptionen::default()).unwrap();
+        let ks = scan(&[root.to_path_buf()], &ScanOptionen::default())
+            .unwrap()
+            .kandidaten;
         let by: std::collections::HashMap<String, &Kandidat> =
             ks.iter().map(|k| (k.name.clone(), k)).collect();
         assert_eq!(by["rust-tool"].vorlage, Vorlage::Software);

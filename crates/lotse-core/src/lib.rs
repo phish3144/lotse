@@ -21,6 +21,8 @@ pub mod vault;
 
 #[cfg(feature = "native")]
 pub mod detect;
+#[cfg(feature = "native")]
+pub mod deuten;
 pub mod dokument;
 #[cfg(feature = "native")]
 pub mod export;

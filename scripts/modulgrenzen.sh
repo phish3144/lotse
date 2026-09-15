@@ -12,7 +12,7 @@ kern="$wurzel/crates/lotse-core/src"
 # Eigenständige Module. Namen, keine Dateinamen: ein Modul kann `x.rs` sein oder ein
 # Ordner `x/` mit mehreren Dateien. Beides wird geprüft, sonst rutscht eine Regel beim
 # Aufteilen eines Moduls unbemerkt durch.
-module=(ai detect dokument forge git kalender mcp netz update watcher)
+module=(ai detect deuten dokument forge git kalender mcp netz update watcher)
 
 # Module, die in einer größeren Datei stehen, als `Datei:Modulname`. `export::spiegel`
 # darf den Tresor nicht sehen, `export::bundle` in derselben Datei schon – deshalb wird
