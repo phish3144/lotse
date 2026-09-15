@@ -65,9 +65,22 @@ geschickt, auch nicht versehentlich. Siehe [[Gegenseite]].
 
 ### Kalender
 
-Ein Kalender wird nicht hier eingerichtet, sondern als Referenz am Vorhaben – die
-Abonnement-Adresse als `url`, die auf `.ics` endet oder mit `webcal://` beginnt. Dieser
-Abschnitt erklärt das und zeigt, was erkannt wurde.
+Ein Kalender wird nicht hier *zugeordnet*, sondern als Referenz am Vorhaben – die
+Abonnement-Adresse als `url`, die auf `.ics` endet oder mit `webcal://` beginnt.
+
+Was hier steht, ist **Meine Kalender**: die Liste der Kalender, die dir gehören. Ein
+Vorrat, keine Zuordnung – er erspart das Abtippen derselben langen Adresse für jedes
+Vorhaben, und er ist die Voraussetzung dafür, dass eine Projektseite nachsehen kann, ob
+dort etwas zum Vorhaben steht.
+
+| Schalter | Was er tut |
+|---|---|
+| **Hinzufügen** | Nimmt eine Adresse in den Vorrat. Was keine Kalenderadresse ist, wird abgewiesen statt stillschweigend übernommen. |
+| **Entfernen** | Nimmt sie wieder heraus. Referenzen an Vorhaben bleiben davon unberührt – die sind die Zuordnung. |
+
+Diese Adressen sind **Geheimnisse**: wer sie hat, liest deinen Kalender. Sie stehen im
+Klartext in der verschlüsselten Datenbank – derselbe Schutz wie für alles andere dort, aber
+ohne die zusätzliche Hülle des [[Tresor]]s.
 
 Geholt wird der Kalender beim Öffnen der Projektseite, danach höchstens alle 15 Minuten
 neu. Siehe [[Kalender]].
@@ -173,6 +186,21 @@ beginnt wieder mit der Einrichtung.
 Aus einem `.deb` oder `.rpm` heraus geht der Austausch nicht – dort aktualisiert die
 Paketverwaltung, und Lotse zeigt das statt eines Knopfes, der nichts täte. Mehr:
 [[Updates]].
+
+### Platz im System
+
+Nur unter Linux und nur, wenn Lotse als AppImage läuft. Ein AppImage wird nicht
+installiert; dieser Abschnitt holt das nach.
+
+| Schalter | Was er tut |
+|---|---|
+| **Platz geben und ins Menü** | Legt die Datei nach `~/.local/share/lotse/Lotse.AppImage` – feste Stelle, fester Name – und schreibt Desktop-Datei und Icon nach `~/.local/share`. |
+| **Von dort neu starten** | Erscheint danach: es läuft noch die heruntergeladene Datei. Sperrt vorher, weil der Schlüssel einen Neustart nicht überlebt. |
+| **Eintrag entfernen** | Nimmt Desktop-Datei und Icon wieder weg. Die AppImage-Datei bleibt – das ist das laufende Programm. |
+
+Angezeigt wird, woraus Lotse gerade läuft, wo sein Platz wäre und ob es den Eintrag schon
+gibt. Die heruntergeladene Datei bleibt liegen; die Anzeige nennt sie, damit du sie selbst
+wegräumen kannst – Lotse löscht nichts in deinem Download-Ordner. Mehr: [[Installation]].
 
 ### Dieses Gerät
 

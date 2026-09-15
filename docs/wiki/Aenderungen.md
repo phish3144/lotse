@@ -13,7 +13,66 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.7.0 — laufende Fassung
+## 0.8.0 — laufende Fassung
+
+**Ein Vorhaben anlegen fragt jetzt nur noch eines: woher kommt es?** Der alte Dialog wollte
+Titel, Vorlage und Kurs – also genau das, was Lotse aus einem Ordner selbst herauslesen
+kann. Jetzt wählst du einen Ordner, fügst eine Adresse ein oder wirfst ein paar Dateien
+hinein, und Lotse zeigt einen **Befund**: Titel, Kurs und Vorlage schon ausgefüllt, dazu was
+es gefunden hat – die Gegenseite auf GitHub oder GitLab, eigene Vorhaben in Unterordnern,
+lesbare Dokumente. Alles vorangekreuzt, alles abwählbar ([[Erste Schritte|Erste-Schritte]]).
+
+Der Befund ist **nie eine Frage, immer eine Feststellung**. Wer mit einer GitHub-Adresse
+anfängt, wird nicht mehr gefragt, ob er von GitHub importieren will – das stand ja schon in
+der Adresse. Und liegt in dem Ordner bereits eine Kennung von Lotse, entsteht kein zweites
+Vorhaben: dann kommt das Abgehakte zum vorhandenen dazu.
+
+**Löschen gibt den Ordner wieder frei.** Das ist der Weg zurück, wenn ein Befund zu weit
+ging. Bisher blieb die Markerdatei liegen, und der Ordner galt für immer als »gehört schon
+dazu« – er ließ sich nie wieder anlegen.
+
+**Wenn ein Zugang fehlt, sagt Lotse es dort, wo du hinsiehst.** Bisher stand »401« in einer
+Fehlerliste in den Einstellungen; die öffnet niemand, solange nichts wehtut. Jetzt steht im
+betroffenen Vorhaben ein offener Faden – mit der Folge statt der Einstellung: »keine offenen
+Anfragen, kein Prüflauf-Status, private Repos gar nicht«. Genau einmal, nur wenn wirklich
+kein Token hinterlegt ist, und nie bei Netzausfall ([[Gegenseite]]).
+
+**Kalender: einmal hinterlegen, dann nachsehen lassen.** Dieselbe lange `.ics`-Adresse für
+jedes Vorhaben abzutippen war Unfug. Unter **Einstellungen → Verbindungen → Kalender**
+steht jetzt eine Liste der Kalender, die dir gehören, und auf einer Projektseite ohne
+Kalender ein Knopf: *Nach „Gartenhaus" suchen*. Lotse zeigt die passenden Termine mit den
+Suchbegriffen dabei; angehängt wird auf Klick. Die Liste ist ein **Vorrat, keine
+Zuordnung** – gelesen wird ein Kalender weiterhin nur dort, wo er als Referenz am Vorhaben
+hängt ([[Kalender]]).
+
+**Die KI bekommt eine Aufgabe, die sich lohnt: den Kurs.** Titel und Vorlage liest die
+Erkennung aus Marken – dafür wäre ein Modell Verschwendung. Aber die erste Zeile einer
+README ist als Kurs meistens eine Überschrift, und den Satz, der dir in drei Monaten sagt,
+was du eigentlich wolltest, kann keine Regel schreiben. Unter *Bearbeiten* steht neben dem
+Kursfeld **Kurs von der KI vorschlagen lassen**; gesendet wird Name, Marken, README-Anfang
+und Dateinamen, und du siehst den Text vorher ([[KI]]).
+
+Dabei kam ein **Fehler** heraus: »Datei deuten« konnte nie funktionieren. Die Zweck-Erkennung
+lief über eine handgeschriebene Liste mit einem Eintrag, und jede Anfrage scheiterte an
+»Unbekannter Zweck«. Behoben, und ein Test geht jetzt alle Zwecke durch statt einen.
+
+**Linux: das AppImage richtet sich ein, wenn du es lässt.** Ein AppImage wird nicht
+installiert – es liegt da, wo der Browser es hingelegt hat. Daraus folgte: kein Eintrag im
+Menü, ein Selbst-Update, das am Download-Ordner hängt, und ein Dateiname, der nach dem
+ersten Tausch die alte Version nennt. Beim ersten Start fragt Lotse jetzt **einmal**, legt
+sich nach `~/.local/share/lotse/Lotse.AppImage` und schreibt Desktop-Datei und Icon. Ein
+»nein« wird gemerkt; der Knopf bleibt unter **Einstellungen → Version → Platz im System**,
+und *Eintrag entfernen* nimmt es wieder weg ([[Installation]]).
+
+Unter der Haube: die Suche eines Ordners hat jetzt ein Budget (20 000 Ordner oder drei
+Sekunden) und sagt im Befund, wenn sie daran aufgehört hat – eine Liste, die man für
+vollständig hält, ist schlimmer als eine, die ihre Grenze nennt. Maschinelle Logbuch-
+Einträge wiederholen denselben Satz nicht mehr und kommen höchstens einmal am Tag; von Hand
+angestoßen weiterhin sofort.
+
+---
+
+## 0.7.0
 
 **Lotse lässt sich von einem Gerät wieder entfernen.** Bisher gab es dafür keinen Weg –
 weder ein Kommando noch einen Knopf. Wer Lotse loswerden wollte, löschte den Datenordner
