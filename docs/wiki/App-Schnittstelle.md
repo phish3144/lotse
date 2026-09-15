@@ -40,6 +40,8 @@ damit es nicht an fünf Orten halb passiert.
 | `wiederherstellungscode_pruefen` | `code` | Kalte Wiedereingabe zur Bestätigung nach der Einrichtung. |
 | `entsperren` | `passwort`, `desktop_schluessel` | Öffnet die Sitzung. |
 | `sperren` | – | Beendet sie. Der Schlüssel verlässt den Speicher; Beobachter und MCP-Zugang enden mit. |
+| `rechnername` | – | Name, unter dem das System diesen Rechner kennt. Die Einrichtung schlägt ihn als Gerätenamen vor. |
+| `zuruecksetzen` | – | Entfernt Lotse von diesem Gerät: Kontodatei, Datenbank und Desktop-Schlüssel im Schlüsselbund. Schließt vorher die Sitzung, sonst hält Windows die Datenbank fest. Braucht kein Passwort; die Rückfrage leistet die Oberfläche ([[Einstellungen]]). |
 | `konto_wiederherstellen` | `code`, `neues_passwort` | Der Weg für ein vergessenes Master-Passwort. |
 | `passwort_aendern` | `altes_passwort`, `neues_passwort`, `code` | Wechselt das Passwort. Der Wiederherstellungscode muss dabei neu verankert werden, weil er am Salt hängt – daher der neue Code als Rückgabe. |
 | `auto_lock` / `auto_lock_setzen` | – / `minuten` | Minuten bis zum selbsttätigen Sperren; `0` = nie. |

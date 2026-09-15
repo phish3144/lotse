@@ -27,6 +27,23 @@ pub struct Konto {
     pub geraet_name: String,
 }
 
+/// Name dieses Rechners, wie ihn das System kennt. Wird beim Einrichten als Gerätename
+/// vorgeschlagen: »MacBook-Pro« sagt in der Geräteliste mehr als »Dieser Rechner«, und
+/// niemand tippt ihn gern selbst ab.
+///
+/// macOS hängt an den Hostnamen oft `.local`; das gehört zum Netz, nicht zum Gerät.
+/// Liefert das System nichts Brauchbares, bleibt es beim alten Platzhalter – ein leerer
+/// Eintrag in der Geräteliste wäre schlimmer als ein unspezifischer.
+pub fn rechnername() -> String {
+    let roh = gethostname::gethostname().to_string_lossy().to_string();
+    let sauber = roh.trim().trim_end_matches(".local").trim();
+    if sauber.is_empty() {
+        "Dieser Rechner".to_string()
+    } else {
+        sauber.to_string()
+    }
+}
+
 pub fn pfad(home: &Path) -> PathBuf {
     home.join(DATEI)
 }
@@ -116,16 +133,44 @@ pub fn einrichten(
     })
 }
 
-/// Entfernt eine begonnene Einrichtung wieder (z. B. wenn die Bestätigung des
-/// Wiederherstellungscodes scheitert).
-pub fn verwerfen(home: &Path) -> Result<()> {
+/// Was beim Zurücksetzen tatsächlich verschwunden ist. Wird angezeigt, damit niemand
+/// raten muss, ob der Schlüsselbund mit drankam.
+#[derive(Debug, Clone, Serialize)]
+pub struct Zuruecksetzung {
+    pub dateien: usize,
+    pub schluesselbund: bool,
+}
+
+/// Entfernt Lotse von diesem Gerät: Kontodatei, Datenbank und der Desktop-Schlüssel im
+/// OS-Schlüsselbund.
+///
+/// Der Schlüsselbund ist der Grund, warum das eine eigene Funktion ist. Wer nur den
+/// Datenordner löscht, lässt ein Geheimnis zurück, das danach niemand mehr zuordnen kann
+/// – die Geräte-ID steht ja in der Datei, die man gerade gelöscht hat. Deshalb wird sie
+/// hier zuerst gelesen.
+///
+/// Ein fehlender oder gesperrter Schlüsselbund bricht das Löschen nicht ab: ein Rechner
+/// ohne Secret Service soll sich trotzdem zurücksetzen lassen. Das Feld `schluesselbund`
+/// sagt, ob der Eintrag wirklich weg ist.
+pub fn zuruecksetzen(home: &Path) -> Result<Zuruecksetzung> {
+    let geraet_id = lesen(home).ok().map(|k| k.geraet_id);
+    let schluesselbund = match geraet_id {
+        Some(id) => cfg!(feature = "keychain") && desktop_key_loeschen(id).is_ok(),
+        None => false,
+    };
+
+    let mut dateien = 0;
     for f in [DATEI, DB_DATEI, "lotse.db-wal", "lotse.db-shm"] {
         let p = home.join(f);
         if p.exists() {
             std::fs::remove_file(p)?;
+            dateien += 1;
         }
     }
-    Ok(())
+    Ok(Zuruecksetzung {
+        dateien,
+        schluesselbund,
+    })
 }
 
 pub struct Entsperrt {
@@ -235,6 +280,26 @@ pub fn desktop_key_laden(geraet_id: Ulid) -> Result<Option<DesktopKey>> {
     }
 }
 
+/// Entfernt den Desktop-Schlüssel aus dem OS-Schlüsselbund. Auch dann `Ok`, wenn gar
+/// keiner abgelegt war – gewollt ist der Zustand, nicht die Handlung.
+pub fn desktop_key_loeschen(geraet_id: Ulid) -> Result<()> {
+    #[cfg(feature = "keychain")]
+    {
+        let entry = keyring::Entry::new(KEYRING_DIENST, &format!("desktop-key/{geraet_id}"))
+            .map_err(|e| Error::Other(format!("Schlüsselbund: {e}")))?;
+        match entry.delete_credential() {
+            Ok(()) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(Error::Other(format!("Schlüsselbund: {e}"))),
+        }
+    }
+    #[cfg(not(feature = "keychain"))]
+    {
+        let _ = geraet_id;
+        Ok(())
+    }
+}
+
 /// Desktop-Schlüssel aus der Umgebung (`LOTSE_DESKTOP_KEY`), für Skripte und Rechner ohne
 /// Schlüsselbund.
 pub fn desktop_key_aus_umgebung() -> Result<Option<DesktopKey>> {
@@ -274,8 +339,28 @@ mod tests {
             KdfParams::schnell_fuer_tests()
         )
         .is_err());
-        verwerfen(&home).unwrap();
+        let z = zuruecksetzen(&home).unwrap();
+        assert!(z.dateien >= 2, "Kontodatei und Datenbank müssen fallen");
         assert!(!existiert(&home));
+        assert!(!home.join(DB_DATEI).exists());
+    }
+
+    #[test]
+    fn zuruecksetzen_ohne_konto_ist_kein_fehler() {
+        // Wer zweimal zurücksetzt, hat nicht weniger Anspruch auf einen leeren Ordner
+        // als beim ersten Mal.
+        let t = tempfile::tempdir().unwrap();
+        let z = zuruecksetzen(t.path()).unwrap();
+        assert_eq!(z.dateien, 0);
+        assert!(!z.schluesselbund);
+    }
+
+    #[test]
+    fn rechnername_ist_nie_leer() {
+        // Ein leerer Eintrag in der Geräteliste wäre schlimmer als ein unspezifischer.
+        let n = rechnername();
+        assert!(!n.trim().is_empty());
+        assert!(!n.ends_with(".local"));
     }
 
     #[test]

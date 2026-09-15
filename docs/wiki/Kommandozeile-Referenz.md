@@ -34,7 +34,7 @@ Desktop-Schlüssel.
 
 | Option | Standard | Bedeutung |
 |---|---|---|
-| `--geraet <NAME>` | `Dieser Rechner` | Name dieses Geräts. Steht später in `lotse sync geraete`. |
+| `--geraet <NAME>` | Name des Rechners laut System | Name dieses Geräts. Steht später in `lotse sync geraete`. Ohne Angabe fragt Lotse das System (auf macOS ohne das angehängte `.local`); liefert es nichts, bleibt es bei `Dieser Rechner`. |
 | `--ohne-bestaetigung` | aus | Überspringt das Abtippen des Wiederherstellungscodes. Nur für Skripte; gleichbedeutend mit `LOTSE_SKIP_CONFIRM=1`. |
 | `--sync-url <URL>` | – | Registriert sofort beim Sync-Dienst. Nur zusammen mit `--email`. |
 | `--email <ADRESSE>` | – | Adresse für die Registrierung. |
@@ -61,6 +61,37 @@ sind ab hier **nicht mehr abrufbar**; mehr dazu in [[Schlüssel und Krypto|Schlu
 hast einen Ort für Notizen über das Werkzeug.
 
 ---
+
+### `lotse zuruecksetzen`
+
+Entfernt Lotse von diesem Gerät: die Kontodatei, die Datenbank samt `-wal`/`-shm` und
+den Desktop-Schlüssel aus dem Schlüsselbund ([[Datenablage]]). Was auf anderen Geräten
+und beim Abgleich liegt, bleibt unberührt.
+
+Braucht **kein** Master-Passwort. Das ist Absicht: Wer es vergessen hat, ist genau der,
+der hier herauskommen will. Ohne Wiederherstellungscode ist das Konto danach für immer
+zu – der Ciphertext beim Abgleich bleibt liegen, aber niemand kann ihn mehr öffnen.
+
+| Option | Standard | Bedeutung |
+|---|---|---|
+| `--ich-bin-sicher` | aus | Ohne Rückfrage löschen. Nur für Skripte. |
+
+Ohne die Option zeigt Lotse, was verschwindet, und verlangt das Wort `LÖSCHEN`.
+
+```
+$ lotse zuruecksetzen
+Das entfernt Lotse von diesem Gerät:
+    /home/du/.local/share/lotse/konto.json
+    /home/du/.local/share/lotse/lotse.db
+    den Desktop-Schlüssel im Schlüsselbund
+
+Was auf anderen Geräten und beim Abgleich liegt, bleibt unberührt.
+Ohne Wiederherstellungscode kommst du an dieses Konto danach nicht mehr heran.
+
+Zum Bestätigen LÖSCHEN eingeben: LÖSCHEN
+2 Datei(en) gelöscht.
+Desktop-Schlüssel aus dem Schlüsselbund entfernt.
+```
 
 ## Erfassen
 
@@ -396,7 +427,7 @@ Meldet ein **neues Gerät** an einem bestehenden Konto an und holt alles herunte
 
 | Option | Standard |
 |---|---|
-| `--geraet <NAME>` | `Dieser Rechner` |
+| `--geraet <NAME>` | Name des Rechners laut System |
 
 ### `lotse sync jetzt`
 

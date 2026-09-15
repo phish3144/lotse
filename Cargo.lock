@@ -1257,6 +1257,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gethostname"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bd49230192a3797a9a4d6abe9b3eed6f7fa4c8a8a4947977c6f80025f92cbd8"
+dependencies = [
+ "rustix",
+ "windows-link",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1851,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-cli"
-version = "0.6.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1868,12 +1878,13 @@ dependencies = [
 
 [[package]]
 name = "lotse-core"
-version = "0.6.2"
+version = "0.7.0"
 dependencies = [
  "age",
  "argon2",
  "base64 0.22.1",
  "chacha20poly1305",
+ "gethostname",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
  "globset",
@@ -2666,9 +2677,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.43"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "log",
  "once_cell",

@@ -114,6 +114,38 @@ fn konto_status(state: State<AppState>) -> R<KontoStatus> {
     })
 }
 
+/// Name, unter dem das System diesen Rechner kennt. Die Oberfläche schlägt ihn beim
+/// Einrichten vor, statt jeden »Dieser Rechner« nennen zu lassen.
+#[tauri::command]
+fn rechnername() -> String {
+    konto::rechnername()
+}
+
+#[derive(Serialize)]
+struct Zuruecksetzung {
+    dateien: usize,
+    schluesselbund: bool,
+}
+
+/// Entfernt Lotse von diesem Gerät. Erst die Sitzung schließen – solange die Datenbank
+/// offen ist, lässt sie sich unter Windows nicht löschen, und der Beobachter würde
+/// weiterlaufen. Danach fallen Dateien und Schlüsselbund-Eintrag.
+///
+/// Braucht bewusst kein Passwort: Wer es vergessen hat, ist genau der, der hier
+/// herauskommen will. Die Bestätigung leistet die Oberfläche.
+#[tauri::command]
+fn zuruecksetzen(state: State<AppState>) -> R<Zuruecksetzung> {
+    let h = home(&state)?;
+    beobachter_stoppen(state.clone())?;
+    mcp_stoppen(state.clone())?;
+    *sperre(&state.sitzung) = None;
+    let z = konto::zuruecksetzen(&h).map_err(fehler)?;
+    Ok(Zuruecksetzung {
+        dateien: z.dateien,
+        schluesselbund: z.schluesselbund,
+    })
+}
+
 #[derive(Serialize)]
 struct Geheimnisse {
     wiederherstellungscode: String,
@@ -2366,6 +2398,8 @@ pub fn run() {
             kandidaten,
             kandidat_uebernehmen,
             kandidat_verwerfen,
+            rechnername,
+            zuruecksetzen,
             scan,
             ordner_waehlen,
             datei_waehlen,

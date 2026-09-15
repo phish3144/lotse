@@ -93,9 +93,21 @@ export interface Geheimnisse {
   schluesselbund: boolean;
 }
 
+export interface Zuruecksetzung {
+  dateien: number;
+  schluesselbund: boolean;
+}
+
 /** Konto-Befehle, die vor dem Datenprovider liegen. */
 export const konto = {
   status: () => invoke<KontoStatus>('konto_status'),
+  /** Name, unter dem das System diesen Rechner kennt – Vorschlag für den Gerätenamen. */
+  rechnername: () => invoke<string>('rechnername'),
+  /**
+   * Entfernt Lotse von diesem Gerät: Kontodatei, Datenbank und der Desktop-Schlüssel
+   * im Schlüsselbund. Nicht rückgängig zu machen; die Rückfrage leistet die Oberfläche.
+   */
+  zuruecksetzen: () => invoke<Zuruecksetzung>('zuruecksetzen'),
   einrichten: (passwort: string, geraet: string) => invoke<Geheimnisse>('einrichten', { passwort, geraet }),
   codePruefen: (code: string) => invoke<boolean>('wiederherstellungscode_pruefen', { code }),
   entsperren: (passwort: string, desktopSchluessel?: string) =>

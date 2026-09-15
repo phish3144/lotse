@@ -39,9 +39,9 @@ struct Cli {
 enum Cmd {
     /// Konto und Datenbank auf diesem Gerät einrichten
     Init {
-        /// Name dieses Geräts
-        #[arg(long, default_value = "Dieser Rechner")]
-        geraet: String,
+        /// Name dieses Geräts (Standard: der Name, unter dem das System diesen Rechner kennt)
+        #[arg(long)]
+        geraet: Option<String>,
         /// Bestätigung des Wiederherstellungscodes überspringen (nur für Skripte;
         /// alternativ Umgebungsvariable LOTSE_SKIP_CONFIRM)
         #[arg(long)]
@@ -51,6 +51,14 @@ enum Cmd {
         sync_url: Option<String>,
         #[arg(long)]
         email: Option<String>,
+    },
+    /// Lotse von diesem Gerät entfernen: Kontodatei, Datenbank und der Desktop-Schlüssel
+    /// im Schlüsselbund. Braucht kein Passwort – sonst käme niemand hier heraus, der es
+    /// vergessen hat.
+    Zuruecksetzen {
+        /// Ohne Rückfrage löschen (nur für Skripte)
+        #[arg(long)]
+        ich_bin_sicher: bool,
     },
     /// Startseite: alle Projekte mit Auffälligkeit
     Hafen,
@@ -141,8 +149,9 @@ enum SyncCmd {
         url: String,
         #[arg(long)]
         email: String,
-        #[arg(long, default_value = "Dieser Rechner")]
-        geraet: String,
+        /// Name dieses Geräts (Standard: der Name, unter dem das System diesen Rechner kennt)
+        #[arg(long)]
+        geraet: Option<String>,
     },
     /// Jetzt abgleichen: pushen, dann pullen
     Jetzt,
@@ -286,14 +295,24 @@ fn run() -> Result<()> {
     {
         return init(
             &home,
-            geraet,
+            &geraet.clone().unwrap_or_else(konto::rechnername),
             *ohne_bestaetigung,
             sync_url.as_deref(),
             email.as_deref(),
         );
     }
     if let Cmd::Sync(SyncCmd::Login { url, email, geraet }) = &cli.cmd {
-        return sync_login(&home, url, email, geraet);
+        return sync_login(
+            &home,
+            url,
+            email,
+            &geraet.clone().unwrap_or_else(konto::rechnername),
+        );
+    }
+    // Zurücksetzen muss ohne Passwort gehen: wer es vergessen hat, ist genau der,
+    // der hier herauskommen will.
+    if let Cmd::Zuruecksetzen { ich_bin_sicher } = &cli.cmd {
+        return zuruecksetzen(&home, *ich_bin_sicher);
     }
     // Nachsehen, ob es eine neuere Version gibt, geht ohne Konto und ohne Passwort.
     if let Cmd::Update = &cli.cmd {
@@ -307,7 +326,7 @@ fn run() -> Result<()> {
         auth_key,
     } = oeffnen(&home)?;
     match cli.cmd {
-        Cmd::Init { .. } | Cmd::Update => unreachable!(),
+        Cmd::Init { .. } | Cmd::Update | Cmd::Zuruecksetzen { .. } => unreachable!(),
         Cmd::Hafen => hafen(&store),
         Cmd::Log {
             text,
@@ -655,6 +674,37 @@ fn beobachten(
 
 // ------------------------------------------------------------------ konto
 
+/// Entfernt Lotse von diesem Gerät. Fragt zurück, weil es nicht rückgängig zu machen ist,
+/// und sagt vorher genau, was verschwindet.
+fn zuruecksetzen(home: &Path, ich_bin_sicher: bool) -> Result<()> {
+    if !konto::existiert(home) {
+        println!("In {} ist nichts eingerichtet.", home.display());
+        return Ok(());
+    }
+    if !ich_bin_sicher {
+        println!("Das entfernt Lotse von diesem Gerät:");
+        println!("    {}", konto::pfad(home).display());
+        println!("    {}", home.join(konto::DB_DATEI).display());
+        println!("    den Desktop-Schlüssel im Schlüsselbund");
+        println!();
+        println!("Was auf anderen Geräten und beim Abgleich liegt, bleibt unberührt.");
+        println!("Ohne Wiederherstellungscode kommst du an dieses Konto danach nicht mehr heran.");
+        println!();
+        let eingabe = zeile_lesen("Zum Bestätigen LÖSCHEN eingeben: ")?;
+        if eingabe.trim() != "LÖSCHEN" {
+            bail!("Abgebrochen. Es wurde nichts gelöscht.");
+        }
+    }
+    let z = konto::zuruecksetzen(home)?;
+    println!("{} Datei(en) gelöscht.", z.dateien);
+    if z.schluesselbund {
+        println!("Desktop-Schlüssel aus dem Schlüsselbund entfernt.");
+    } else {
+        println!("Im Schlüsselbund war nichts zu entfernen (oder es gibt keinen).");
+    }
+    Ok(())
+}
+
 fn init(
     home: &Path,
     geraet: &str,
@@ -702,7 +752,7 @@ fn init(
             .unwrap_or(false);
         if !ok {
             drop(e);
-            konto::verwerfen(home)?;
+            konto::zuruecksetzen(home)?;
             bail!("Der eingegebene Code ist falsch. Einrichtung verworfen.");
         }
     }
@@ -785,6 +835,20 @@ fn sync_login(home: &Path, url: &str, email: &str, geraet: &str) -> Result<()> {
         store.projekte()?.len()
     );
     Ok(())
+}
+
+/// Eine sichtbare Zeile einlesen. Für Bestätigungen – die sind kein Geheimnis und
+/// sollen gelesen werden können, bevor man sie abschickt.
+fn zeile_lesen(prompt: &str) -> Result<String> {
+    use std::io::{BufRead, Write};
+    print!("{prompt}");
+    std::io::stdout().flush().context("Ausgabe")?;
+    let mut zeile = String::new();
+    std::io::stdin()
+        .lock()
+        .read_line(&mut zeile)
+        .context("Eingabe")?;
+    Ok(zeile)
 }
 
 fn passwort_abfragen(prompt: &str) -> Result<Zeroizing<String>> {

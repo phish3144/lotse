@@ -17,6 +17,11 @@ einer unerwarteten Stelle liegt.
 Überschreibbar mit `--home <PFAD>` oder `LOTSE_HOME` ([[Umgebungsvariablen]]). App und
 Kommandozeile benutzen **denselben** Ordner – zwei Oberflächen, ein Bestand.
 
+Der Ordner liegt im Benutzerprofil, nicht beim Programm. Deshalb überlebt er ein Update
+und eine Deinstallation: ein Update darf kein Datenverlust sein. Wer wirklich alles
+loswerden will, nimmt `lotse zuruecksetzen` ([[Kommandozeile-Referenz]]) oder den Knopf
+in den [[Einstellungen]] – Handarbeit vergisst sonst den Schlüsselbund.
+
 Darin liegen genau zwei Dateien:
 
 ```
@@ -30,6 +35,19 @@ Der Konto-Kopf. Enthält den Salt, die KDF-Parameter, die **gewrappten** Schlüs
 die Geräte-ID. Keine Geheimnisse im Klartext: ohne Master-Passwort ist die Datei
 nutzlos. Sie darf in eine Sicherung, und sie muss dort hinein – ohne sie ist die
 Datenbank nicht aufzuschließen.
+
+### Außerhalb des Ordners
+
+Zwei Dinge liegen nicht im Datenordner und überleben deshalb auch dessen Löschung:
+
+| Wo | Was | Wer räumt auf |
+|---|---|---|
+| OS-Schlüsselbund, Dienst `app.lotse.desktop`, Eintrag `desktop-key/<geräte-id>` | Der Desktop-Schlüssel für Tresor-Einträge der Stufe »nur dieses Gerät« ([[Schluessel-und-Krypto]]) | `lotse zuruecksetzen` und der Knopf in den [[Einstellungen]] |
+| Speicher der Oberfläche, Schlüssel `lotse.thema` | Die Themenwahl dieses Geräts ([[Einstellungen]]) | belanglos; enthält nichts von dir |
+
+Die Geräte-ID steht in `konto.json`. Wer die Datei zuerst löscht, findet den
+Schlüsselbund-Eintrag danach nicht mehr wieder – deshalb liest das Zurücksetzen sie,
+bevor es etwas anfasst.
 
 ### `lotse.db`
 

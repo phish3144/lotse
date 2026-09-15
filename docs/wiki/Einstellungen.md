@@ -9,6 +9,19 @@ abgeglichen – jedes Gerät hat seine eigenen Einstellungen ([[Datenablage]]).
 
 ---
 
+## Darstellung
+
+| Feld | Bedeutung |
+|---|---|
+| **Thema** | `Wie das System` (Standard), `Hell` oder `Dunkel`. |
+
+Ab Werk folgt Lotse dem Betriebssystem. Eine ausdrückliche Wahl schlägt das System in
+beide Richtungen – wer dunkel wählt, bleibt auch mittags dunkel.
+
+Die Wahl gilt **für dieses Gerät** und wird nicht abgeglichen. Sie liegt auch nicht in
+der Datenbank, sondern im Speicher der Oberfläche: der Sperrbildschirm erscheint, bevor
+irgendetwas entschlüsselt ist, und soll trotzdem schon richtig aussehen.
+
 ## Ordner
 
 Welche Wurzelordner Lotse durchsucht und beobachtet.
@@ -134,6 +147,20 @@ Danach wird ein **neuer Wiederherstellungscode** angezeigt, einmalig, mit *Habe 
 gesichert* zum Bestätigen. Der alte gilt nicht mehr.
 
 ---
+
+### Gerät zurücksetzen
+
+Entfernt Lotse von diesem Rechner: Kontodatei, Datenbank und den Desktop-Schlüssel aus
+dem Schlüsselbund ([[Datenablage]]). Was auf anderen Geräten und beim Abgleich liegt,
+bleibt unberührt.
+
+Die Bestätigung ist getippt, nicht geklickt: erst das Wort `LÖSCHEN` gibt den Knopf frei.
+Ein Klick aus Versehen ist möglich, ein getipptes Wort nicht. Danach startet Lotse neu und
+beginnt wieder mit der Einrichtung.
+
+> **Ohne Wiederherstellungscode ist das Konto danach zu.** Beim Abgleich bleibt der
+> Ciphertext liegen, aber niemand kann ihn mehr öffnen. Auf der Kommandozeile macht
+> `lotse zuruecksetzen` dasselbe ([[Kommandozeile-Referenz]]).
 
 ## Version
 

@@ -10,6 +10,7 @@
   import { meldungen } from './lib/meldung.svelte';
   import { router, zurueck } from './lib/router.svelte';
   import { sprung } from './lib/sprung.svelte';
+  import { kuerzel } from './lib/tasten';
   import Einstellungen from './routes/Einstellungen.svelte';
   import Hafen from './routes/Hafen.svelte';
   import OffenePunkte from './routes/OffenePunkte.svelte';
@@ -192,11 +193,11 @@
         <a href="#/einstellungen" class:aktiv={router.current.segmente[0] === 'einstellungen'}>Einstellungen</a>
       </nav>
       <div class="aktionen">
-        <button type="button" class="werkzeug" onclick={() => sprung.oeffnen()} title="Zu Projekt springen (Strg+P)">
-          Springen <kbd>⌘P</kbd>
+        <button type="button" class="werkzeug" onclick={() => sprung.oeffnen()} title={`Zu Projekt springen (${kuerzel('P')})`}>
+          Springen <kbd>{kuerzel('P')}</kbd>
         </button>
-        <button type="button" class="werkzeug" onclick={() => erfassung.oeffnen()} title="Schnellerfassung (Strg+K)">
-          Erfassen <kbd>⌘K</kbd>
+        <button type="button" class="werkzeug" onclick={() => erfassung.oeffnen()} title={`Schnellerfassung (${kuerzel('K')})`}>
+          Erfassen <kbd>{kuerzel('K')}</kbd>
         </button>
       </div>
     </header>

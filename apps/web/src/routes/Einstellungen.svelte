@@ -27,6 +27,7 @@
     type UpdateStand,
   } from '../lib/data/tauri';
   import { router } from '../lib/router.svelte';
+  import { setzen as themaSetzen, thema, THEMEN } from '../lib/thema.svelte';
   import { datumText } from '../lib/format';
   import { meldungen } from '../lib/meldung.svelte';
 
@@ -34,6 +35,7 @@
   // Der gewählte Bereich steht in der Adresse (#/einstellungen/ki). Das kostet nichts
   // und macht Lesezeichen, Zurück-Taste und „schick mir den Link“ möglich.
   const REITER = [
+    { id: 'darstellung', name: 'Darstellung' },
     { id: 'ordner', name: 'Ordner' },
     { id: 'verbindungen', name: 'Verbindungen' },
     { id: 'abgleich', name: 'Abgleich' },
@@ -47,6 +49,31 @@
     const gewaehlt = router.current.segmente[1];
     return REITER.some((r) => r.id === gewaehlt) ? gewaehlt : 'ordner';
   });
+
+  // --- Zurücksetzen ---------------------------------------------------------
+  // Getippte Bestätigung statt eines zweiten Knopfes: ein Klick aus Versehen ist
+  // möglich, ein getipptes Wort nicht.
+  let zrOffen = $state(false);
+  let zrEingabe = $state('');
+  let zrLaeuft = $state(false);
+
+  async function zuruecksetzen() {
+    if (zrEingabe.trim() !== 'LÖSCHEN') return;
+    zrLaeuft = true;
+    try {
+      const z = await konto.zuruecksetzen();
+      meldungen.zeigen(
+        z.schluesselbund
+          ? `${z.dateien} Dateien gelöscht, Schlüsselbund-Eintrag entfernt.`
+          : `${z.dateien} Dateien gelöscht. Im Schlüsselbund war nichts zu entfernen.`,
+      );
+      // Neu laden, damit die Einrichtung wieder von vorn beginnt.
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) {
+      meldungen.fehler(e);
+      zrLaeuft = false;
+    }
+  }
 
   // --- Ordner durchsuchen und beobachten ------------------------------------
   let wurzel = $state('');
@@ -551,6 +578,24 @@
     {/each}
   </nav>
   <div class="einst-inhalt">
+
+{#if reiter === 'darstellung'}
+  <section aria-labelledby="darstellung-titel">
+    <h2 id="darstellung-titel">Darstellung</h2>
+    <p class="hinweis">
+      Ab Werk folgt Lotse dem, was das Betriebssystem eingestellt hat. Wer es anders will,
+      wählt hier – die Wahl gilt für dieses Gerät und wird nicht abgeglichen.
+    </p>
+    <label class="zeile">
+      <span>Thema</span>
+      <select value={thema.wert} onchange={(e) => themaSetzen(e.currentTarget.value as (typeof THEMEN)[number]['id'])}>
+        {#each THEMEN as t (t.id)}
+          <option value={t.id}>{t.name}</option>
+        {/each}
+      </select>
+    </label>
+  </section>
+{/if}
 
 {#if reiter === 'ordner'}
 <section aria-labelledby="ordner-titel">
@@ -1171,12 +1216,52 @@
     </p>
     <button type="button" onclick={sperren}>Jetzt sperren</button>
   </section>
+
+  <section aria-labelledby="zuruecksetzen-titel" class="gefahr">
+    <h2 id="zuruecksetzen-titel">Gerät zurücksetzen</h2>
+    <p class="hinweis">
+      Entfernt Lotse von diesem Rechner: die Kontodatei, die Datenbank und den
+      Desktop-Schlüssel aus dem Schlüsselbund. Was auf anderen Geräten und beim Abgleich
+      liegt, bleibt unberührt. <strong>Ohne Wiederherstellungscode kommst du an dieses
+      Konto danach nicht mehr heran.</strong>
+    </p>
+    {#if zrOffen}
+      <label class="zeile">
+        <span>Zum Bestätigen <code>LÖSCHEN</code> eingeben</span>
+        <input bind:value={zrEingabe} type="text" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="aktionen">
+        <button type="button" onclick={() => { zrOffen = false; zrEingabe = ''; }}>Abbrechen</button>
+        <button type="button" class="warnend" disabled={zrEingabe.trim() !== 'LÖSCHEN' || zrLaeuft} onclick={zuruecksetzen}>
+          {zrLaeuft ? 'Lösche …' : 'Endgültig löschen'}
+        </button>
+      </div>
+    {:else}
+      <button type="button" onclick={() => (zrOffen = true)}>Gerät zurücksetzen …</button>
+    {/if}
+  </section>
 {/if}
 {/if}
   </div>
 </div>
 
 <style>
+  .gefahr {
+    border: 1px solid var(--farbe-ueberfaellig);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .gefahr h2 {
+    color: var(--farbe-ueberfaellig);
+  }
+  .warnend {
+    background: var(--farbe-ueberfaellig);
+    border-color: var(--farbe-ueberfaellig);
+    color: #fff;
+  }
+  .warnend:disabled {
+    opacity: 0.5;
+  }
   h1 {
     font-size: 1.7rem;
     font-family: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;

@@ -10,7 +10,7 @@
 
   let passwort = $state('');
   let passwort2 = $state('');
-  let geraet = $state('Dieser Rechner');
+  let geraet = $state('');
   let desktopSchluessel = $state('');
   let geheimnisse = $state<Geheimnisse | null>(null);
   let codeEingabe = $state('');
@@ -48,6 +48,17 @@
         if (s.entsperrt) fertig();
       })
       .catch((e) => (fehler = String(e)));
+  });
+
+  // Der Rechner hat schon einen Namen; ihn abtippen zu lassen wäre Arbeit ohne Ertrag.
+  // Änderbar bleibt er trotzdem – in der Geräteliste steht er später neben den anderen.
+  $effect(() => {
+    konto
+      .rechnername()
+      .then((n) => {
+        if (!geraet) geraet = n;
+      })
+      .catch(() => (geraet ||= 'Dieser Rechner'));
   });
 
   async function einrichten(ev: SubmitEvent) {

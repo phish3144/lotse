@@ -77,3 +77,10 @@ lotse log "Beton bestellt" -p Gartenhaus
 
 Wer das oft braucht, legt sich ein Kürzel in der Shell an – Beispiele in
 [[Kommandozeile]].
+
+## Wie die Kürzel angezeigt werden
+
+Lotse horcht immer auf beide Modifikatoren – `Strg` und die Befehlstaste funktionieren
+überall. Angezeigt wird nur das jeweils Richtige: `⌘K` auf Apple-Geräten, `Strg+K` auf
+Windows und Linux. Ein `⌘` auf einem Linux-Rechner ist schlicht falsch, auch wenn die
+Taste daneben tut, was sie soll.

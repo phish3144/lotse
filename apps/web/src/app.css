@@ -28,8 +28,14 @@
   color-scheme: light dark;
 }
 
+/* Standard ist der Systemstandard. Eine ausdrückliche Wahl in den Einstellungen setzt
+   `data-thema` am Wurzelelement und schlägt das System – in beide Richtungen.
+
+   Der dunkle Satz steht zweimal, weil CSS keinen Weg kennt, eine Regel gleichzeitig an
+   eine Medienabfrage und an einen Selektor zu hängen. Beide Blöcke sind erzeugt und
+   müssen gleich bleiben. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-thema='hell']) {
     --hintergrund: #0b1b2b; /* unteres Ende des Logo-Verlaufs */
     --fg: #e8e1d1; /* der Kreis im Logo */
     --karten-hintergrund: #14263a;
@@ -45,6 +51,31 @@
     --farbe-ueberfaellig: #e0685c;
     --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
+}
+
+:root[data-thema='dunkel'] {
+    --hintergrund: #0b1b2b; /* unteres Ende des Logo-Verlaufs */
+    --fg: #e8e1d1; /* der Kreis im Logo */
+    --karten-hintergrund: #14263a;
+    --flaeche-still: #102032;
+    --rahmen: #24405a;
+    --rahmen-still: #1b3349;
+    --linie: #325873;
+    --text-gedaempft: #93a7b8;
+    --akzent: #7fb4d4;
+    --feuer: #f2b544; /* bleibt gleich: es ist das Leuchtfeuer, nicht Dekoration */
+    --farbe-ruhig: #7bc28c;
+    --farbe-auffaellig: #d9a441;
+    --farbe-ueberfaellig: #e0685c;
+    --schatten: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-thema='hell'] {
+  color-scheme: light;
+}
+
+:root[data-thema='dunkel'] {
+  color-scheme: dark;
 }
 
 * {

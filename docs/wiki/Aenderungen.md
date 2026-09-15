@@ -13,7 +13,37 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.6.2 — laufende Fassung
+## 0.7.0 — laufende Fassung
+
+**Lotse lässt sich von einem Gerät wieder entfernen.** Bisher gab es dafür keinen Weg –
+weder ein Kommando noch einen Knopf. Wer Lotse loswerden wollte, löschte den Datenordner
+von Hand und ließ dabei jedes Mal den Desktop-Schlüssel im Schlüsselbund zurück, weil die
+Geräte-ID in genau der Datei steht, die man gerade gelöscht hatte. Jetzt gibt es
+`lotse zuruecksetzen` ([[Kommandozeile-Referenz]]) und **Einstellungen → Sicherheit →
+Gerät zurücksetzen** ([[Einstellungen]]). Beide räumen Kontodatei, Datenbank **und**
+Schlüsselbund ab, und beide brauchen kein Master-Passwort: Wer es vergessen hat, ist genau
+der, der hier herauskommen will. Bestätigt wird getippt, nicht geklickt.
+
+**Der Gerätename kommt jetzt vom System.** Beim Einrichten stand »Dieser Rechner« im Feld,
+und wer nichts änderte, hatte in `lotse sync geraete` drei Zeilen, die alle gleich hießen.
+Jetzt schlägt Lotse den Namen vor, unter dem der Rechner ohnehin bekannt ist – auf macOS
+ohne das angehängte `.local`. Ändern kann man ihn weiterhin.
+
+**Die Tastenkürzel zeigen das Richtige.** In der Kopfzeile stand `⌘P` und `⌘K`, auch auf
+Windows und Linux, wo die Taste nicht existiert. Gehorcht hat Lotse immer beiden
+Modifikatoren; jetzt steht dort auch `Strg+P` und `Strg+K`, wo es hingehört
+([[Tastenkuerzel]]).
+
+**Das Thema ist umschaltbar.** Standard bleibt, was das Betriebssystem sagt – neu ist, dass
+man es unter **Einstellungen → Darstellung** überstimmen kann, in beide Richtungen. Die
+Wahl gilt für dieses Gerät und wird nicht abgeglichen.
+
+Unter der Haube: `rustls` auf 0.23.45 gehoben (RUSTSEC-2026-0285, TLS-1.3-Handshake-
+Nachrichten wurden auf der falschen Verschlüsselungsebene angenommen).
+
+---
+
+## 0.6.2
 
 **Die Landing Page läuft unter [lotse.sanctora.eu](https://lotse.sanctora.eu/), und der
 Updater fragt dort zuerst nach.** Bis 0.6.1 stand dort die GitHub-Adresse; die bleibt als
