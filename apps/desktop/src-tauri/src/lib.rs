@@ -501,10 +501,26 @@ fn postkorb(state: State<AppState>) -> R<Projekt> {
     mit(&state, |s| s.store.postkorb())
 }
 
+/// Löscht ein Projekt – samt der Marker in seinen Ordnern.
+///
+/// Ohne das Aufräumen wäre Löschen keine Rücknahme: der Ordner bliebe »gehört schon zu
+/// einem Projekt«, ließe sich also nie wieder anlegen. Und genau das Einzelne wieder
+/// loszuwerden ist der Weg zurück aus einem Befund, den man zu weit abgehakt hat.
 #[tauri::command]
 fn projekt_loeschen(state: State<AppState>, id: String) -> R<()> {
     let id = ulid(&id)?;
-    mit(&state, |s| s.store.projekt_loeschen(id))
+    mit(&state, |s| {
+        for r in s.store.referenzen(id)? {
+            if matches!(r.typ, ReferenzTyp::Ordner | ReferenzTyp::GitRepo) {
+                let pfad = std::path::Path::new(&r.ziel);
+                // Nur den eigenen Marker: ein fremder gehört einem anderen Projekt.
+                if lotse_core::detect::marker_lesen(pfad) == Some(id) {
+                    lotse_core::detect::marker_entfernen(pfad);
+                }
+            }
+        }
+        s.store.projekt_loeschen(id)
+    })
 }
 
 #[tauri::command]
@@ -692,7 +708,8 @@ fn kandidat_verwerfen(state: State<AppState>, pfad: String) -> R<()> {
 fn scan(state: State<AppState>, wurzeln: Vec<String>) -> R<Vec<Kandidat>> {
     let roots: Vec<PathBuf> = wurzeln.into_iter().map(PathBuf::from).collect();
     mit(&state, |s| {
-        let alle = lotse_core::detect::scan(&roots, &lotse_core::detect::ScanOptionen::default())?;
+        let alle = lotse_core::detect::scan(&roots, &lotse_core::detect::ScanOptionen::default())?
+            .kandidaten;
         let neu: Vec<Kandidat> = alle
             .into_iter()
             .filter(|k| {
@@ -704,6 +721,270 @@ fn scan(state: State<AppState>, wurzeln: Vec<String>) -> R<Vec<Kandidat>> {
         s.store.kandidaten_merken(&neu)?;
         Ok(neu)
     })
+}
+
+// ------------------------------------------------------------------ Deuten
+
+/// Woher gedeutet werden soll. Ein einziger Eingang für alles, was man anhängen kann –
+/// Ordner, Adresse, Dateien. Die Oberfläche fragt nach der Herkunft, nicht nach Feldern.
+#[derive(Deserialize)]
+#[serde(tag = "art", rename_all = "snake_case")]
+enum QuelleEingabe {
+    Ordner { pfad: String },
+    Adresse { url: String },
+    Dateien { pfade: Vec<String> },
+}
+
+/// Der Befund plus die Antwort auf die eine Frage, die der Kern nicht beantworten kann:
+/// Gibt es das Projekt, auf das der Marker zeigt, überhaupt noch?
+#[derive(Serialize)]
+struct Deutung {
+    befund: lotse_core::deuten::Befund,
+    /// Gesetzt, wenn die Quelle schon zu einem Projekt gehört. Dann wird nichts angelegt,
+    /// sondern angehängt.
+    bekannt: Option<Projekt>,
+}
+
+/// Deutet eine Quelle und liefert Feststellungen, keine Fragen. Schreibt nichts – außer
+/// einem Marker, der ins Leere zeigt, wegzuräumen.
+#[tauri::command]
+fn quelle_deuten(state: State<AppState>, quelle: QuelleEingabe) -> R<Deutung> {
+    use lotse_core::deuten::{deuten, Fund, Quelle as DeutQuelle};
+
+    let q = match quelle {
+        QuelleEingabe::Ordner { pfad } => DeutQuelle::Ordner(PathBuf::from(pfad)),
+        QuelleEingabe::Adresse { url } => DeutQuelle::Adresse(url.trim().to_string()),
+        QuelleEingabe::Dateien { pfade } => {
+            DeutQuelle::Dateien(pfade.into_iter().map(PathBuf::from).collect())
+        }
+    };
+    let opt = lotse_core::detect::ScanOptionen::default();
+    let befund = deuten(&q, &opt).map_err(fehler)?;
+
+    let schon = befund.funde.iter().find_map(|f| match f {
+        Fund::SchonBekannt { id, pfad } => Some((*id, pfad.clone())),
+        _ => None,
+    });
+    let Some((id, pfad)) = schon else {
+        return Ok(Deutung {
+            befund,
+            bekannt: None,
+        });
+    };
+    if let Some(p) = mit(&state, |s| s.store.projekt(id))? {
+        return Ok(Deutung {
+            befund,
+            bekannt: Some(p),
+        });
+    }
+    // Der Marker zeigt auf ein gelöschtes Projekt. Der Ordner ist frei; ihn weiter als
+    // bekannt zu melden hiesse, ihn für immer zu sperren.
+    lotse_core::detect::marker_entfernen(std::path::Path::new(&pfad));
+    Ok(Deutung {
+        befund: deuten(&q, &opt).map_err(fehler)?,
+        bekannt: None,
+    })
+}
+
+/// Was aus dem Befund werden soll. Die Oberfläche schickt, was abgehakt geblieben ist;
+/// hier wird nichts mehr entschieden und nichts mehr erraten.
+#[derive(Deserialize)]
+struct AnlegenAuftrag {
+    titel: String,
+    kurs: Option<String>,
+    vorlage: String,
+    /// Der gedeutete Ordner: wird Referenz, bekommt den Marker, liefert die Git-Historie.
+    ordner: Option<String>,
+    /// Adresse der Gegenseite, als Referenz.
+    remote: Option<String>,
+    /// Abgehakte Unterprojekte – je ein eigenes Projekt.
+    unterprojekte: Vec<String>,
+    /// Abgehakte Dokumente – Referenzen am Hauptprojekt.
+    dokumente: Vec<String>,
+    /// Statt anzulegen an dieses Projekt anhängen.
+    an_projekt: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AnlegeBilanz {
+    /// Das Haupt-Projekt – neu angelegt oder das, an das angehängt wurde.
+    projekt: Projekt,
+    unterprojekte: Vec<Projekt>,
+    referenzen: usize,
+}
+
+/// Satz für das Logbuch: was gedeutet wurde. Leer, wenn es nichts zu erzählen gibt –
+/// ein von Hand angelegtes Projekt braucht keinen Eintrag über seine Herkunft.
+fn deutung_satz(a: &AnlegenAuftrag, unterprojekte: usize) -> Option<String> {
+    let mut teile = Vec::new();
+    if let Some(o) = a.ordner.as_deref() {
+        teile.push(format!("Ordner {o}"));
+    }
+    if let Some(r) = a.remote.as_deref() {
+        teile.push(format!("Gegenseite {r}"));
+    }
+    if unterprojekte > 0 {
+        teile.push(format!("{unterprojekte} Unterprojekt(e)"));
+    }
+    if !a.dokumente.is_empty() {
+        teile.push(format!("{} Dokument(e)", a.dokumente.len()));
+    }
+    if teile.is_empty() {
+        return None;
+    }
+    Some(format!("Gedeutet: {}.", teile.join(", ")))
+}
+
+/// Legt an, was im Befund abgehakt geblieben ist. Ein Aufruf, ein Ergebnis – wer hier
+/// abbricht, hinterlässt kein halbes Projekt, weil alles über denselben Speicher läuft.
+#[tauri::command]
+fn aus_befund_anlegen(state: State<AppState>, auftrag: AnlegenAuftrag) -> R<AnlegeBilanz> {
+    let an = match auftrag.an_projekt.as_deref() {
+        Some(s) => Some(ulid(s)?),
+        None => None,
+    };
+    let vorlage = Vorlage::parse(&auftrag.vorlage).unwrap_or(Vorlage::Generisch);
+    let titel = auftrag.titel.trim().to_string();
+    if an.is_none() && titel.is_empty() {
+        return Err("Ohne Titel kein Projekt".into());
+    }
+
+    mit(&state, |s| {
+        let mut ts = now_ms();
+        let mut naechster = || {
+            ts += 1;
+            ts
+        };
+        let mut referenzen = 0usize;
+
+        let projekt = match an {
+            Some(id) => s
+                .store
+                .projekt(id)?
+                .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?,
+            None => {
+                let mut p = Projekt::neu(&titel, vorlage, naechster());
+                p.kurs = auftrag.kurs.as_deref().unwrap_or_default().trim().to_string();
+                s.store.projekt_speichern(&p)?;
+                if p.kurs.is_empty() {
+                    s.store.notiz_speichern(&Notiz::neu(
+                        p.id,
+                        Quelle::Import,
+                        Art::Offen,
+                        "Kurs festlegen: worum geht es, was ist das Ziel?",
+                        naechster(),
+                    ))?;
+                }
+                p
+            }
+        };
+
+        if let Some(pfad) = auftrag.ordner.as_deref().filter(|p| !p.trim().is_empty()) {
+            let pf = std::path::Path::new(pfad);
+            let hat_git = pf.join(".git").is_dir();
+            let typ = if hat_git {
+                ReferenzTyp::GitRepo
+            } else {
+                ReferenzTyp::Ordner
+            };
+            s.store
+                .referenz_speichern(&Referenz::neu(projekt.id, typ, pfad, Rolle::Material))?;
+            referenzen += 1;
+            if hat_git {
+                let commits = lotse_core::git::log(pf, None, 500)?;
+                for n in lotse_core::git::verdichten(projekt.id, &commits, Quelle::Import) {
+                    s.store.notiz_speichern(&n)?;
+                }
+            }
+            // Der Marker macht den Ordner wiedererkennbar: beim nächsten Deuten steht
+            // »gehört schon dazu« da, statt dass ein zweites Projekt entsteht.
+            lotse_core::detect::marker_schreiben(pf, projekt.id).ok();
+        }
+
+        if let Some(url) = auftrag.remote.as_deref().filter(|u| !u.trim().is_empty()) {
+            s.store.referenz_speichern(&Referenz::neu(
+                projekt.id,
+                ReferenzTyp::Url,
+                url.trim(),
+                Rolle::Material,
+            ))?;
+            referenzen += 1;
+        }
+
+        for d in auftrag.dokumente.iter().filter(|d| !d.trim().is_empty()) {
+            s.store.referenz_speichern(&Referenz::neu(
+                projekt.id,
+                ReferenzTyp::Datei,
+                d.as_str(),
+                Rolle::Material,
+            ))?;
+            referenzen += 1;
+        }
+
+        let mut unterprojekte = Vec::new();
+        for pfad in &auftrag.unterprojekte {
+            let pf = std::path::Path::new(pfad);
+            // Zwischen Befund und Häkchen kann etwas dazugekommen sein.
+            let schon = lotse_core::detect::marker_lesen(pf)
+                .and_then(|id| s.store.projekt(id).ok().flatten())
+                .is_some();
+            if schon {
+                continue;
+            }
+            let Some(k) = lotse_core::detect::erkenne(pf) else {
+                continue;
+            };
+            let up = lotse_core::detect::uebernehmen(&mut s.store, &k)?;
+            s.store.notiz_speichern(&Notiz::neu(
+                up.id,
+                Quelle::Import,
+                Art::Log,
+                format!("Beim Deuten von »{}« gefunden.", projekt.titel),
+                naechster(),
+            ))?;
+            unterprojekte.push(up);
+        }
+
+        if let Some(satz) = deutung_satz(&auftrag, unterprojekte.len()) {
+            s.store.notiz_speichern(&Notiz::neu(
+                projekt.id,
+                Quelle::Import,
+                Art::Log,
+                satz,
+                naechster(),
+            ))?;
+        }
+
+        Ok(AnlegeBilanz {
+            projekt,
+            unterprojekte,
+            referenzen,
+        })
+    })
+}
+
+/// Systemdialog für mehrere Dateien. Gefiltert auf das, was Lotse lesen kann – ein
+/// Dialog, der alles anbietet und danach die Hälfte verwirft, ist keine Hilfe.
+#[tauri::command]
+async fn dateien_waehlen(app: tauri::AppHandle) -> R<Vec<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .add_filter(
+            "Lesbare Dateien",
+            &["pdf", "md", "markdown", "txt", "text", "log", "csv", "tsv", "json"],
+        )
+        .pick_files(move |pfade| {
+            let _ = tx.send(pfade);
+        });
+    let gewaehlt = rx.recv().map_err(|_| "Auswahl abgebrochen".to_string())?;
+    Ok(gewaehlt
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string())
+        .collect())
 }
 
 /// Systemdialog zur Ordnerwahl. Spart das Abtippen von Pfaden beim ersten Scan.
@@ -937,7 +1218,10 @@ fn beobachter_starten(
                 return;
             }
             match forge_lauf(&zustand, None, Some(stop)) {
-                Ok(e) if e.abgefragt > 0 => {
+                // Auch dann melden, wenn keine Abfrage durchkam, aber ein Hinweis
+                // geschrieben wurde: sonst steht ein neuer offener Faden da, den die
+                // Oberfläche erst beim nächsten Neuladen zeigt.
+                Ok(e) if e.abgefragt > 0 || e.hinweise > 0 => {
                     let _ = app.emit("forge-bilanz", e);
                 }
                 Ok(_) => {}
@@ -1251,6 +1535,74 @@ fn ki_modelle(state: State<AppState>, basis_url: String) -> R<Vec<String>> {
         schluessel,
     };
     lotse_core::ai::modelle(&ziel).map_err(fehler)
+}
+
+/// Baut den Text für den Kurs-Vorschlag: der eine Satz, den keine Regel schreiben kann.
+///
+/// Gelesen wird der Ordner, der als Referenz am Vorhaben hängt – Name, Erkennungsmarken,
+/// README und Dateinamen. **Keine Dateiinhalte** außer der README. Gesendet wird hier
+/// nichts: das Ergebnis geht an die Oberfläche, die es zeigt, bevor jemand auf Senden
+/// drückt (`ki_verdichten` mit Zweck `kurs_vorschlagen`).
+#[tauri::command]
+fn ki_kurs_text(state: State<AppState>, projekt_id: String) -> R<String> {
+    let id = ulid(&projekt_id)?;
+    let (titel, ordner) = mit(&state, |s| {
+        let p = s
+            .store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?;
+        let ordner = s
+            .store
+            .referenzen(id)?
+            .into_iter()
+            .find(|r| matches!(r.typ, ReferenzTyp::Ordner | ReferenzTyp::GitRepo))
+            .map(|r| r.ziel);
+        Ok((p.titel, ordner))
+    })?;
+
+    let Some(ordner) = ordner else {
+        return Err("An diesem Vorhaben hängt kein Ordner. Ohne Unterlagen gibt es nichts \
+                    zu deuten – ein Kurs aus dem Titel allein wäre geraten."
+            .into());
+    };
+    let pfad = PathBuf::from(&ordner);
+    if !pfad.is_dir() {
+        return Err(format!("Den Ordner {ordner} gibt es nicht (mehr)."));
+    }
+
+    // Ohne Sperre lesen: das geht auf die Platte und kann dauern.
+    let erkannt = lotse_core::detect::erkenne(&pfad);
+    let marken = erkannt.as_ref().map(|k| k.marken.clone()).unwrap_or_default();
+    let readme = erkannt.as_ref().and_then(|k| k.readme.clone());
+    let dateien = ordner_dateinamen(&pfad);
+
+    Ok(lotse_core::ai::kurs_anfrage_text(
+        &titel,
+        &marken,
+        readme.as_deref(),
+        &dateien,
+    ))
+}
+
+/// Dateinamen der obersten Ebene, sortiert. Versteckte Dateien und die üblichen
+/// Werkzeugordner bleiben draußen: `node_modules` sagt nichts über ein Vorhaben.
+fn ordner_dateinamen(dir: &std::path::Path) -> Vec<String> {
+    let Ok(eintraege) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut namen: Vec<String> = eintraege
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') || lotse_core::detect::nie_lesen(&name) {
+                return None;
+            }
+            let ordner = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            Some(if ordner { format!("{name}/") } else { name })
+        })
+        .collect();
+    namen.sort();
+    namen
 }
 
 /// Genau der Text, der gesendet würde. Die Oberfläche zeigt ihn, bevor etwas das
@@ -1636,6 +1988,8 @@ fn forge_auto_setzen(state: State<AppState>, an: bool) -> R<()> {
 struct ForgeErgebnis {
     abgefragt: usize,
     notizen: usize,
+    /// Offene Fäden, die geschrieben wurden, weil ein Zugang fehlt.
+    hinweise: usize,
     fehler: Vec<String>,
 }
 
@@ -1694,6 +2048,7 @@ fn forge_lauf(
     let mut notizen = 0usize;
     let mut fehler = Vec::new();
     let mut abgefragt = 0usize;
+    let mut hinweise = 0usize;
 
     for (p, z, _) in ziele {
         if angehalten() {
@@ -1712,11 +2067,54 @@ fn forge_lauf(
                     break;
                 }
                 if let Some(n) = lotse_core::forge::notiz(p.id, &z, &stand, now_ms()) {
-                    mit(state, |s| s.store.notiz_speichern(&n))?;
-                    notizen += 1;
+                    // Von Hand angestoßen umgeht die Zeitbremse; die Gleichheitsbremse
+                    // gilt immer. Sonst füllt ein tagelang roter Prüflauf das Logbuch
+                    // im Halbstundentakt und begräbt alles von Hand Eingetragene.
+                    let von_hand = nur.is_some();
+                    let geschrieben = mit(state, |s| {
+                        let bisher = s.store.notizen(p.id)?;
+                        let letzte = lotse_core::forge::letzte_maschinelle(
+                            &bisher,
+                            lotse_core::model::Quelle::Git,
+                        );
+                        if lotse_core::forge::schreiben_faellig(letzte, &n, von_hand) {
+                            s.store.notiz_speichern(&n)?;
+                            return Ok(true);
+                        }
+                        Ok(false)
+                    })?;
+                    if geschrieben {
+                        notizen += 1;
+                    }
                 }
             }
-            Err(e) => fehler.push(format!("{}: {e}", z.anzeige())),
+            Err(e) => {
+                // Fehlt der Zugang, gehört das ins Projekt und nicht auf eine
+                // Einstellungsseite, die niemand öffnet, solange nichts wehtut. Genau
+                // einmal, und nur wenn wirklich kein Token hinterlegt ist: mit Token ist
+                // ein Fehler eine Sache für die Fehlerliste, nicht für das Logbuch.
+                if token.is_none() && lotse_core::forge::zugangsproblem(&e) {
+                    let text = lotse_core::forge::zugang_faden(z.anbieter, &z.anzeige());
+                    let gesetzt = mit(state, |s| {
+                        let bisher = s.store.notizen(p.id)?;
+                        if lotse_core::forge::hinweis_faellig(&bisher, &text) {
+                            s.store.notiz_speichern(&Notiz::neu(
+                                p.id,
+                                Quelle::Git,
+                                Art::Offen,
+                                text,
+                                now_ms(),
+                            ))?;
+                            return Ok(true);
+                        }
+                        Ok(false)
+                    })?;
+                    if gesetzt {
+                        hinweise += 1;
+                    }
+                }
+                fehler.push(format!("{}: {e}", z.anzeige()));
+            }
         }
     }
 
@@ -1733,6 +2131,7 @@ fn forge_lauf(
     Ok(ForgeErgebnis {
         abgefragt,
         notizen,
+        hinweise,
         fehler,
     })
 }
@@ -1907,6 +2306,82 @@ fn selbst_austauschbar() -> (bool, Option<String>) {
     (true, None)
 }
 
+// ------------------------------------------------------------ Systemeintrag
+
+/// Ist die Frage schon gestellt worden? Ein Nein bleibt ein Nein – sonst wäre »später«
+/// nur ein anderes Wort für »bei jedem Start noch einmal«.
+const META_SYSTEMEINTRAG_GEFRAGT: &str = "systemeintrag_gefragt";
+
+/// Das Programmsymbol, mitgebracht statt im entpackten AppImage gesucht: unter
+/// `/tmp/.mount_…` liegt es nur, solange das Programm läuft, und der Pfad wechselt.
+const ICON_128: &[u8] = include_bytes!("../icons/128x128.png");
+
+#[derive(Serialize)]
+struct SystemeintragStand {
+    #[serde(flatten)]
+    stand: lotse_core::systemeintrag::Stand,
+    /// Schon einmal gefragt worden? Die Oberfläche fragt dann nicht von selbst, der
+    /// Knopf in den Einstellungen bleibt.
+    gefragt: bool,
+}
+
+#[tauri::command]
+fn systemeintrag_stand(state: State<AppState>) -> R<SystemeintragStand> {
+    let gefragt = mit(&state, |s| {
+        Ok(s.store.meta_get(META_SYSTEMEINTRAG_GEFRAGT)?.is_some())
+    })?;
+    Ok(SystemeintragStand {
+        stand: lotse_core::systemeintrag::stand(),
+        gefragt,
+    })
+}
+
+/// Legt Lotse an seinen Platz und schreibt den Menüeintrag. Nur auf ausdrücklichen Klick.
+#[tauri::command]
+fn systemeintrag_anlegen(state: State<AppState>) -> R<lotse_core::systemeintrag::Bericht> {
+    let bericht = lotse_core::systemeintrag::einrichten(ICON_128).map_err(fehler)?;
+    systemeintrag_gefragt_merken(&state)?;
+    Ok(bericht)
+}
+
+/// Nimmt den Menüeintrag wieder weg.
+#[tauri::command]
+fn systemeintrag_entfernen(state: State<AppState>) -> R<()> {
+    lotse_core::systemeintrag::entfernen().map_err(fehler)?;
+    systemeintrag_gefragt_merken(&state)
+}
+
+/// Merkt, dass gefragt wurde – auch bei »nein, danke«.
+#[tauri::command]
+fn systemeintrag_gefragt(state: State<AppState>) -> R<()> {
+    systemeintrag_gefragt_merken(&state)
+}
+
+fn systemeintrag_gefragt_merken(state: &State<AppState>) -> R<()> {
+    mit(state, |s| {
+        s.store.meta_set(META_SYSTEMEINTRAG_GEFRAGT, "1")
+    })
+}
+
+/// Startet die Fassung an ihrem Platz und beendet diese hier.
+///
+/// Nach dem Einrichten läuft noch die heruntergeladene Datei. Ohne diesen Schritt würde
+/// der Selbsttausch weiter an ihr arbeiten, und der Menüeintrag zeigte auf eine Fassung,
+/// die niemand benutzt. Vorher wird gesperrt – der Schlüssel überlebt den Wechsel nicht.
+#[tauri::command]
+fn systemeintrag_neu_starten(app: tauri::AppHandle, state: State<AppState>, ziel: String) -> R<()> {
+    let pfad = PathBuf::from(&ziel);
+    if !pfad.is_file() {
+        return Err(format!("Es gibt keine Datei {ziel}."));
+    }
+    sperren(state)?;
+    std::process::Command::new(&pfad)
+        .spawn()
+        .map_err(|e| format!("Start von {ziel} fehlgeschlagen: {e}"))?;
+    app.exit(0);
+    Ok(())
+}
+
 #[derive(Clone, Serialize)]
 struct UpdateFortschritt {
     geladen: u64,
@@ -2066,6 +2541,18 @@ struct KalenderErgebnis {
     fehler: Vec<String>,
 }
 
+fn termin_anzeige(t: lotse_core::kalender::Termin) -> TerminAnzeige {
+    TerminAnzeige {
+        titel: t.titel,
+        datum: t.datum,
+        uhrzeit: t.uhrzeit,
+        utc: t.utc,
+        ort: t.ort,
+        wiederholt: t.wiederholung.is_some(),
+        ungenau: t.wiederholung.is_some_and(|r| !r.genau),
+    }
+}
+
 /// Heutiges Datum als `JJJJ-MM-TT`, aus derselben Uhr wie alle Zeitstempel.
 fn heute() -> String {
     lotse_core::export::iso(now_ms())
@@ -2086,6 +2573,168 @@ fn kalender_holen(state: &State<AppState>, ziel: &str) -> lotse_core::Result<Str
     let ics = lotse_core::kalender::holen(ziel)?;
     sperre(&state.kalender).insert(ziel.to_string(), (now_ms(), ics.clone()));
     Ok(ics)
+}
+
+/// Die Kalender, die dieser Mensch besitzt – eine Vorratsliste, **keine Zuordnung**.
+///
+/// Gelesen wird ein Kalender weiterhin nur dort, wo er als Referenz an einem Vorhaben
+/// hängt (`docs/wiki/Kalender.md`). Die Liste erspart bloß das Abtippen derselben langen
+/// Adresse für jedes Vorhaben – und sie ist die Voraussetzung dafür, dass Lotse nach dem
+/// Anlegen überhaupt nachsehen kann, ob dort etwas zum neuen Vorhaben steht.
+const META_KALENDER_VORRAT: &str = "kalender_vorrat";
+
+fn kalender_vorrat_lesen(s: &mut Sitzung) -> lotse_core::Result<Vec<String>> {
+    Ok(s.store
+        .meta_get(META_KALENDER_VORRAT)?
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|z| !z.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+#[tauri::command]
+fn kalender_vorrat(state: State<AppState>) -> R<Vec<String>> {
+    mit(&state, kalender_vorrat_lesen)
+}
+
+/// Schreibt die Vorratsliste. Was keine Kalenderadresse ist, wird abgewiesen statt
+/// stillschweigend übernommen – sonst steht später eine Adresse in der Liste, die niemals
+/// einen Termin liefert, und niemand weiß, warum.
+#[tauri::command]
+fn kalender_vorrat_setzen(state: State<AppState>, quellen: Vec<String>) -> R<Vec<String>> {
+    let mut sauber: Vec<String> = Vec::new();
+    for q in quellen {
+        let z = q.trim().to_string();
+        if z.is_empty() {
+            continue;
+        }
+        if !lotse_core::kalender::ist_kalender(&z) {
+            return Err(format!(
+                "»{z}« ist keine Kalenderadresse. Erwartet wird etwas, das auf .ics endet \
+                 oder mit webcal:// beginnt."
+            ));
+        }
+        if !sauber.contains(&z) {
+            sauber.push(z);
+        }
+    }
+    let inhalt = sauber.join("\n");
+    mit(&state, |s| {
+        s.store.meta_set(META_KALENDER_VORRAT, &inhalt)?;
+        Ok(())
+    })?;
+    Ok(sauber)
+}
+
+/// Ein Kalender aus dem Vorrat und was dort zum Vorhaben passt.
+#[derive(Serialize)]
+struct KalenderTreffer {
+    quelle: String,
+    /// Wie viele Termine passen – auch die, die unten nicht aufgeführt sind.
+    anzahl: usize,
+    /// Die nächsten davon, zum Ansehen. Kann leer sein, obwohl `anzahl` größer als null
+    /// ist: dann liegen alle passenden Termine hinter uns. Das ist immer noch ein Hinweis,
+    /// dass der Kalender zum Vorhaben gehört – nur eben keiner auf einen nächsten Schritt.
+    termine: Vec<TerminAnzeige>,
+}
+
+#[derive(Serialize)]
+struct KalenderVorschlag {
+    /// Nach welchen Begriffen gesucht wurde. Muss dastehen: sonst rät man, warum etwas
+    /// fehlt.
+    begriffe: Vec<String>,
+    /// Kalender mit Treffern, die noch nicht am Vorhaben hängen.
+    treffer: Vec<KalenderTreffer>,
+    /// Kalender aus dem Vorrat, in denen nichts Passendes stand.
+    ohne_treffer: Vec<String>,
+    fehler: Vec<String>,
+}
+
+/// Sucht in den Kalendern des Vorrats nach Terminen, die zum Vorhaben passen.
+///
+/// **Nur auf Klick.** Das holt fremde Kalender für ein Vorhaben, das sie noch nicht
+/// angefordert hat; von allein zu laufen wäre Verkehr, den niemand bestellt hat.
+#[tauri::command]
+fn kalender_vorschlag(state: State<AppState>, projekt_id: String) -> R<KalenderVorschlag> {
+    let id = ulid(&projekt_id)?;
+    let (titel, schon, vorrat) = mit(&state, |s| {
+        let p = s
+            .store
+            .projekt(id)?
+            .ok_or_else(|| Error::NotFound(format!("Projekt {id}")))?;
+        let schon: Vec<String> = s
+            .store
+            .referenzen(id)?
+            .into_iter()
+            .filter(|r| lotse_core::kalender::ist_kalender(&r.ziel))
+            .map(|r| r.ziel)
+            .collect();
+        let vorrat = kalender_vorrat_lesen(s)?;
+        Ok((p.titel, schon, vorrat))
+    })?;
+
+    let begriffe = lotse_core::kalender::begriffe(&titel);
+    let mut vorschlag = KalenderVorschlag {
+        begriffe: begriffe.clone(),
+        treffer: Vec::new(),
+        ohne_treffer: Vec::new(),
+        fehler: Vec::new(),
+    };
+    if begriffe.is_empty() {
+        return Ok(vorschlag);
+    }
+
+    let von = heute();
+    let bis = lotse_core::kalender::tage_spaeter(&von, 365);
+    for quelle in vorrat.iter().filter(|q| !schon.contains(q)) {
+        let ics = match kalender_holen(&state, quelle) {
+            Ok(i) => i,
+            Err(e) => {
+                vorschlag.fehler.push(format!("{quelle}: {e}"));
+                continue;
+            }
+        };
+        let alle = lotse_core::kalender::lesen(&ics);
+        let passend: Vec<lotse_core::kalender::Termin> =
+            lotse_core::kalender::passende(&alle, &titel)
+                .into_iter()
+                .cloned()
+                .collect();
+        // Erst zuordnen, dann das Fenster anwenden: ein Termin, der sich wiederholt,
+        // gehört zum Vorhaben, auch wenn sein erstes Vorkommen lange her ist.
+        let kommend = lotse_core::kalender::kommende(&passend, &von, &bis, 5);
+        if passend.is_empty() {
+            vorschlag.ohne_treffer.push(quelle.clone());
+            continue;
+        }
+        vorschlag.treffer.push(KalenderTreffer {
+            quelle: quelle.clone(),
+            anzahl: passend.len(),
+            termine: kommend.into_iter().map(termin_anzeige).collect(),
+        });
+    }
+    Ok(vorschlag)
+}
+
+/// Hängt einen Kalender aus dem Vorrat an ein Vorhaben. Ab dann wird er dort gelesen –
+/// das ist die Zuordnung, die die Vorratsliste absichtlich nicht ist.
+#[tauri::command]
+fn kalender_anhaengen(state: State<AppState>, projekt_id: String, quelle: String) -> R<Referenz> {
+    let id = ulid(&projekt_id)?;
+    let ziel = quelle.trim().to_string();
+    if !lotse_core::kalender::ist_kalender(&ziel) {
+        return Err(format!("»{ziel}« ist keine Kalenderadresse."));
+    }
+    mit(&state, |s| {
+        if let Some(r) = s.store.referenzen(id)?.into_iter().find(|r| r.ziel == ziel) {
+            return Ok(r);
+        }
+        let r = Referenz::neu(id, ReferenzTyp::Url, &ziel, Rolle::Doku);
+        s.store.referenz_speichern(&r)?;
+        Ok(r)
+    })
 }
 
 /// Anstehende Termine eines Projekts aus seinen Kalender-Referenzen.
@@ -2122,15 +2771,7 @@ fn kalender_termine(
 
     let termine = lotse_core::kalender::kommende(&alle, &von, &bis, 20)
         .into_iter()
-        .map(|t| TerminAnzeige {
-            titel: t.titel,
-            datum: t.datum,
-            uhrzeit: t.uhrzeit,
-            utc: t.utc,
-            ort: t.ort,
-            wiederholt: t.wiederholung.is_some(),
-            ungenau: t.wiederholung.is_some_and(|r| !r.genau),
-        })
+        .map(termin_anzeige)
         .collect();
 
     Ok(KalenderErgebnis {
@@ -2401,8 +3042,11 @@ pub fn run() {
             rechnername,
             zuruecksetzen,
             scan,
+            quelle_deuten,
+            aus_befund_anlegen,
             ordner_waehlen,
             datei_waehlen,
+            dateien_waehlen,
             export_spiegel,
             export_bundle,
             beobachter_status,
@@ -2416,6 +3060,7 @@ pub fn run() {
             ki_ziel_setzen,
             ki_modelle,
             ki_anfrage_text,
+            ki_kurs_text,
             ki_verdichten,
             ki_verbrauch,
             ki_verbrauch_loeschen,
@@ -2429,9 +3074,18 @@ pub fn run() {
             datei_auszug,
             datei_referenzen,
             kalender_termine,
+            kalender_vorrat,
+            kalender_vorrat_setzen,
+            kalender_vorschlag,
+            kalender_anhaengen,
             update_pruefen,
             update_installieren,
             update_automatisch_setzen,
+            systemeintrag_stand,
+            systemeintrag_anlegen,
+            systemeintrag_entfernen,
+            systemeintrag_gefragt,
+            systemeintrag_neu_starten,
             oeffnen,
             tresor_liste,
             tresor_anlegen,

@@ -211,6 +211,13 @@ export const ki = {
   modelle: (basisUrl: string) => invoke<string[]>('ki_modelle', { basisUrl }),
   verbrauch: () => invoke<KiVerbrauch>('ki_verbrauch'),
   verbrauchLoeschen: () => invoke<void>('ki_verbrauch_loeschen'),
+  /**
+   * Genau der Text, aus dem ein Kurs-Vorschlag würde: Name des Vorhabens,
+   * Erkennungsmarken, README und Dateinamen des angehängten Ordners. Keine
+   * Dateiinhalte außer der README. Gesendet wird hier nichts – erst
+   * `provider.kiVerdichten(text, 'kurs_vorschlagen')`.
+   */
+  kursText: (projektId: string) => invoke<string>('ki_kurs_text', { projektId }),
 };
 
 export interface KiProtokollEintrag {
@@ -258,6 +265,8 @@ export interface ForgeStatus {
 export interface ForgeErgebnis {
   abgefragt: number;
   notizen: number;
+  /** Offene Fäden, die geschrieben wurden, weil ein Zugang fehlt. */
+  hinweise: number;
   fehler: string[];
 }
 
@@ -318,6 +327,138 @@ export const update = {
   automatischSetzen: (an: boolean) => invoke<void>('update_automatisch_setzen', { an }),
 };
 
+/**
+ * Deuten: aus einer Quelle einen Befund. Ein Ordner, eine Adresse oder eine Handvoll
+ * Dateien gehen hinein, und heraus kommt, was gefunden wurde – **nie eine Frage, immer
+ * eine Feststellung**. Was Lotse schon weiß, wird nicht erfragt: hat der Ordner ein
+ * Remote, steht es im Befund, statt dass jemand »von GitHub importieren?« beantwortet.
+ */
+export type DeutQuelle =
+  | { art: 'ordner'; pfad: string }
+  | { art: 'adresse'; url: string }
+  | { art: 'dateien'; pfade: string[] };
+
+export interface FundSchonBekannt {
+  art: 'schon_bekannt';
+  id: string;
+  pfad: string;
+}
+export interface FundRemote {
+  art: 'remote';
+  url: string;
+  /** Erkannte Gegenseite, falls es eine bekannte ist: „GitHub", „GitLab". */
+  dienst?: string;
+}
+export interface FundUnterprojekt {
+  art: 'unterprojekt';
+  pfad: string;
+  name: string;
+  vorlage: VorlagenId;
+  marken: string[];
+}
+export interface FundDokument {
+  art: 'dokument';
+  pfad: string;
+  name: string;
+}
+export type Fund = FundSchonBekannt | FundRemote | FundUnterprojekt | FundDokument;
+
+export interface Vorschlag {
+  titel: string;
+  kurs?: string;
+  vorlage: VorlagenId;
+}
+
+export interface Befund {
+  /** Die Quelle in lesbarer Form – Überschrift des Befunds. */
+  quelle: string;
+  /** Fehlt, wenn die Quelle schon zu einem Projekt gehört. */
+  vorschlag?: Vorschlag;
+  funde: Fund[];
+  angesehen: number;
+  /** Die Suche hat an ihrer Grenze aufgehört. Muss dastehen, sonst hält man die Liste
+   *  für vollständig. */
+  abgebrochen: boolean;
+  weitere_dokumente: number;
+}
+
+export interface Deutung {
+  befund: Befund;
+  /** Gesetzt, wenn die Quelle schon zu einem Projekt gehört: dann wird angehängt. */
+  bekannt?: Projekt;
+}
+
+export interface AnlegenAuftrag {
+  titel: string;
+  kurs?: string;
+  vorlage: VorlagenId;
+  ordner?: string;
+  remote?: string;
+  unterprojekte: string[];
+  dokumente: string[];
+  /** Statt anzulegen an dieses Projekt anhängen. */
+  an_projekt?: string;
+}
+
+export interface AnlegeBilanz {
+  projekt: Projekt;
+  unterprojekte: Projekt[];
+  referenzen: number;
+}
+
+export const deuten = {
+  quelle: async (quelle: DeutQuelle): Promise<Deutung> => {
+    const d = await invoke<{ befund: Befund; bekannt?: RohProjekt }>('quelle_deuten', { quelle });
+    return { befund: d.befund, bekannt: d.bekannt ? projekt(d.bekannt) : undefined };
+  },
+  anlegen: async (auftrag: AnlegenAuftrag): Promise<AnlegeBilanz> => {
+    const b = await invoke<{ projekt: RohProjekt; unterprojekte: RohProjekt[]; referenzen: number }>(
+      'aus_befund_anlegen',
+      { auftrag },
+    );
+    return { projekt: projekt(b.projekt), unterprojekte: b.unterprojekte.map(projekt), referenzen: b.referenzen };
+  },
+};
+
+/**
+ * Systemeintrag (nur Linux, nur als AppImage): Lotse an einen festen Platz legen und
+ * einen Menüeintrag schreiben.
+ *
+ * Ein AppImage wird nicht installiert – es liegt da, wo der Browser es hingelegt hat.
+ * Daraus folgt kein Eintrag im Menü, ein Selbsttausch, der am Download-Ordner hängt, und
+ * ein Dateiname, der nach dem ersten Tausch die alte Version nennt. Das hier räumt alle
+ * drei auf, und nur auf ausdrücklichen Klick.
+ */
+export interface SystemeintragStand {
+  /** Läuft diese Fassung als AppImage? Sonst gibt es hier nichts anzubieten. */
+  appimage: boolean;
+  pfad?: string;
+  ziel?: string;
+  am_platz: boolean;
+  menueintrag: boolean;
+  /** Schon einmal gefragt worden. Dann fragt die Oberfläche nicht von selbst. */
+  gefragt: boolean;
+}
+
+export interface SystemeintragBericht {
+  ziel: string;
+  /** Die heruntergeladene Datei. Die kann weg – entscheidet aber der Mensch. */
+  alter_pfad?: string;
+  desktop_datei: string;
+  icon_datei: string;
+  kopiert: boolean;
+}
+
+export const systemeintrag = {
+  stand: () => invoke<SystemeintragStand>('systemeintrag_stand'),
+  anlegen: () => invoke<SystemeintragBericht>('systemeintrag_anlegen'),
+  entfernen: () => invoke<void>('systemeintrag_entfernen'),
+  /** Merkt ein »nein, danke«, damit die Frage nicht bei jedem Start wiederkommt. */
+  gefragt: () => invoke<void>('systemeintrag_gefragt'),
+  /** Startet die Fassung am festen Platz und beendet die laufende. */
+  neuStarten: (ziel: string) => invoke<void>('systemeintrag_neu_starten', { ziel }),
+};
+
 export interface DateiAuszug {
   pfad: string;
   name: string;
@@ -363,13 +504,44 @@ export interface KalenderErgebnis {
   fehler: string[];
 }
 
+export interface KalenderTreffer {
+  quelle: string;
+  /** Wie viele Termine passen – auch die, die unten nicht aufgeführt sind. */
+  anzahl: number;
+  /**
+   * Die nächsten davon. Kann leer sein, obwohl `anzahl` größer als null ist: dann liegen
+   * alle passenden Termine hinter uns.
+   */
+  termine: Termin[];
+}
+
+export interface KalenderVorschlag {
+  /** Wonach gesucht wurde. Muss dastehen, sonst rät man, warum etwas fehlt. */
+  begriffe: string[];
+  treffer: KalenderTreffer[];
+  ohne_treffer: string[];
+  fehler: string[];
+}
+
 /**
  * Kalender lesend: was für ein Projekt ansteht. Lotse schreibt keine Termine und
  * kopiert sie nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
+ *
+ * `vorrat` ist die Liste der Kalender, die dieser Mensch besitzt – **keine Zuordnung**.
+ * Gelesen wird ein Kalender nur dort, wo er als Referenz an einem Vorhaben hängt. Die
+ * Liste erspart das Abtippen derselben langen Adresse für jedes Vorhaben und macht
+ * `vorschlag` möglich.
  */
 export const kalender = {
   termine: (projektId: string, tage?: number) =>
     invoke<KalenderErgebnis>('kalender_termine', { projektId, tage: tage ?? null }),
+  vorrat: () => invoke<string[]>('kalender_vorrat'),
+  vorratSetzen: (quellen: string[]) => invoke<string[]>('kalender_vorrat_setzen', { quellen }),
+  /** Sucht im Vorrat nach Terminen zum Vorhaben. Nur auf Klick – das geht übers Netz. */
+  vorschlag: (projektId: string) => invoke<KalenderVorschlag>('kalender_vorschlag', { projektId }),
+  /** Hängt einen Kalender an das Vorhaben. Ab dann wird er dort gelesen. */
+  anhaengen: async (projektId: string, quelle: string): Promise<Referenz> =>
+    referenz(await invoke<RohReferenz>('kalender_anhaengen', { projektId, quelle })),
 };
 
 export interface McpStatus {
@@ -423,6 +595,8 @@ export const system = {
   ordnerWaehlen: () => invoke<string | null>('ordner_waehlen'),
   /** Systemdialog für einen Speicherort. `null`, wenn abgebrochen. */
   dateiWaehlen: (name: string) => invoke<string | null>('datei_waehlen', { name }),
+  /** Systemdialog für mehrere vorhandene Dateien, gefiltert auf Lesbares. Leer bei Abbruch. */
+  dateienWaehlen: () => invoke<string[]>('dateien_waehlen'),
   /** Öffnet Ordner, Datei oder URL im System – nur auf ausdrücklichen Klick. */
   oeffnen: (ziel: string) => invoke<void>('oeffnen', { ziel }),
 };

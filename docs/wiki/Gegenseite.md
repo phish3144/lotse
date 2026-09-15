@@ -152,3 +152,25 @@ Aufrufer herein; wer es holt, ist die Oberfläche oder die Kommandozeile. Siehe
 Lotse unterscheidet bei `403` bewusst zwischen »keine Berechtigung« und »Kontingent
 erschöpft«, weil die Antworten darauf entgegengesetzt sind: einmal Token ändern, einmal
 warten.
+
+### Der Hinweis kommt zum Vorhaben, nicht auf diese Seite
+
+Ist für einen Hoster **kein Token hinterlegt** und die Abfrage scheitert daran, schreibt
+Lotse das als **offenen Faden in das betroffene Vorhaben**:
+
+> Für GitHub fehlt ein Zugang. Ohne ihn sieht Lotse bei »owner/repo« nicht nach: keine
+> offenen Anfragen, kein Prüflauf-Status, und private Repos gar nicht. Einstellungen →
+> Verbindungen.
+
+Warum dort und nicht hier: eine Einstellungsseite öffnet niemand, solange nichts wehtut.
+Der Satz nennt außerdem die **Folge**, nicht die Einstellung – »keine offenen Anfragen« ist
+eine Aussage, »Token nicht gesetzt« wäre eine Zustandsmeldung.
+
+Drei Regeln dazu:
+
+- **Genau einmal** je Vorhaben und Repo. Abgehakt heißt gelesen; er kommt nicht wieder. Wer
+  ihn löscht, bekommt ihn beim nächsten Lauf erneut – das ist der Weg zurück.
+- **Nur wenn kein Token hinterlegt ist.** Mit Token ist ein Fehler eine Sache für die
+  Fehlerliste in den Einstellungen, nicht für das Logbuch.
+- **Nie bei Netzausfall.** Ein abgebrochenes WLAN ist kein Zugangsproblem; sonst stünde
+  nach einer Zugfahrt in jedem Vorhaben ein Faden.

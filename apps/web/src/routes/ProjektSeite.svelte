@@ -4,7 +4,17 @@
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
   import { echteDaten, provider } from '../lib/data/store';
-  import { datei, forge, kalender, system, type DateiAuszug, type ForgeProjekt, type Termin } from '../lib/data/tauri';
+  import {
+    datei,
+    forge,
+    kalender,
+    ki,
+    system,
+    type DateiAuszug,
+    type ForgeProjekt,
+    type KalenderVorschlag,
+    type Termin,
+  } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
   import { meldungen } from '../lib/meldung.svelte';
   import { navigiereZu } from '../lib/router.svelte';
@@ -471,6 +481,105 @@
     kiErgebnis = null;
   }
 
+  // --- Kurs vorschlagen -----------------------------------------------------
+  // Die eigentliche Aufgabe für ein Modell: Titel und Vorlage liest die Erkennung aus
+  // Marken, aber den einen Satz, der in drei Monaten sagt, was man wollte, kann keine
+  // Regel schreiben. Die erste Zeile einer README ist meist eine Überschrift.
+  //
+  // Derselbe Ablauf wie beim Brief: erst zeigen, was gesendet würde, dann senden, dann
+  // übernehmen – und übernehmen heißt hier, das Feld zu füllen, nicht zu speichern.
+  let kursText: string | null = $state(null);
+  let kursVorschlag: string | null = $state(null);
+  let kursLaeuft = $state(false);
+
+  async function kursVorbereiten() {
+    kursLaeuft = true;
+    kursVorschlag = null;
+    try {
+      kursText = await ki.kursText(id);
+    } catch (e) {
+      melde(e);
+    } finally {
+      kursLaeuft = false;
+    }
+  }
+
+  async function kursSenden() {
+    if (!kursText) return;
+    kursLaeuft = true;
+    try {
+      kursVorschlag = await provider.kiVerdichten(kursText, 'kurs_vorschlagen');
+    } catch (e) {
+      melde(e);
+    } finally {
+      kursLaeuft = false;
+    }
+  }
+
+  function kursUebernehmen() {
+    if (!kursVorschlag) return;
+    eKurs = kursVorschlag.trim();
+    kursText = null;
+    kursVorschlag = null;
+    meldungen.zeigen('Übernommen. Noch nicht gespeichert – lies ihn erst.');
+  }
+
+  function kursVerwerfen() {
+    kursText = null;
+    kursVorschlag = null;
+  }
+
+  // --- Kalender: erst nach dem Anlegen, mit dem Titel als Suchbegriff -------
+  // Ein Kalender gehört nicht in den Anlege-Ablauf: dort weiß noch niemand, wie das
+  // Vorhaben heißt, und ohne Titel gibt es keinen Suchbegriff. Hier gibt es ihn.
+  //
+  // Gesucht wird nur auf Klick. Das holt Kalender, die dieses Vorhaben noch nicht
+  // angefordert hat – von allein zu laufen wäre Verkehr, den niemand bestellt hat.
+  let kalVorrat: string[] = $state([]);
+  let kalVorschlag: KalenderVorschlag | null = $state(null);
+  let kalLaeuft = $state(false);
+
+  $effect(() => {
+    if (!echteDaten) return;
+    let gilt = true;
+    kalVorschlag = null;
+    kalender
+      .vorrat()
+      .then((v) => {
+        if (gilt) kalVorrat = v;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  async function kalSuchen() {
+    kalLaeuft = true;
+    try {
+      kalVorschlag = await kalender.vorschlag(id);
+      for (const f of kalVorschlag.fehler) meldungen.zeigen(f, 'fehler');
+    } catch (e) {
+      melde(e);
+    } finally {
+      kalLaeuft = false;
+    }
+  }
+
+  async function kalAnhaengen(quelle: string) {
+    kalLaeuft = true;
+    try {
+      await kalender.anhaengen(id, quelle);
+      kalVorschlag = null;
+      datenVersion.bump();
+      meldungen.zeigen('Kalender angehängt. Die Termine stehen jetzt unter „Was ansteht".');
+    } catch (e) {
+      melde(e);
+    } finally {
+      kalLaeuft = false;
+    }
+  }
+
   // --- Tresor ---------------------------------------------------------------
   let tresorOffen = $state(false);
 
@@ -585,6 +694,34 @@
           <span>Kurs – worum geht es, was ist das Ziel?</span>
           <textarea bind:value={eKurs} rows="3"></textarea>
         </label>
+        <!-- Nur wenn ein Ordner dranhängt: ohne Unterlagen wäre ein Kurs geraten. -->
+        {#if echteDaten && referenzen.some((r) => r.typ === 'ordner' || r.typ === 'git_repo')}
+          {#if !kursText}
+            <button type="button" class="schlicht ki-knopf" onclick={kursVorbereiten} disabled={kursLaeuft}>
+              {kursLaeuft ? 'Moment …' : 'Kurs von der KI vorschlagen lassen'}
+            </button>
+          {:else}
+            <div class="ki">
+              <strong>Das würde gesendet:</strong>
+              <pre class="ki-text">{kursText}</pre>
+              {#if kursVorschlag}
+                <strong>Vorschlag:</strong>
+                <div class="ki-antwort"><NoteText text={kursVorschlag} /></div>
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kursVerwerfen}>Verwerfen</button>
+                  <button type="button" class="primaer" onclick={kursUebernehmen}>Ins Feld übernehmen</button>
+                </div>
+              {:else}
+                <div class="ki-aktionen">
+                  <button type="button" onclick={kursVerwerfen}>Abbrechen</button>
+                  <button type="button" class="primaer" onclick={kursSenden} disabled={kursLaeuft}>
+                    {kursLaeuft ? 'Frage …' : 'Senden'}
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        {/if}
         <div class="feld-paar">
           <label>
             <span>Ruhig für (Tage)</span>
@@ -763,6 +900,61 @@
           </ul>
         {/if}
       </section>
+      <!-- Kein Kalender am Vorhaben, aber welche im Vorrat: dann kann Lotse nachsehen.
+           Der Titel ist der Suchbegriff – den gibt es erst jetzt, nicht beim Anlegen. -->
+      {#if echteDaten && terminQuellen === 0 && kalVorrat.length > 0}
+        <section aria-labelledby="kal-vorschlag-titel">
+          <h2 id="kal-vorschlag-titel">Steht dazu was im Kalender?</h2>
+          {#if !kalVorschlag}
+            <p class="hinweis">
+              {kalVorrat.length === 1 ? 'Ein Kalender ist hinterlegt' : `${kalVorrat.length} Kalender sind hinterlegt`},
+              aber keiner hängt an diesem Vorhaben.
+            </p>
+            <button type="button" class="schlicht" onclick={kalSuchen} disabled={kalLaeuft}>
+              {kalLaeuft ? 'Sehe nach …' : `Nach „${projekt.titel}" suchen`}
+            </button>
+          {:else if kalVorschlag.begriffe.length === 0}
+            <p class="hinweis">
+              „{projekt.titel}" taugt nicht als Suchbegriff – zu kurz oder zu allgemein. Häng den Kalender unter
+              <em>Referenzen</em> von Hand an.
+            </p>
+          {:else if kalVorschlag.treffer.length === 0}
+            <p class="hinweis">
+              Nichts gefunden. Gesucht wurde nach: {kalVorschlag.begriffe.map((b) => `„${b}"`).join(', ')}.
+            </p>
+            <button type="button" class="schlicht" onclick={() => (kalVorschlag = null)}>Zurück</button>
+          {:else}
+            {#each kalVorschlag.treffer as tr (tr.quelle)}
+              <div class="kal-treffer">
+                <p class="hinweis">
+                  <strong>{tr.anzahl} {tr.anzahl === 1 ? 'Termin passt' : 'Termine passen'}</strong>
+                  in <code>{tr.quelle}</code>
+                </p>
+                {#if tr.termine.length === 0}
+                  <p class="hinweis klein">Alle liegen hinter uns – ein Hinweis, kein nächster Schritt.</p>
+                {:else}
+                  <ul class="einfache-liste">
+                    {#each tr.termine as t (t.datum + t.titel + (t.uhrzeit ?? ''))}
+                      <li>
+                        <span class="termin-datum">{datumText(t.datum)}</span>
+                        <span class="referenz-ziel">{t.titel}</span>
+                        {#if t.ort}<span class="hinweis rolle">{t.ort}</span>{/if}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+                <button type="button" class="primaer" onclick={() => kalAnhaengen(tr.quelle)} disabled={kalLaeuft}>
+                  Kalender anhängen
+                </button>
+              </div>
+            {/each}
+            <p class="hinweis klein">
+              Gesucht wurde nach: {kalVorschlag.begriffe.map((b) => `„${b}"`).join(', ')}. Angehängt wird der ganze
+              Kalender, nicht einzelne Termine – kopiert wird nichts.
+            </p>
+          {/if}
+        </section>
+      {/if}
       {#if terminQuellen > 0 || terminFehler.length > 0}
         <section aria-labelledby="termine-titel">
           <h2 id="termine-titel">Was ansteht</h2>
@@ -1243,6 +1435,24 @@
     padding: 0.75rem 0.85rem;
     margin: 0;
     box-shadow: var(--schatten);
+  }
+  .kal-treffer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0.9rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--rahmen);
+  }
+  .kal-treffer:last-of-type {
+    border-bottom: none;
+  }
+  .kal-treffer code {
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+  .kal-treffer button {
+    align-self: flex-start;
   }
   .kurs-karte {
     border-left: 3px solid var(--feuer) !important;

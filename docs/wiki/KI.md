@@ -5,13 +5,30 @@ Verdichten und Deuten – nie Entscheiden, nie Automatisieren.
 
 ## Was sie tut
 
-| Funktion | Was passiert |
-|---|---|
-| **Brief verdichten** | Aus dem Wo-war-ich-Brief wird ein Fließtext. Auf der Projektseite, pro Aufruf, nur auf Klick. |
-| **Datei deuten** | Aus einem Dateiauszug wird eine Zusammenfassung. |
+| Funktion | Zweck | Was passiert |
+|---|---|---|
+| **Brief verdichten** | `brief_verdichten` | Aus dem Wo-war-ich-Brief wird ein Fließtext. Auf der Projektseite, pro Aufruf, nur auf Klick. |
+| **Datei deuten** | `datei_deuten` | Aus einem Dateiauszug wird eine Zusammenfassung. |
+| **Kurs vorschlagen** | `kurs_vorschlagen` | Aus dem Ordner eines Vorhabens wird der eine Satz, der sagt, worum es geht und was das Ziel ist. Unter *Bearbeiten*, neben dem Kursfeld. |
 
 Das Ergebnis ist immer ein **Vorschlag**. Es landet nur im Logbuch, wenn du es
-übernimmst.
+übernimmst; beim Kurs füllt »Übernehmen« das Feld, gespeichert wird erst mit *Speichern*.
+
+### Warum gerade der Kurs
+
+Das ist die Aufgabe, für die es ein Modell braucht. Titel und Vorlage liest die Erkennung
+aus Marken – `Cargo.toml`, `platformio.ini`, eine README ([[Erkennungsregeln]]); dafür
+wäre ein Modell Verschwendung. Aber die erste Zeile einer README ist als Kurs meistens
+eine Überschrift und kein Ziel, und den Satz, der einer Person in drei Monaten sagt, was
+sie eigentlich wollte, kann keine Regel schreiben.
+
+Gesendet wird dabei: Name des Vorhabens, die Erkennungsmarken, die ersten 3000 Zeichen der
+README und bis zu 40 Dateinamen. **Keine Dateiinhalte außer der README** – wer mehr senden
+will, deutet die Datei ausdrücklich ([[Datei deuten|Datei-deuten]]), und das ist dann eine
+eigene Entscheidung. Hängt am Vorhaben kein Ordner, gibt es den Knopf nicht: ein Kurs aus
+dem Titel allein wäre geraten.
+
+Empfohlenes lokales Modell: `qwen3:8b` – reicht für einen Satz, läuft auf 8 GB.
 
 ## Die sieben Zusagen
 

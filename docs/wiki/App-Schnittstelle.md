@@ -98,9 +98,51 @@ Siehe [[Logbuch]].
 | `scan` | `wurzeln` | Durchsucht Ordner ([[Erkennungsregeln]]). |
 | `ordner_waehlen` | – | Systemdialog. `None` bei Abbruch – spart das Abtippen von Pfaden. |
 | `datei_waehlen` | `name` | Systemdialog für einen Speicherort. |
+| `dateien_waehlen` | – | Systemdialog für mehrere vorhandene Dateien, gefiltert auf Lesbares (PDF, Markdown, Text, CSV, JSON). Leere Liste bei Abbruch. |
 | `oeffnen` | `ziel` | Öffnet eine Referenz im System: Ordner im Dateimanager, Adresse im Browser. **Nur auf ausdrücklichen Klick**, nie von allein. |
 
 Siehe [[Referenzen]].
+
+---
+
+## Deuten
+
+Der Weg, auf dem ein Vorhaben entsteht: erst die Herkunft, dann ein Befund. Der Befund ist
+**nie eine Frage, immer eine Feststellung** – was Lotse schon weiß, wird nicht erfragt. Hat
+der Ordner ein Remote, steht es im Befund, statt dass jemand »von GitHub importieren?«
+bejaht; wer eine Adresse eintippt, hat die Frage ohnehin beantwortet.
+
+| Kommando | Argumente | Was |
+|---|---|---|
+| `quelle_deuten` | `quelle` | Deutet einen Ordner, eine Adresse oder eine Handvoll Dateien und liefert den Befund. Schreibt nichts – bis auf einen Marker, der ins Leere zeigt: den räumt es weg. |
+| `aus_befund_anlegen` | `auftrag` | Legt in einem Aufruf an, was im Befund abgehakt geblieben ist. |
+
+`quelle` ist eines von `{ art: "ordner", pfad }`, `{ art: "adresse", url }` oder
+`{ art: "dateien", pfade }`.
+
+Der Befund enthält einen `vorschlag` (Titel, Kurs, Vorlage – alles änderbar) und eine
+Liste `funde`. Jeder Fund wird in der Oberfläche eine Zeile mit Haken, **alle
+vorangekreuzt**; was nicht gefunden wurde, taucht nicht auf:
+
+| Fund | Bedeutet |
+|---|---|
+| `schon_bekannt` | Der Ordner trägt schon eine Kennung. Dann entsteht kein zweites Vorhaben; `bekannt` nennt das Projekt, und was abgehakt bleibt, kommt dort dazu. |
+| `remote` | Eine Gegenseite, aus `git remote` gelesen. `dienst` ist „GitHub" oder „GitLab", wenn die Adresse eine bekannte ist. |
+| `unterprojekt` | Ein eigenes Vorhaben im Ordner. Jedes abgehakte wird ein eigenes Projekt ([[Erkennungsregeln]]). |
+| `dokument` | Eine lesbare Datei. Wird eine Referenz. |
+
+Dazu `angesehen` (wie viele Ordner die Suche gesehen hat), `abgebrochen` (die Suche hat an
+ihrer Grenze aufgehört – das muss dastehen, sonst hält man die Liste für vollständig) und
+`weitere_dokumente` (nicht aufgeführte, aber gezählte Dateien).
+
+`auftrag` hat die Felder `titel`, `kurs`, `vorlage`, `ordner`, `remote`, `unterprojekte`,
+`dokumente` und `an_projekt`. Ist `an_projekt` gesetzt, wird angehängt statt angelegt.
+Angelegt werden: das Vorhaben, die Ordner-Referenz samt Markerdatei, die verdichtete
+Git-Historie, die Gegenseite und die Dokumente als Referenzen, jedes abgehakte
+Unterprojekt als eigenes Vorhaben – und ein Logbucheintrag, der nennt, was gedeutet wurde.
+
+Der Weg zurück ist `projekt_loeschen`: es räumt die eigenen Marker aus den Ordnern, sonst
+blieben sie »gehört schon dazu« und ließen sich nie wieder anlegen.
 
 ---
 
@@ -142,6 +184,10 @@ Siehe [[Tresor]].
 | `forge_projekt` | `projekt_id` | Das Repo eines Vorhabens, für die Projektseite. |
 | `forge_abfragen` | `projekt_id` | Von Hand angestoßen; ohne Angabe alle mit erkanntem Repo. |
 | `kalender_termine` | `projekt_id`, `tage` | Anstehende Termine aus den Kalender-Referenzen. |
+| `kalender_vorrat` | – | Die Kalender, die dieser Mensch besitzt. Ein **Vorrat, keine Zuordnung** – gelesen wird ein Kalender nur, wo er als Referenz an einem Vorhaben hängt. |
+| `kalender_vorrat_setzen` | `quellen` | Schreibt den Vorrat. Was keine Kalenderadresse ist, wird abgewiesen statt stillschweigend übernommen. |
+| `kalender_vorschlag` | `projekt_id` | Sucht im Vorrat nach Terminen, die zum Titel des Vorhabens passen, und nennt die Suchbegriffe mit. **Nur auf Klick**: es holt Kalender, die dieses Vorhaben noch nicht angefordert hat. |
+| `kalender_anhaengen` | `projekt_id`, `quelle` | Legt die Referenz an. Das ist die Zuordnung, die der Vorrat absichtlich nicht ist. |
 
 Siehe [[Gegenseite]] und [[Kalender]].
 
@@ -155,7 +201,8 @@ Siehe [[Gegenseite]] und [[Kalender]].
 | `ki_ziel_setzen` | `basis_url`, `modell`, `schluessel_eintrag`, `schluessel_feld` | Der Schlüssel liegt im Tresor; hier steht nur der Zeiger. |
 | `ki_modelle` | `basis_url` | Modelle eines Ziels, damit niemand einen Namen abtippen muss. |
 | `ki_anfrage_text` | `projekt_id` | **Genau der Text, der gesendet würde** – die Oberfläche zeigt ihn, bevor etwas das Gerät verlässt. |
-| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. |
+| `ki_kurs_text` | `projekt_id` | Dasselbe für den Kurs-Vorschlag: Name, Erkennungsmarken, README und Dateinamen des angehängten Ordners. **Keine Dateiinhalte außer der README.** Fehlt der Ordner, ist das ein Fehler und kein leerer Text – ein Kurs aus dem Titel allein wäre geraten. |
+| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. `zweck` ist `brief_verdichten`, `datei_deuten` oder `kurs_vorschlagen`. |
 | `ki_verbrauch` | – | Zähler und die letzten Protokolleinträge. |
 | `ki_verbrauch_loeschen` | – | Was Lotse über den eigenen Gebrauch führt, muss man auch loswerden können. |
 | `datei_auszug` | `pfad` | Macht **eine** ausdrücklich gewählte Datei auf. Gespeichert wird dabei nichts. |
@@ -213,6 +260,11 @@ Siehe [[Export und Fluchtweg|Export-und-Fluchtweg]].
 | `update_pruefen` | `erzwingen` | Sieht nach. Lädt nichts und führt nichts aus. |
 | `update_installieren` | – | Holt die neue Fassung, prüft die Signatur, tauscht aus, startet neu. Sperrt vorher – der Schlüssel überlebt einen Neustart nicht. |
 | `update_automatisch_setzen` | `an` | Nachsehen beim Start. |
+| `systemeintrag_stand` | – | Läuft diese Fassung als AppImage, liegt sie an ihrem Platz, gibt es den Menüeintrag, wurde schon gefragt? Außerhalb von Linux-AppImages ist alles `false`. |
+| `systemeintrag_anlegen` | – | Legt die Datei nach `~/.local/share/lotse/Lotse.AppImage` und schreibt Desktop-Datei und Icon. Nur auf Klick. |
+| `systemeintrag_entfernen` | – | Nimmt Menüeintrag und Icon wieder weg. Die Datei bleibt – das ist das laufende Programm. |
+| `systemeintrag_gefragt` | – | Merkt ein »nein, danke«, damit die Frage nicht bei jedem Start wiederkommt. |
+| `systemeintrag_neu_starten` | `ziel` | Startet die Fassung am Platz und beendet die laufende. Sperrt vorher. |
 
 Während des Austauschs sendet die Hülle Fortschrittsmeldungen (`update-fortschritt`), aus
 denen die Oberfläche den Balken baut. Siehe [[Updates]].

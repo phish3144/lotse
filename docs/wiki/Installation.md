@@ -81,6 +81,37 @@ chmod +x Lotse_*_amd64.AppImage
 ./Lotse_*_amd64.AppImage
 ```
 
+### Platz im System
+
+Ein AppImage wird nicht installiert. Es liegt da, wo der Browser es hingelegt hat, und
+daraus folgen drei Ärgernisse auf einmal:
+
+- kein Eintrag im Anwendungsmenü, kein Icon
+- das Selbst-Update arbeitet an genau dieser Datei – wird der Download-Ordner aufgeräumt,
+  ist Lotse weg
+- der Dateiname trägt die Version: nach dem ersten Selbst-Update heißt die Datei
+  `Lotse_0.7.0_amd64.AppImage` und enthält 0.8.0
+
+Beim ersten Start fragt Lotse deshalb **einmal**, ob es sich einrichten darf. Ein »nein«
+wird gemerkt; der Knopf bleibt unter *Einstellungen → Version → Platz im System*.
+
+Was dabei passiert – und nichts darüber hinaus:
+
+| Datei | Was |
+|---|---|
+| `~/.local/share/lotse/Lotse.AppImage` | Die Fassung, die von jetzt an gilt. Fester Name ohne Version, damit das Selbst-Update verlässlich greift und der Name nicht lügt. |
+| `~/.local/share/applications/lotse.desktop` | Der Eintrag im Menü. `Exec` zeigt auf die Datei oben. |
+| `~/.local/share/icons/hicolor/128x128/apps/lotse.png` | Das Icon. |
+
+Die heruntergeladene Datei bleibt liegen – Lotse löscht nichts im Download-Ordner; die
+Anzeige nennt sie, damit du sie selbst wegräumen kannst. Nach dem Einrichten läuft noch
+die alte Datei; *Von dort neu starten* wechselt (und sperrt vorher, weil der Schlüssel
+einen Neustart nicht überlebt).
+
+**Deinstallieren** heißt dann: die drei Dateien oben löschen, dazu den Datenordner
+([[Datenablage]]). Der Eintrag im Menü lässt sich auch aus den Einstellungen wieder
+wegnehmen, ohne dass das Programm verschwindet.
+
 ## Kommandozeile
 
 Vier Ziele, jeweils als Archiv mit Prüfsumme:

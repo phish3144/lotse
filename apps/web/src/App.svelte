@@ -4,7 +4,14 @@
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
   import Sprung from './lib/components/Sprung.svelte';
   import { echteDaten } from './lib/data/store';
-  import { konto, update, type BeobachterBilanz } from './lib/data/tauri';
+  import {
+    konto,
+    systemeintrag,
+    update,
+    type BeobachterBilanz,
+    type ForgeErgebnis,
+    type SystemeintragStand,
+  } from './lib/data/tauri';
   import { datenVersion } from './lib/data/version.svelte';
   import { erfassung } from './lib/erfassung.svelte';
   import { meldungen } from './lib/meldung.svelte';
@@ -23,13 +30,20 @@
   let entsperrt = $state(!echteDaten);
 
   // Der Ordner-Beobachter schreibt im Hintergrund. Damit das sichtbar wird, ohne dass
-  // man die Seite neu lädt, hört die App auf seine Meldungen.
+  // man die Seite neu lädt, hört die App auf seine Meldungen – und auf die der Gegenseite,
+  // die am selben Thread hängt.
   $effect(() => {
     if (!echteDaten || !entsperrt) return;
-    let abmelden: (() => void) | undefined;
+    const abmelden: (() => void)[] = [];
     let entsorgt = false;
-    void import('@tauri-apps/api/event').then(({ listen }) =>
-      listen<BeobachterBilanz>('beobachter-bilanz', (e) => {
+
+    function merken(un: () => void) {
+      if (entsorgt) un();
+      else abmelden.push(un);
+    }
+
+    void import('@tauri-apps/api/event').then(({ listen }) => {
+      void listen<BeobachterBilanz>('beobachter-bilanz', (e) => {
         datenVersion.bump();
         const b = e.payload;
         const teile = [
@@ -38,14 +52,24 @@
           b.kandidaten ? `${b.kandidaten} neue Kandidaten` : '',
         ].filter(Boolean);
         if (teile.length > 0) meldungen.zeigen(`Beobachter: ${teile.join(', ')}.`);
-      }).then((un) => {
-        if (entsorgt) un();
-        else abmelden = un;
-      }),
-    );
+      }).then(merken);
+
+      // Fehlt ein Zugang zur Gegenseite, schreibt die Hülle das als offenen Faden ins
+      // Projekt. Ohne diesen Empfänger stünde er erst nach dem nächsten Neuladen da.
+      void listen<ForgeErgebnis>('forge-bilanz', (e) => {
+        datenVersion.bump();
+        const f = e.payload;
+        const teile = [
+          f.notizen ? `${f.notizen} Einträge` : '',
+          f.hinweise ? `${f.hinweise} mal fehlt ein Zugang` : '',
+        ].filter(Boolean);
+        if (teile.length > 0) meldungen.zeigen(`Gegenseite: ${teile.join(', ')}.`);
+      }).then(merken);
+    });
+
     return () => {
       entsorgt = true;
-      abmelden?.();
+      for (const un of abmelden) un();
     };
   });
 
@@ -53,6 +77,50 @@
   // entscheidet, ob daraus wirklich eine Anfrage wird: nur wenn eingeschaltet und der
   // letzte Blick mehr als einen Tag her ist.
   let neueVersion: { version: string; seite: string } | null = $state(null);
+
+  // Ein AppImage hat keinen Platz im System: kein Eintrag im Menü, und der Selbsttausch
+  // hängt an dem Ordner, in dem der Browser die Datei abgelegt hat. Einmal angeboten,
+  // dann nie wieder – ein »nein« wird gemerkt, sonst wäre »später« nur ein anderes Wort
+  // für »bei jedem Start noch einmal«.
+  let sysAngebot: SystemeintragStand | null = $state(null);
+
+  $effect(() => {
+    if (!echteDaten || !entsperrt) return;
+    let gilt = true;
+    systemeintrag
+      .stand()
+      .then((s) => {
+        if (gilt && s.appimage && !s.menueintrag && !s.gefragt) sysAngebot = s;
+      })
+      .catch(() => {});
+    return () => {
+      gilt = false;
+    };
+  });
+
+  async function sysAngebotAnnehmen() {
+    try {
+      const b = await systemeintrag.anlegen();
+      sysAngebot = null;
+      meldungen.zeigen(
+        b.kopiert
+          ? `Lotse liegt jetzt unter ${b.ziel} und steht im Menü. Beim nächsten Start gilt diese Fassung.`
+          : 'Lotse steht jetzt im Menü.',
+      );
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
+
+  async function sysAngebotAblehnen() {
+    sysAngebot = null;
+    try {
+      await systemeintrag.gefragt();
+    } catch {
+      // Nicht gemerkt heißt: die Frage kommt beim nächsten Start noch einmal. Kein Grund
+      // für eine Fehlermeldung über etwas, das der Mensch gerade weggeklickt hat.
+    }
+  }
 
   $effect(() => {
     if (!echteDaten || !entsperrt) return;
@@ -205,6 +273,13 @@
       <div class="update-band sperr-band" role="status">
         <span>Lotse sperrt in {warnungLaeuft} Sekunden.</span>
         <button type="button" class="schlicht" onclick={regung}>Wach bleiben</button>
+      </div>
+    {/if}
+    {#if sysAngebot}
+      <div class="update-band">
+        <span>Lotse läuft als AppImage – ohne Eintrag im Menü.</span>
+        <button type="button" class="schlicht" onclick={sysAngebotAnnehmen}>Ins Menü aufnehmen</button>
+        <button type="button" class="schlicht" onclick={sysAngebotAblehnen} aria-label="Hinweis schließen">✕</button>
       </div>
     {/if}
     {#if neueVersion}

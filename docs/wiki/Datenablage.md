@@ -118,6 +118,7 @@ Zeiger. Siehe [[Gegenseite]].
 |---|---|
 | `ki_basis_url` | Adresse des Ziels, z. B. `http://localhost:11434/v1`. |
 | `ki_modell` | Modellname. |
+| `kalender_vorrat` | Die Kalenderadressen, die dieser Mensch besitzt, eine pro Zeile. Ein **Vorrat, keine Zuordnung**: gelesen wird ein Kalender nur dort, wo er als Referenz an einem Vorhaben hängt ([[Kalender]]). Die Adressen sind Geheimnisse – wer sie hat, liest den Kalender. |
 | `ki_schluessel_eintrag` | ID des Tresor-Eintrags mit dem API-Schlüssel. |
 | `ki_schluessel_feld` | Welches Feld darin. |
 | `ki_protokoll` | Protokoll der Anfragen: wann, wozu, wie viele Zeichen. |
@@ -142,6 +143,7 @@ Rechnung kommt. Siehe [[KI]].
 | `auto_lock_minuten` | Nach wie vielen Minuten ohne Eingabe die App sperrt. `0` = nie. |
 | `update_aus` | Ob die Suche nach Updates abgeschaltet ist. |
 | `update_zuletzt` | Wann zuletzt nachgesehen wurde. |
+| `systemeintrag_gefragt` | Dass nach dem Platz im System schon einmal gefragt wurde (nur Linux-AppImage). Ein »nein« bleibt ein Nein – sonst wäre »später« nur ein anderes Wort für »bei jedem Start noch einmal«. Siehe [[Installation]]. |
 
 ---
 

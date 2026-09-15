@@ -256,6 +256,7 @@ impl Beobachter {
             let bekannt: std::collections::HashSet<PathBuf> =
                 self.zuordnung.iter().map(|(p, _)| p.clone()).collect();
             let kandidaten: Vec<_> = detect::scan(&self.wurzeln, &detect::ScanOptionen::default())?
+                .kandidaten
                 .into_iter()
                 .filter(|k| !bekannt.contains(Path::new(&k.pfad)))
                 .filter(|k| {

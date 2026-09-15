@@ -497,6 +497,85 @@ pub fn kommende(termine: &[Termin], von: &str, bis: &str, hoechstens: usize) -> 
     out
 }
 
+// ------------------------------------------------------- Zu welchem Vorhaben?
+
+/// Ab dieser Länge taugt ein einzelnes Wort als Suchbegriff. Kürzeres trifft zu viel:
+/// »Haus« steckt in »Hausarzt«, »Bau« in »Baumarkt«.
+const MIN_WORT: usize = 5;
+
+/// Wörter, die in jedem zweiten Projekttitel stehen und deshalb nichts unterscheiden.
+const ZU_ALLGEMEIN: &[&str] = &[
+    "projekt",
+    "vorhaben",
+    "neues",
+    "neuer",
+    "neue",
+    "meine",
+    "meiner",
+    "mein",
+    "sache",
+    "arbeit",
+    "termin",
+    "termine",
+    "planung",
+    "phase",
+    "sonstiges",
+    "allgemein",
+    "diverse",
+];
+
+/// Termine, die zu einem Vorhaben gehören könnten.
+///
+/// Das ist ein **Fund, keine Zuordnung**: die Liste geht an einen Menschen, der sie
+/// ansieht. Deshalb darf die Regel großzügig sein – aber nicht so großzügig, dass jeder
+/// Zahnarzttermin dabei ist, denn dann sieht sie niemand mehr durch.
+///
+/// Es trifft, wenn der ganze Titel im Termin steht, oder ein Wort daraus, das lang genug
+/// und nicht allgemein ist. Groß- und Kleinschreibung zählt nicht.
+pub fn passende<'a>(termine: &'a [Termin], titel: &str) -> Vec<&'a Termin> {
+    let begriffe = begriffe(titel);
+    if begriffe.is_empty() {
+        return Vec::new();
+    }
+    termine
+        .iter()
+        .filter(|t| {
+            let wo = format!(
+                "{} {}",
+                t.titel.to_lowercase(),
+                t.ort.as_deref().unwrap_or("").to_lowercase()
+            );
+            begriffe.iter().any(|b| wo.contains(b.as_str()))
+        })
+        .collect()
+}
+
+/// Die Suchbegriffe zu einem Titel: der ganze Titel und die brauchbaren Einzelwörter.
+///
+/// Gibt eine leere Liste zurück, wenn nichts Brauchbares übrig bleibt – dann wird gar
+/// nicht gesucht. Ein Vorhaben namens »Neues Projekt« soll nicht den halben Kalender
+/// einsammeln.
+pub fn begriffe(titel: &str) -> Vec<String> {
+    let ganz = titel.trim().to_lowercase();
+    if ganz.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    if ganz.chars().count() >= MIN_WORT {
+        out.push(ganz.clone());
+    }
+    for wort in ganz.split(|c: char| !c.is_alphanumeric()) {
+        if wort.chars().count() < MIN_WORT
+            || ZU_ALLGEMEIN.contains(&wort)
+            || out.iter().any(|b| b == wort)
+        {
+            continue;
+        }
+        out.push(wort.to_string());
+    }
+    out
+}
+
 // ------------------------------------------------------------------ Holen
 
 /// Erkennt eine Kalenderadresse: `webcal://…`, `…​.ics` oder ein lokaler Pfad auf eine
@@ -836,5 +915,84 @@ mod tests {
             "BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20260101\r\nSUMMARY:Neujahr 🎉\r\nEND:VEVENT\r\n",
         );
         assert_eq!(mit_emoji[0].titel, "Neujahr 🎉");
+    }
+
+    // ------------------------------------------------- Zu welchem Vorhaben?
+
+    fn t(titel: &str, ort: Option<&str>) -> Termin {
+        Termin {
+            titel: titel.to_string(),
+            datum: "2026-05-01".into(),
+            uhrzeit: None,
+            utc: false,
+            ort: ort.map(str::to_string),
+            wiederholung: None,
+        }
+    }
+
+    #[test]
+    fn ganzer_titel_und_einzelne_woerter_treffen() {
+        let termine = vec![
+            t("Gartenhaus: Beton liefern", None),
+            t("Statik Gartenhaus", None),
+            t("Zahnarzt", None),
+        ];
+        let treffer = passende(&termine, "Gartenhaus");
+        assert_eq!(treffer.len(), 2);
+        assert!(treffer.iter().all(|x| x.titel.contains("Gartenhaus")));
+    }
+
+    #[test]
+    fn auch_der_ort_zaehlt() {
+        // »Wo« ist bei einem Bauvorhaben oft aussagekräftiger als »was«.
+        let termine = vec![t("Abnahme", Some("Baustelle Gartenhaus"))];
+        assert_eq!(passende(&termine, "Gartenhaus").len(), 1);
+    }
+
+    #[test]
+    fn grossschreibung_zaehlt_nicht() {
+        let termine = vec![t("GARTENHAUS abnehmen", None)];
+        assert_eq!(passende(&termine, "gartenhaus").len(), 1);
+    }
+
+    #[test]
+    fn kurze_woerter_treffen_nicht() {
+        // »Haus« steckt in »Hausarzt«, »Bau« in »Baumarkt«. Wer das durchgehen lässt,
+        // liefert eine Liste, die niemand mehr durchsieht.
+        let termine = vec![t("Hausarzt", None), t("Baumarkt", None)];
+        assert!(passende(&termine, "Haus Bau").is_empty());
+    }
+
+    #[test]
+    fn allgemeine_woerter_sammeln_nicht_den_halben_kalender_ein() {
+        let termine = vec![t("Projekt Kickoff", None), t("Termine planen", None)];
+        assert!(
+            passende(&termine, "Neues Projekt").is_empty(),
+            "»Projekt« allein unterscheidet nichts"
+        );
+        // Der ganze Titel bleibt ein Begriff – »neues projekt« als Wortfolge trifft nur,
+        // wo sie wirklich steht, und das ist kein Lärm. Die Einzelwörter fallen weg.
+        assert_eq!(begriffe("Neues Projekt"), vec!["neues projekt".to_string()]);
+    }
+
+    #[test]
+    fn mehrwortige_titel_treffen_auch_in_teilen() {
+        let termine = vec![t("Hochbeet gießen", None), t("Südseite streichen", None)];
+        let treffer = passende(&termine, "Hochbeet Südseite");
+        assert_eq!(treffer.len(), 2);
+    }
+
+    #[test]
+    fn ein_titel_ohne_brauchbares_wort_sucht_gar_nicht() {
+        // Sonst würde »Bau« alles treffen, was ein »bau« enthält.
+        assert!(begriffe("Bau").is_empty());
+        assert!(begriffe("").is_empty());
+        assert!(passende(&[t("Baumarkt", None)], "Bau").is_empty());
+    }
+
+    #[test]
+    fn begriffe_kommen_nicht_doppelt() {
+        // »Gartenhaus« ist ganzer Titel und einziges Wort – einmal genügt.
+        assert_eq!(begriffe("Gartenhaus"), vec!["gartenhaus".to_string()]);
     }
 }

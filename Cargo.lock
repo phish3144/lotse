@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1878,7 +1878,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "age",
  "argon2",

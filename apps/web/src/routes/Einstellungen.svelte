@@ -7,12 +7,14 @@
     beobachter,
     exportieren,
     forge,
+    kalender,
     ki,
     KI_ZIELE,
     konto,
     mcp,
     sync,
     system,
+    systemeintrag,
     update,
     type BeobachterStatus,
     type ForgeStatus,
@@ -23,6 +25,8 @@
     type KontoStatus,
     type SyncErgebnis,
     type SyncStatus,
+    type SystemeintragBericht,
+    type SystemeintragStand,
     type UpdateFortschritt,
     type UpdateStand,
   } from '../lib/data/tauri';
@@ -292,6 +296,15 @@
       const r = await forge.abfragen();
       datenVersion.bump();
       for (const f of r.fehler) meldungen.zeigen(f, 'fehler');
+      if (r.hinweise > 0) {
+        // Der Hinweis steht als offener Faden im Projekt. Hier nur der Zeiger darauf –
+        // sonst muss man zwei Stellen lesen, um dasselbe zu erfahren.
+        meldungen.zeigen(
+          r.hinweise === 1
+            ? 'Für ein Projekt fehlt ein Zugang. Es steht als offener Punkt dort.'
+            : `Für ${r.hinweise} Projekte fehlt ein Zugang. Es steht als offener Punkt dort.`,
+        );
+      }
       if (r.fehler.length === 0 || r.abgefragt > 0) {
         meldungen.zeigen(
           r.notizen > 0
@@ -304,6 +317,35 @@
     } finally {
       forgeLaeuft = false;
     }
+  }
+
+  // --- Kalender-Vorrat ------------------------------------------------------
+  // Eine Liste der Kalender, die dieser Mensch besitzt. Keine Zuordnung: gelesen wird ein
+  // Kalender nur, wo er als Referenz an einem Vorhaben hängt. Die Liste erspart bloß das
+  // Abtippen derselben langen Adresse für jedes Vorhaben – und macht es möglich, nach dem
+  // Anlegen nachzusehen, ob dort etwas zum neuen Vorhaben steht.
+  let kalVorrat: string[] = $state([]);
+  let kalEingabe = $state('');
+  let kalLaeuft = $state(false);
+
+  async function kalVorratSchreiben(neu: string[]) {
+    kalLaeuft = true;
+    try {
+      kalVorrat = await kalender.vorratSetzen(neu);
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      kalLaeuft = false;
+    }
+  }
+
+  async function kalHinzufuegen(e: Event) {
+    e.preventDefault();
+    const z = kalEingabe.trim();
+    if (!z) return;
+    await kalVorratSchreiben([...kalVorrat, z]);
+    // Nur leeren, wenn die Adresse angenommen wurde – sonst muss man sie neu tippen.
+    if (kalVorrat.includes(z)) kalEingabe = '';
   }
 
   // --- Was die KI bisher gesendet hat ---------------------------------------
@@ -322,6 +364,50 @@
 
   // --- Version und Updates --------------------------------------------------
   let updateStand: UpdateStand | null = $state(null);
+
+  // --- Systemeintrag (Linux, AppImage) ---------------------------------------
+  // Ein AppImage wird nicht installiert. Es liegt da, wo der Browser es hingelegt hat –
+  // ohne Menüeintrag, und der Selbsttausch hängt an genau diesem Ordner. Hier lässt sich
+  // das nachholen, auf Klick.
+  let sysStand: SystemeintragStand | null = $state(null);
+  let sysBericht: SystemeintragBericht | null = $state(null);
+  let sysLaeuft = $state(false);
+
+  async function sysAnlegen() {
+    sysLaeuft = true;
+    try {
+      sysBericht = await systemeintrag.anlegen();
+      sysStand = await systemeintrag.stand();
+      kalVorrat = await kalender.vorrat();
+      meldungen.zeigen('Menüeintrag angelegt.');
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      sysLaeuft = false;
+    }
+  }
+
+  async function sysEntfernen() {
+    sysLaeuft = true;
+    try {
+      await systemeintrag.entfernen();
+      sysBericht = null;
+      sysStand = await systemeintrag.stand();
+      meldungen.zeigen('Menüeintrag entfernt. Die Datei selbst bleibt liegen.');
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      sysLaeuft = false;
+    }
+  }
+
+  async function sysNeuStarten(ziel: string) {
+    try {
+      await systemeintrag.neuStarten(ziel);
+    } catch (e) {
+      meldungen.fehler(e);
+    }
+  }
   let austauschLaeuft = $state(false);
   let geladen = $state(0);
   let gesamt: number | null = $state(null);
@@ -387,6 +473,7 @@
     try {
       await update.automatischSetzen(an);
       updateStand = await update.pruefen(false);
+      sysStand = await systemeintrag.stand();
       kiVerbrauch = await ki.verbrauch();
     } catch (e) {
       meldungen.fehler(e);
@@ -972,6 +1059,42 @@
     jeder gängige Dienst gibt so eine Adresse aus. Auf der Projektseite steht dann unter <em>Was ansteht</em>, was in
     den nächsten 90 Tagen kommt. Termine wandern nicht ins Logbuch – sie bleiben dort, wo sie gepflegt werden.
   </p>
+  {#if echteDaten}
+    <h3>Meine Kalender</h3>
+    <p class="hinweis">
+      Ein Vorrat, <strong>keine Zuordnung</strong>: gelesen wird ein Kalender nur dort, wo er als Referenz an einem
+      Vorhaben hängt. Die Liste erspart das Abtippen derselben langen Adresse für jedes Vorhaben – und sie ist die
+      Voraussetzung dafür, dass Lotse auf einer Projektseite nachsehen kann, ob hier etwas zum Vorhaben steht.
+    </p>
+    {#if kalVorrat.length > 0}
+      <ul class="kal-liste">
+        {#each kalVorrat as q (q)}
+          <li>
+            <code>{q}</code>
+            <button
+              type="button"
+              class="schlicht"
+              disabled={kalLaeuft}
+              onclick={() => kalVorratSchreiben(kalVorrat.filter((x) => x !== q))}
+            >
+              Entfernen
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="hinweis klein">Noch kein Kalender hinterlegt.</p>
+    {/if}
+    <form class="zeile" onsubmit={kalHinzufuegen}>
+      <input bind:value={kalEingabe} type="text" placeholder="https://kalender.example.org/feeds/bau.ics" />
+      <button type="submit" disabled={kalLaeuft || !kalEingabe.trim()}>Hinzufügen</button>
+    </form>
+    <p class="hinweis klein">
+      Diese Adressen sind <strong>Geheimnisse</strong>: wer sie hat, liest deinen Kalender. Sie stehen im Klartext in
+      der verschlüsselten Datenbank – derselbe Schutz wie für alles andere dort, aber ohne die zusätzliche Hülle des
+      Tresors.
+    </p>
+  {/if}
   <p class="hinweis klein">
     Geholt wird der Kalender, wenn du die Projektseite öffnest, und danach höchstens alle 15 Minuten neu.
     Uhrzeiten zeigt Lotse so, wie sie im Kalender stehen; ohne Zeitzonendatenbank wäre jede Umrechnung geraten.
@@ -1187,6 +1310,59 @@
     </button>
   {/if}
 </section>
+
+{#if sysStand?.appimage}
+  <section aria-labelledby="sys-titel">
+    <h2 id="sys-titel">Platz im System</h2>
+    <p class="hinweis">
+      Diese Fassung läuft als AppImage. Ein AppImage wird nicht installiert: es liegt da, wo der Browser es
+      hingelegt hat – ohne Eintrag im Menü, und der Selbsttausch arbeitet an genau dieser Datei. Wird der
+      Download-Ordner aufgeräumt, ist Lotse weg.
+    </p>
+    <dl class="werte">
+      <dt>Läuft aus</dt>
+      <dd><code>{sysStand.pfad ?? 'unbekannt'}</code></dd>
+      {#if sysStand.ziel}
+        <dt>Platz</dt>
+        <dd><code>{sysStand.ziel}</code></dd>
+      {/if}
+      <dt>Eintrag im Menü</dt>
+      <dd>{sysStand.menueintrag ? 'ja' : 'nein'}</dd>
+    </dl>
+
+    {#if sysBericht}
+      <p class="hinweis klein">
+        Angelegt: <code>{sysBericht.desktop_datei}</code> und <code>{sysBericht.icon_datei}</code>.
+        {#if sysBericht.alter_pfad}
+          Die heruntergeladene Datei <code>{sysBericht.alter_pfad}</code> kann weg – Lotse löscht sie nicht.
+        {/if}
+      </p>
+      {#if sysBericht.kopiert}
+        <p class="hinweis klein">
+          Es läuft noch die heruntergeladene Datei. Bis zum Neustart aktualisiert sich diese, nicht die am Platz.
+        </p>
+        <button type="button" class="primaer" onclick={() => sysNeuStarten(sysBericht!.ziel)}>
+          Von dort neu starten
+        </button>
+      {/if}
+    {/if}
+
+    <div class="zeile">
+      <button type="button" class="primaer" onclick={sysAnlegen} disabled={sysLaeuft}>
+        {sysStand.menueintrag && sysStand.am_platz ? 'Eintrag erneuern' : 'Platz geben und ins Menü'}
+      </button>
+      {#if sysStand.menueintrag}
+        <button type="button" onclick={sysEntfernen} disabled={sysLaeuft}>Eintrag entfernen</button>
+      {/if}
+    </div>
+    <p class="hinweis klein">
+      Legt die Datei nach <code>~/.local/share/lotse/Lotse.AppImage</code> – feste Stelle, fester Name, damit der
+      Selbsttausch verlässlich greift und der Dateiname nicht nach dem ersten Update die alte Version nennt. Dazu
+      eine Desktop-Datei und ein Icon unter <code>~/.local/share</code>. Sonst wird nichts angefasst; zum
+      Deinstallieren reichen diese drei Dateien und der Datenordner.
+    </p>
+  </section>
+{/if}
   {/if}
 
 {#if reiter === 'sicherheit'}
@@ -1360,6 +1536,24 @@
   .zeile input {
     flex: 1;
     min-width: 15rem;
+  }
+  .kal-liste {
+    list-style: none;
+    margin: 0.6rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .kal-liste li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .kal-liste code {
+    font-size: 0.78rem;
+    word-break: break-all;
   }
   .protokoll {
     list-style: none;

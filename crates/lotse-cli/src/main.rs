@@ -1317,7 +1317,14 @@ fn scan(store: &mut Store, wurzeln: Vec<PathBuf>, uebernehmen: bool) -> Result<(
         .into_iter()
         .map(|w| w.canonicalize().unwrap_or(w))
         .collect();
-    let alle = detect::scan(&wurzeln, &detect::ScanOptionen::default())?;
+    let bilanz = detect::scan(&wurzeln, &detect::ScanOptionen::default())?;
+    if bilanz.abgebrochen {
+        eprintln!(
+            "Nach {} Ordnern abgebrochen – die Liste ist unvollständig. Wähle enger.",
+            bilanz.angesehen
+        );
+    }
+    let alle = bilanz.kandidaten;
     // Bereits bekannte Projekte (Marker) sind keine Kandidaten mehr.
     let neu: Vec<Kandidat> = alle
         .into_iter()

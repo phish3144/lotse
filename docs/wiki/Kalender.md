@@ -42,6 +42,43 @@ Erkannt wird als Kalender, was auf `.ics` endet (Abfrageteil wird ignoriert) ode
 Ein **lokaler Pfad** auf eine `.ics`-Datei geht auch – nützlich für einen Kalender, der
 per Datei-Sync ohnehin auf dem Rechner liegt.
 
+### Meine Kalender: ein Vorrat, keine Zuordnung
+
+Dieselbe lange Adresse für jedes Vorhaben abzutippen ist Unfug. Deshalb gibt es unter
+*Einstellungen → Verbindungen → Kalender* eine Liste der Kalender, die dir gehören.
+
+Diese Liste ist ausdrücklich **keine Zuordnung**. Gelesen wird ein Kalender nur dort, wo er
+als Referenz an einem Vorhaben hängt – der Satz oben gilt unverändert. Der Vorrat ist nur
+die Sammlung der Adressen, und er macht eine Sache möglich, die vorher nicht ging.
+
+### Nachsehen, was zu einem Vorhaben passt
+
+Auf einer Projektseite ohne Kalender steht **Steht dazu was im Kalender?** mit einem Knopf:
+*Nach „Gartenhaus" suchen*. Lotse holt dann die Kalender aus dem Vorrat und zeigt, welche
+Termine zum Titel passen – mit den Suchbegriffen dabei, damit du nicht rätst, warum etwas
+fehlt. Passt etwas, hängst du den Kalender mit einem Klick an.
+
+Warum das erst hier steht und nicht beim Anlegen: dort gibt es den Titel noch nicht, und
+ohne Titel gibt es keinen Suchbegriff.
+
+**Gesucht wird nur auf Klick.** Das holt Kalender, die dieses Vorhaben noch nicht
+angefordert hat; von allein zu laufen wäre Verkehr, den niemand bestellt hat.
+
+Die Regel, nach der zugeordnet wird:
+
+| Trifft | Trifft nicht |
+|---|---|
+| Der ganze Titel im Termin oder im Ort (»Baustelle Gartenhaus«) | Wörter unter fünf Zeichen – »Haus« steckt in »Hausarzt«, »Bau« in »Baumarkt« |
+| Ein einzelnes Wort daraus, ab fünf Zeichen: »Hochbeet Südseite« findet »Hochbeet gießen« | Wörter, die nichts unterscheiden: *Projekt*, *Vorhaben*, *Termin*, *Planung*, *Allgemein* … |
+| Groß- und Kleinschreibung ist gleichgültig | Ein Titel, aus dem kein brauchbarer Begriff übrig bleibt – dann wird gar nicht gesucht |
+
+Es ist ein **Fund, keine Zuordnung**: du siehst die Termine, bevor etwas angehängt wird.
+Deshalb darf die Regel großzügig sein – aber nicht so großzügig, dass jeder Zahnarzttermin
+dabei ist, denn dann sieht sie niemand mehr durch.
+
+Angehängt wird immer der **ganze Kalender**, nie einzelne Termine. Einen Termin zu kopieren
+hieße, ihn an zwei Orten zu führen, und einer davon wäre irgendwann falsch.
+
 ---
 
 ## Was angezeigt wird

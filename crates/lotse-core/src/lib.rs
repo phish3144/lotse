@@ -21,6 +21,8 @@ pub mod vault;
 
 #[cfg(feature = "native")]
 pub mod detect;
+#[cfg(feature = "native")]
+pub mod deuten;
 pub mod dokument;
 #[cfg(feature = "native")]
 pub mod export;
@@ -36,6 +38,8 @@ pub mod mcp;
 pub mod netz;
 #[cfg(feature = "native")]
 pub mod store;
+#[cfg(feature = "native")]
+pub mod systemeintrag;
 #[cfg(feature = "native")]
 pub mod update;
 #[cfg(feature = "native")]
