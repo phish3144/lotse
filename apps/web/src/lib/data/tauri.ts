@@ -258,6 +258,8 @@ export interface ForgeStatus {
 export interface ForgeErgebnis {
   abgefragt: number;
   notizen: number;
+  /** Offene Fäden, die geschrieben wurden, weil ein Zugang fehlt. */
+  hinweise: number;
   fehler: string[];
 }
 

@@ -292,6 +292,42 @@ pub(crate) fn hole<T: serde::de::DeserializeOwned>(
     }
 }
 
+// ------------------------------------------------------- Zugang, wenn er fehlt
+
+/// Steckt hinter dem Fehler ein Zugangsproblem – oder nur ein Netz, das gerade nicht da
+/// ist?
+///
+/// Der Unterschied entscheidet, ob ein Hinweis ins Projekt gehört: für ein WLAN, das im
+/// Zug abbricht, einen offenen Faden zu schreiben wäre Lärm. Geprüft wird an der Variante,
+/// nicht am Text – `hole` bildet 401, 403, 404 und 429 auf `Invalid` bzw. `NotFound` ab,
+/// alles andere landet in `Netz`.
+pub fn zugangsproblem(e: &Error) -> bool {
+    matches!(e, Error::Invalid(_) | Error::NotFound(_))
+}
+
+/// Der Satz, mit dem Lotse sagt, dass ein Zugang fehlt.
+///
+/// Er gehört ins Projekt, als offener Faden – nicht auf eine Einstellungsseite, die
+/// niemand öffnet, solange nichts wehtut. Und er nennt die Folge, nicht die Einstellung:
+/// »keine Pull Requests« ist eine Aussage, »Token nicht gesetzt« ist eine Zustandsmeldung.
+pub fn zugang_faden(anbieter: Anbieter, repo: &str) -> String {
+    format!(
+        "Für {} fehlt ein Zugang. Ohne ihn sieht Lotse bei »{repo}« nicht nach: keine \
+         offenen Anfragen, kein Prüflauf-Status, und private Repos gar nicht. \
+         Einstellungen → Verbindungen.",
+        anbieter.as_str()
+    )
+}
+
+/// Denselben Hinweis nicht zweimal – auch dann nicht, wenn er abgehakt wurde: dann ist er
+/// gelesen. Ein täglich wiederkehrender Faden ist kein Hinweis, sondern Lärm. Wer ihn
+/// löscht, bekommt ihn beim nächsten Lauf wieder; das ist der Weg zurück.
+pub fn hinweis_faellig(notizen: &[Notiz], text: &str) -> bool {
+    !notizen
+        .iter()
+        .any(|n| n.art == Art::Offen && n.text == text)
+}
+
 /// GitHub: ein Aufruf für das Repo, einer für die Pull Requests, einer für den Prüflauf.
 mod github {
     use super::*;
@@ -1177,5 +1213,48 @@ mod verdichtung_tests {
         ];
         let l = letzte_maschinelle(&notizen, Quelle::Git).expect("Git-Notiz");
         assert_eq!(l.text, "maschinell");
+    }
+}
+
+#[cfg(test)]
+mod zugang_tests {
+    use super::*;
+    use crate::model::{Art, Notiz, Quelle};
+
+    #[test]
+    fn netzausfall_ist_kein_zugangsproblem() {
+        // Sonst schreibt eine Zugfahrt ohne Empfang in jedes Projekt einen offenen Faden.
+        assert!(!zugangsproblem(&Error::Netz("kein DNS".into())));
+        assert!(zugangsproblem(&Error::Invalid("Keine Berechtigung".into())));
+        assert!(zugangsproblem(&Error::NotFound("Repo".into())));
+    }
+
+    #[test]
+    fn der_satz_nennt_die_folge_nicht_die_einstellung() {
+        let t = zugang_faden(Anbieter::GitHub, "o/r");
+        assert!(t.contains("GitHub"));
+        assert!(t.contains("o/r"));
+        assert!(
+            t.contains("offenen Anfragen"),
+            "die Folge muss dastehen: {t}"
+        );
+    }
+
+    #[test]
+    fn derselbe_hinweis_kommt_nicht_zweimal() {
+        let text = zugang_faden(Anbieter::GitHub, "o/r");
+        let leer: Vec<Notiz> = Vec::new();
+        assert!(hinweis_faellig(&leer, &text));
+
+        let mut offen = Notiz::neu(Ulid::new(), Quelle::Git, Art::Offen, text.clone(), 0);
+        assert!(!hinweis_faellig(std::slice::from_ref(&offen), &text));
+
+        // Abgehakt heißt gelesen – nicht »noch einmal sagen«.
+        offen.erledigt_am = Some(1);
+        assert!(!hinweis_faellig(std::slice::from_ref(&offen), &text));
+
+        // Ein anderes Repo ist ein anderer Hinweis.
+        let anderes = zugang_faden(Anbieter::GitHub, "o/x");
+        assert!(hinweis_faellig(std::slice::from_ref(&offen), &anderes));
     }
 }

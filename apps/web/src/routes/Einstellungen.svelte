@@ -295,6 +295,15 @@
       const r = await forge.abfragen();
       datenVersion.bump();
       for (const f of r.fehler) meldungen.zeigen(f, 'fehler');
+      if (r.hinweise > 0) {
+        // Der Hinweis steht als offener Faden im Projekt. Hier nur der Zeiger darauf –
+        // sonst muss man zwei Stellen lesen, um dasselbe zu erfahren.
+        meldungen.zeigen(
+          r.hinweise === 1
+            ? 'Für ein Projekt fehlt ein Zugang. Es steht als offener Punkt dort.'
+            : `Für ${r.hinweise} Projekte fehlt ein Zugang. Es steht als offener Punkt dort.`,
+        );
+      }
       if (r.fehler.length === 0 || r.abgefragt > 0) {
         meldungen.zeigen(
           r.notizen > 0

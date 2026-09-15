@@ -4,7 +4,14 @@
   import Schnellerfassung from './lib/components/Schnellerfassung.svelte';
   import Sprung from './lib/components/Sprung.svelte';
   import { echteDaten } from './lib/data/store';
-  import { konto, systemeintrag, update, type BeobachterBilanz, type SystemeintragStand } from './lib/data/tauri';
+  import {
+    konto,
+    systemeintrag,
+    update,
+    type BeobachterBilanz,
+    type ForgeErgebnis,
+    type SystemeintragStand,
+  } from './lib/data/tauri';
   import { datenVersion } from './lib/data/version.svelte';
   import { erfassung } from './lib/erfassung.svelte';
   import { meldungen } from './lib/meldung.svelte';
@@ -23,13 +30,20 @@
   let entsperrt = $state(!echteDaten);
 
   // Der Ordner-Beobachter schreibt im Hintergrund. Damit das sichtbar wird, ohne dass
-  // man die Seite neu lädt, hört die App auf seine Meldungen.
+  // man die Seite neu lädt, hört die App auf seine Meldungen – und auf die der Gegenseite,
+  // die am selben Thread hängt.
   $effect(() => {
     if (!echteDaten || !entsperrt) return;
-    let abmelden: (() => void) | undefined;
+    const abmelden: (() => void)[] = [];
     let entsorgt = false;
-    void import('@tauri-apps/api/event').then(({ listen }) =>
-      listen<BeobachterBilanz>('beobachter-bilanz', (e) => {
+
+    function merken(un: () => void) {
+      if (entsorgt) un();
+      else abmelden.push(un);
+    }
+
+    void import('@tauri-apps/api/event').then(({ listen }) => {
+      void listen<BeobachterBilanz>('beobachter-bilanz', (e) => {
         datenVersion.bump();
         const b = e.payload;
         const teile = [
@@ -38,14 +52,24 @@
           b.kandidaten ? `${b.kandidaten} neue Kandidaten` : '',
         ].filter(Boolean);
         if (teile.length > 0) meldungen.zeigen(`Beobachter: ${teile.join(', ')}.`);
-      }).then((un) => {
-        if (entsorgt) un();
-        else abmelden = un;
-      }),
-    );
+      }).then(merken);
+
+      // Fehlt ein Zugang zur Gegenseite, schreibt die Hülle das als offenen Faden ins
+      // Projekt. Ohne diesen Empfänger stünde er erst nach dem nächsten Neuladen da.
+      void listen<ForgeErgebnis>('forge-bilanz', (e) => {
+        datenVersion.bump();
+        const f = e.payload;
+        const teile = [
+          f.notizen ? `${f.notizen} Einträge` : '',
+          f.hinweise ? `${f.hinweise} mal fehlt ein Zugang` : '',
+        ].filter(Boolean);
+        if (teile.length > 0) meldungen.zeigen(`Gegenseite: ${teile.join(', ')}.`);
+      }).then(merken);
+    });
+
     return () => {
       entsorgt = true;
-      abmelden?.();
+      for (const un of abmelden) un();
     };
   });
 

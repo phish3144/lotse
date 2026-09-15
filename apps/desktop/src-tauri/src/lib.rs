@@ -1218,7 +1218,10 @@ fn beobachter_starten(
                 return;
             }
             match forge_lauf(&zustand, None, Some(stop)) {
-                Ok(e) if e.abgefragt > 0 => {
+                // Auch dann melden, wenn keine Abfrage durchkam, aber ein Hinweis
+                // geschrieben wurde: sonst steht ein neuer offener Faden da, den die
+                // Oberfläche erst beim nächsten Neuladen zeigt.
+                Ok(e) if e.abgefragt > 0 || e.hinweise > 0 => {
                     let _ = app.emit("forge-bilanz", e);
                 }
                 Ok(_) => {}
@@ -1917,6 +1920,8 @@ fn forge_auto_setzen(state: State<AppState>, an: bool) -> R<()> {
 struct ForgeErgebnis {
     abgefragt: usize,
     notizen: usize,
+    /// Offene Fäden, die geschrieben wurden, weil ein Zugang fehlt.
+    hinweise: usize,
     fehler: Vec<String>,
 }
 
@@ -1975,6 +1980,7 @@ fn forge_lauf(
     let mut notizen = 0usize;
     let mut fehler = Vec::new();
     let mut abgefragt = 0usize;
+    let mut hinweise = 0usize;
 
     for (p, z, _) in ziele {
         if angehalten() {
@@ -2014,7 +2020,33 @@ fn forge_lauf(
                     }
                 }
             }
-            Err(e) => fehler.push(format!("{}: {e}", z.anzeige())),
+            Err(e) => {
+                // Fehlt der Zugang, gehört das ins Projekt und nicht auf eine
+                // Einstellungsseite, die niemand öffnet, solange nichts wehtut. Genau
+                // einmal, und nur wenn wirklich kein Token hinterlegt ist: mit Token ist
+                // ein Fehler eine Sache für die Fehlerliste, nicht für das Logbuch.
+                if token.is_none() && lotse_core::forge::zugangsproblem(&e) {
+                    let text = lotse_core::forge::zugang_faden(z.anbieter, &z.anzeige());
+                    let gesetzt = mit(state, |s| {
+                        let bisher = s.store.notizen(p.id)?;
+                        if lotse_core::forge::hinweis_faellig(&bisher, &text) {
+                            s.store.notiz_speichern(&Notiz::neu(
+                                p.id,
+                                Quelle::Git,
+                                Art::Offen,
+                                text,
+                                now_ms(),
+                            ))?;
+                            return Ok(true);
+                        }
+                        Ok(false)
+                    })?;
+                    if gesetzt {
+                        hinweise += 1;
+                    }
+                }
+                fehler.push(format!("{}: {e}", z.anzeige()));
+            }
         }
     }
 
@@ -2031,6 +2063,7 @@ fn forge_lauf(
     Ok(ForgeErgebnis {
         abgefragt,
         notizen,
+        hinweise,
         fehler,
     })
 }
