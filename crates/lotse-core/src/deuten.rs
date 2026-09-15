@@ -29,11 +29,125 @@ use crate::Result;
 const MAX_DOKUMENTE: usize = 20;
 
 /// Woher gedeutet wird.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Quelle {
     Ordner(PathBuf),
     Adresse(String),
     Dateien(Vec<PathBuf>),
+    /// Kein Anhalt außer dem, was jemand getippt hat. Kein Sonderfall: ein Vorhaben
+    /// braucht keine Quelle, und wer nur einen Namen weiß, soll nicht erst einen
+    /// zweiten Weg suchen müssen.
+    Titel(String),
+}
+
+/// Ordnet ein, was jemand in ein einziges Feld geworfen hat.
+///
+/// Ein Feld für alles, weil die Frage »ist das ein Ordner, eine Adresse oder ein Titel?«
+/// eine ist, die das Programm beantworten kann. Wer sie stellt, verlangt vom Menschen
+/// eine Einordnung, die er gerade gar nicht vorhatte.
+///
+/// Die Reihenfolge ist Absicht:
+///
+/// 1. **Adressen** zuerst, an ihrem Schema erkannt. Sie liegen nie auf der Platte, also
+///    hat ein Dateisystem-Blick hier nichts zu suchen.
+/// 2. **Pfade** nur mit Anker – `/`, `~/`, `./`, `../`, `\\` oder ein Laufwerksbuchstabe.
+///    Ohne Anker bleibt »Haus/Garten« ein Titel; in einem Dialogfeld tippt niemand
+///    relative Pfade, aber Titel mit Schrägstrich sehr wohl.
+/// 3. **Alles andere** ist der Titel.
+///
+/// Ein angekerter Pfad, den es nicht gibt, ist ein **Fehler** und kein Titel: wer
+/// `/home/ich/Grten` tippt, hat sich vertippt und will das hören, statt ein Vorhaben mit
+/// diesem Namen zu bekommen.
+pub fn einordnen(text: &str) -> Result<Quelle> {
+    let t = text.trim();
+    if t.is_empty() {
+        return Ok(Quelle::Titel(String::new()));
+    }
+    if ist_adresse(t) {
+        return Ok(Quelle::Adresse(t.to_string()));
+    }
+    let Some(pfad) = als_pfad(t) else {
+        return Ok(Quelle::Titel(t.to_string()));
+    };
+    if pfad.is_dir() {
+        return Ok(Quelle::Ordner(pfad));
+    }
+    if pfad.is_file() {
+        return Ok(Quelle::Dateien(vec![pfad]));
+    }
+    Err(crate::Error::NotFound(format!(
+        "Den Pfad »{}« gibt es nicht. Tippfehler? Wenn es ein Titel sein soll, lass den \
+         führenden Schrägstrich weg.",
+        pfad.display()
+    )))
+}
+
+/// Erkennt eine Adresse am Schema. `www.` zählt mit, weil das jeder aus der Adresszeile
+/// kopiert; `git@host:pfad` auch, weil das die Form ist, die GitHub zum Klonen anbietet.
+fn ist_adresse(t: &str) -> bool {
+    let l = t.to_ascii_lowercase();
+    for schema in [
+        "http://",
+        "https://",
+        "webcal://",
+        "ssh://",
+        "git://",
+        "ftp://",
+        "ftps://",
+    ] {
+        if l.starts_with(schema) {
+            return true;
+        }
+    }
+    if l.starts_with("www.") {
+        return true;
+    }
+    // `git@github.com:owner/repo` – ein Doppelpunkt nach dem Wirt, kein Laufwerk.
+    if let Some((vorn, hinten)) = t.split_once('@') {
+        if !vorn.is_empty() && hinten.contains(':') && hinten.contains('.') {
+            return true;
+        }
+    }
+    false
+}
+
+/// Macht aus dem Text einen Pfad, wenn er wie einer **beginnt**. `file://` wird
+/// entpackt, `~` durch das Heimatverzeichnis ersetzt.
+fn als_pfad(t: &str) -> Option<PathBuf> {
+    if let Some(rest) = t.strip_prefix("file://") {
+        // `file:///tmp/x` – der dritte Schrägstrich gehört zum Pfad.
+        let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+        return Some(PathBuf::from(if rest.starts_with('/') {
+            rest.to_string()
+        } else {
+            format!("/{rest}")
+        }));
+    }
+    if t == "~" || t.starts_with("~/") || t.starts_with("~\\") {
+        let heim = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from)?;
+        let rest = t[1..].trim_start_matches(['/', '\\']);
+        return Some(if rest.is_empty() {
+            heim
+        } else {
+            heim.join(rest)
+        });
+    }
+    let anker = t.starts_with('/')
+        || t.starts_with("./")
+        || t.starts_with("../")
+        || t.starts_with(".\\")
+        || t.starts_with("..\\")
+        || t.starts_with("\\\\")
+        || laufwerk(t);
+    anker.then(|| PathBuf::from(t))
+}
+
+/// `C:\…` oder `C:/…` – ein Laufwerksbuchstabe, kein `git@host:pfad`.
+fn laufwerk(t: &str) -> bool {
+    let b = t.as_bytes();
+    b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/')
 }
 
 /// Ein einzelner Fund. Jeder wird in der Oberfläche eine Zeile mit Haken, alle
@@ -93,6 +207,24 @@ pub fn deuten(quelle: &Quelle, opt: &ScanOptionen) -> Result<Befund> {
         Quelle::Ordner(p) => ordner(p, opt),
         Quelle::Adresse(a) => adresse(a),
         Quelle::Dateien(d) => dateien(d),
+        Quelle::Titel(t) => Ok(nur_titel(t)),
+    }
+}
+
+/// Ein Befund ohne Funde. Keine leere Seite: Titel und Vorlage stehen drin, der Rest ist
+/// eben nichts – und das ist eine Feststellung wie jede andere.
+fn nur_titel(titel: &str) -> Befund {
+    Befund {
+        quelle: titel.trim().to_string(),
+        vorschlag: Some(Vorschlag {
+            titel: titel.trim().to_string(),
+            kurs: None,
+            vorlage: Vorlage::Generisch,
+        }),
+        funde: Vec::new(),
+        angesehen: 0,
+        abgebrochen: false,
+        weitere_dokumente: 0,
     }
 }
 
@@ -298,6 +430,112 @@ mod tests {
             .args(args)
             .output()
             .expect("git");
+    }
+
+    // ------------------------------------------- Ein Feld nimmt alles
+
+    #[test]
+    fn adressen_werden_am_schema_erkannt() {
+        for t in [
+            "https://github.com/o/r",
+            "http://example.org",
+            "www.example.org/kalender.ics",
+            "webcal://example.org/k.ics",
+            "git@github.com:owner/repo.git",
+            "ssh://git@example.org/r.git",
+        ] {
+            assert_eq!(
+                einordnen(t).unwrap(),
+                Quelle::Adresse(t.to_string()),
+                "{t} sollte eine Adresse sein"
+            );
+        }
+    }
+
+    #[test]
+    fn ein_titel_mit_schraegstrich_bleibt_ein_titel() {
+        // Ohne Anker ist es kein Pfad. In einem Dialogfeld tippt niemand relative Pfade,
+        // aber »Haus/Garten« oder »Kunde: Meier/2026« sehr wohl.
+        for t in ["Haus/Garten", "Gartenhaus", "Kunde Meier 2026", "C:Bericht"] {
+            assert_eq!(
+                einordnen(t).unwrap(),
+                Quelle::Titel(t.to_string()),
+                "{t} sollte ein Titel sein"
+            );
+        }
+    }
+
+    #[test]
+    fn leeres_feld_ist_ein_leerer_titel_kein_fehler() {
+        assert_eq!(einordnen("   ").unwrap(), Quelle::Titel(String::new()));
+    }
+
+    #[test]
+    fn ordner_und_datei_werden_am_dateisystem_unterschieden() {
+        let t = tempfile::tempdir().unwrap();
+        let datei = t.path().join("angebot.pdf");
+        fs::write(&datei, b"%PDF-1.4").unwrap();
+
+        let dir_text = t.path().to_string_lossy().to_string();
+        assert_eq!(
+            einordnen(&dir_text).unwrap(),
+            Quelle::Ordner(t.path().to_path_buf())
+        );
+        assert_eq!(
+            einordnen(&datei.to_string_lossy()).unwrap(),
+            Quelle::Dateien(vec![datei.clone()])
+        );
+        // Leerzeichen drumherum passieren beim Kopieren aus dem Dateimanager.
+        assert_eq!(
+            einordnen(&format!("  {dir_text}  ")).unwrap(),
+            Quelle::Ordner(t.path().to_path_buf())
+        );
+    }
+
+    #[test]
+    fn file_url_wird_entpackt() {
+        let t = tempfile::tempdir().unwrap();
+        let url = format!("file://{}", t.path().display());
+        assert_eq!(
+            einordnen(&url).unwrap(),
+            Quelle::Ordner(t.path().to_path_buf())
+        );
+    }
+
+    #[test]
+    fn tilde_wird_ersetzt() {
+        let heim = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
+        if heim.is_none() {
+            return;
+        }
+        // `~` selbst ist ein Ordner, der es gibt.
+        assert!(matches!(einordnen("~").unwrap(), Quelle::Ordner(_)));
+    }
+
+    #[test]
+    fn ein_pfad_der_fehlt_ist_ein_fehler_kein_titel() {
+        // Wer sich vertippt, will das hören – und kein Vorhaben namens »/home/ich/Grten«.
+        let e = einordnen("/gibt/es/ganz/sicher/nicht/4f2a").unwrap_err();
+        let text = e.to_string();
+        assert!(text.contains("gibt es nicht"), "{text}");
+        assert!(
+            text.contains("Titel"),
+            "die Meldung muss den Ausweg nennen: {text}"
+        );
+    }
+
+    #[test]
+    fn nur_ein_titel_gibt_einen_befund_ohne_funde() {
+        let b = deuten(
+            &Quelle::Titel("Gartenhaus".into()),
+            &ScanOptionen::default(),
+        )
+        .unwrap();
+        let v = b.vorschlag.expect("Vorschlag");
+        assert_eq!(v.titel, "Gartenhaus");
+        assert_eq!(v.vorlage, Vorlage::Generisch);
+        assert!(b.funde.is_empty());
+        assert!(!b.abgebrochen);
     }
 
     #[test]

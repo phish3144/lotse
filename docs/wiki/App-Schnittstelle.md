@@ -114,11 +114,33 @@ bejaht; wer eine Adresse eintippt, hat die Frage ohnehin beantwortet.
 
 | Kommando | Argumente | Was |
 |---|---|---|
-| `quelle_deuten` | `quelle` | Deutet einen Ordner, eine Adresse oder eine Handvoll Dateien und liefert den Befund. Schreibt nichts – bis auf einen Marker, der ins Leere zeigt: den räumt es weg. |
+| `eingabe_deuten` | `eingabe` | **Der Eingang für das eine Feld.** Ordnet ein, was jemand getippt oder hineingezogen hat, und deutet es. |
+| `quelle_deuten` | `quelle` | Dasselbe, wenn die Art schon feststeht – aus den Systemdialogen. |
 | `aus_befund_anlegen` | `auftrag` | Legt in einem Aufruf an, was im Befund abgehakt geblieben ist. |
 
-`quelle` ist eines von `{ art: "ordner", pfad }`, `{ art: "adresse", url }` oder
+`eingabe` ist `{ art: "text", text }` oder `{ art: "pfade", pfade }`;
+`quelle` eines von `{ art: "ordner", pfad }`, `{ art: "adresse", url }` oder
 `{ art: "dateien", pfade }`.
+
+### Was ein Feld annimmt
+
+Die Einordnung steht im Kern (`deuten::einordnen`) und nicht in der Oberfläche: dort wäre
+sie ungeprüft, und sie muss auf dem Dateisystem nachsehen. Die Reihenfolge ist Absicht:
+
+| Erkannt als | Woran |
+|---|---|
+| Adresse | Schema: `http://`, `https://`, `webcal://`, `ssh://`, `git://`, `ftp(s)://`, ein führendes `www.` oder die Klonform `git@wirt:pfad`. Adressen liegen nie auf der Platte, also wird hier gar nicht erst nachgesehen. |
+| Ordner / Datei | Ein Pfad **mit Anker** – `/`, `~/`, `./`, `../`, `\\` oder ein Laufwerksbuchstabe – den es gibt. `file://` wird entpackt, `~` ersetzt. |
+| Titel | Alles andere. Ohne Anker bleibt »Haus/Garten« ein Titel: in ein Dialogfeld tippt niemand relative Pfade, Titel mit Schrägstrich aber schon. |
+
+Ein angekerter Pfad, den es **nicht** gibt, ist ein Fehler und kein Titel – wer sich
+vertippt, soll das hören und nicht ein Vorhaben namens `/home/ich/Grten` bekommen. Die
+Meldung nennt den Ausweg.
+
+Bei `{ art: "pfade" }` – hineingezogen oder aus dem Dateidialog – gilt: ein Pfad wird
+eingeordnet wie getippter Text, mehrere Dateien sind eine Liste, und mehrere Ordner auf
+einmal werden abgewiesen. Daraus würden mehrere Vorhaben, und dafür gibt es schon einen
+Weg: den übergeordneten Ordner hineinziehen, dann stehen sie als Unterprojekte im Befund.
 
 Der Befund enthält einen `vorschlag` (Titel, Kurs, Vorlage – alles änderbar) und eine
 Liste `funde`. Jeder Fund wird in der Oberfläche eine Zeile mit Haken, **alle

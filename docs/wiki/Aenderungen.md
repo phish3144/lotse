@@ -13,7 +13,37 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.8.0 — laufende Fassung
+## 0.8.1 — laufende Fassung
+
+**Das Anlegen in 0.8.0 war kaputt.** Der Dialog sprang nach jedem Klick sofort zurück:
+»Deuten« und »Ohne Quelle« sahen beide aus wie tot. Ursache war ein Effekt in der
+Oberfläche, der eine Element-Referenz gelesen hat — die wird beim Wechsel zum Befund
+ausgehängt, der Effekt lief dadurch noch einmal und machte seine eigene Rücksetzung
+zunichte. Kein Test hat das gefangen, weil es für Dialoge keinen gab; inzwischen läuft
+einer im Browser durch den ganzen Ablauf.
+
+**Und es ist jetzt ein Feld statt zweier Schritte.** Das Fenster fragt **Was gibt's?** und
+wartet auf eine Zeile. Die nimmt alles:
+
+| Hineingeschrieben | Was daraus wird |
+|---|---|
+| `/home/ich/Gartenhaus` | Der Ordner, mit allem darin |
+| `https://github.com/ich/lotse` | Das Repo als Gegenseite |
+| `~/Downloads/angebot.pdf` | Die Datei als Referenz |
+| `Gartenhaus` | Ein Vorhaben mit diesem Namen |
+
+Ordner und Dateien lassen sich auch ins Fenster **ziehen** oder über *Durchsuchen* wählen.
+Die Frage »ist das ein Ordner, eine Adresse oder ein Titel?« kann das Programm selbst
+beantworten — sie zu stellen verlangte eine Einordnung, die gerade niemand vorhatte.
+
+Zwei Dinge daran sind bewusst streng: ein Pfad mit Tippfehler ist ein **Fehler** und kein
+Titel, sonst bekäme man still ein Vorhaben namens `/home/ich/Grten`. Und ohne Anker
+(`/`, `~/`, `./`) bleibt »Haus/Garten« ein Titel, denn in ein Dialogfeld tippt niemand
+relative Pfade, Titel mit Schrägstrich aber schon.
+
+---
+
+## 0.8.0
 
 **Ein Vorhaben anlegen fragt jetzt nur noch eines: woher kommt es?** Der alte Dialog wollte
 Titel, Vorlage und Kurs – also genau das, was Lotse aus einem Ordner selbst herauslesen

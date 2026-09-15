@@ -1,11 +1,18 @@
 <script lang="ts">
-  // Ein Projekt anlegen: erst die Herkunft, dann der Befund.
+  // Ein Vorhaben anlegen. Ein Feld, eine Frage: **Was gibt's?**
   //
-  // Der alte Dialog fragte nach Titel, Vorlage und Kurs – also nach genau dem, was Lotse
-  // aus einem Ordner selbst herauslesen kann. Jetzt kommt zuerst die einzige Frage, die
-  // niemand sonst beantworten kann: woher kommt das? Alles Weitere ist ein Befund mit
-  // Häkchen, keine zweite Fragerunde. Was Lotse schon weiß, wird nicht erfragt: hat der
-  // Ordner ein Remote, steht es da, statt dass jemand »von GitHub importieren?« bejaht.
+  // Das Feld nimmt alles – einen Ordner, einen Link, eine Datei, oder einfach einen Namen.
+  // Die Einordnung macht der Kern (`deuten::einordnen`), nicht diese Datei: dort ist sie
+  // geprüft, und sie muss auf dem Dateisystem nachsehen. Wer fragt »ist das ein Ordner
+  // oder ein Titel?«, verlangt eine Einordnung, die der Mensch gerade nicht vorhatte.
+  //
+  // Danach ein Befund mit Häkchen: was gefunden wurde, nie eine zweite Fragerunde.
+  //
+  // Zur Vorsicht, weil es genau hier schon einmal schiefging: der Rücksetz-Effekt darf
+  // **keine** `bind:this`-Referenz lesen. Svelte schreibt die, nachdem der Dialog steht,
+  // und beim Wechsel auf den Befund wieder auf `undefined` – ein Effekt, der sie liest,
+  // läuft dann noch einmal und macht seine eigene Rücksetzung zunichte. In 0.8.0 sprang
+  // der Dialog dadurch im selben Frame zurück, und beide Knöpfe sahen aus wie tot.
   import { echteDaten, provider } from '../data/store';
   import { datenVersion } from '../data/version.svelte';
   import {
@@ -27,23 +34,20 @@
 
   const VORLAGEN = Object.keys(VORLAGEN_LABEL) as VorlagenId[];
 
-  type Schritt = 'herkunft' | 'befund';
-
-  let schritt: Schritt = $state('herkunft');
+  let eingabe = $state('');
   let deutung: Deutung | null = $state(null);
-  /** Der gedeutete Ordner. Nur gesetzt, wenn die Quelle einer war. */
+  /** Der gedeutete Ordner, falls die Quelle einer war – er bekommt die Markerdatei. */
   let ordnerPfad: string | undefined = $state();
-  let adresse = $state('');
   let titel = $state('');
   let vorlage: VorlagenId = $state('generisch');
   let kurs = $state('');
-  /** Häkchen je Fund, alle vorangekreuzt. Schlüssel ist `schluessel(fund)`. */
+  /** Häkchen je Fund, alle vorangekreuzt. */
   let gewaehlt: Record<string, boolean> = $state({});
   let laeuft = $state(false);
   let wirdGespeichert = $state(false);
   let fehler: string | null = $state(null);
-  let titelEl: HTMLInputElement | undefined = $state();
-  let adresseEl: HTMLInputElement | undefined = $state();
+  let ueberZiehen = $state(false);
+  let eingabeEl: HTMLInputElement | undefined = $state();
 
   function schluessel(f: Fund): string {
     switch (f.art) {
@@ -58,36 +62,57 @@
     }
   }
 
+  // Zurücksetzen genau beim Öffnen. Liest nur `offen` – siehe Kopf dieser Datei.
   $effect(() => {
     if (!offen) return;
-    // Ohne Hülle gibt es keine Ordner und keine Dialoge – dann bleibt das Formular,
-    // und der Schritt „Herkunft" wäre eine leere Seite.
-    schritt = echteDaten ? 'herkunft' : 'befund';
-    deutung = echteDaten ? null : ohneQuelle();
+    eingabe = '';
+    deutung = null;
     ordnerPfad = undefined;
-    adresse = '';
     titel = '';
     vorlage = 'generisch';
     kurs = '';
     gewaehlt = {};
     fehler = null;
     laeuft = false;
-    (echteDaten ? adresseEl : titelEl)?.focus();
+    ueberZiehen = false;
   });
 
-  /** Ein Befund ohne Quelle: das alte Formular, als Sonderfall des neuen Ablaufs. */
-  function ohneQuelle(): Deutung {
-    return {
-      befund: {
-        quelle: 'ohne Quelle',
-        vorschlag: { titel: '', vorlage: 'generisch' },
-        funde: [],
-        angesehen: 0,
-        abgebrochen: false,
-        weitere_dokumente: 0,
-      },
+  // Fokus als eigener Effekt: er liest die Referenz, schreibt aber nichts.
+  $effect(() => {
+    if (offen && !deutung) eingabeEl?.focus();
+  });
+
+  // Hineingezogene Ordner und Dateien. Tauri fängt das auf Fensterebene ab und liefert
+  // echte Pfade – im Webview wären es Datei-Objekte ohne Pfad, mit denen der Kern nichts
+  // anfangen kann.
+  $effect(() => {
+    if (!offen || !echteDaten) return;
+    let abmelden: (() => void) | undefined;
+    let entsorgt = false;
+    void import('@tauri-apps/api/webview').then(({ getCurrentWebview }) =>
+      getCurrentWebview()
+        .onDragDropEvent((e) => {
+          if (e.payload.type === 'enter' || e.payload.type === 'over') {
+            ueberZiehen = true;
+          } else if (e.payload.type === 'leave') {
+            ueberZiehen = false;
+          } else if (e.payload.type === 'drop') {
+            ueberZiehen = false;
+            // Nur im ersten Schritt: ein Wurf auf den Befund würde die Häkchen
+            // wegwerfen, die gerade gesetzt wurden.
+            if (!deutung) void deutePfade(e.payload.paths);
+          }
+        })
+        .then((un) => {
+          if (entsorgt) un();
+          else abmelden = un;
+        }),
+    );
+    return () => {
+      entsorgt = true;
+      abmelden?.();
     };
-  }
+  });
 
   function uebernehmen(d: Deutung) {
     deutung = d;
@@ -96,29 +121,7 @@
     titel = v?.titel ?? '';
     vorlage = v?.vorlage ?? 'generisch';
     kurs = v?.kurs ?? '';
-    schritt = 'befund';
     fehler = null;
-  }
-
-  async function deuteOrdner() {
-    const pfad = await system.ordnerWaehlen();
-    if (!pfad) return;
-    ordnerPfad = pfad;
-    await deute(() => deuten.quelle({ art: 'ordner', pfad }));
-  }
-
-  async function deuteAdresse() {
-    const url = adresse.trim();
-    if (!url) return;
-    ordnerPfad = undefined;
-    await deute(() => deuten.quelle({ art: 'adresse', url }));
-  }
-
-  async function deuteDateien() {
-    const pfade = await system.dateienWaehlen();
-    if (!pfade.length) return;
-    ordnerPfad = undefined;
-    await deute(() => deuten.quelle({ art: 'dateien', pfade }));
   }
 
   async function deute(auftrag: () => Promise<Deutung>) {
@@ -133,21 +136,93 @@
     }
   }
 
-  // `$derived.by` statt `$derived`: im Ausdruck hält TypeScript `deutung` noch für das
-  // `null` der Deklaration, im Funktionsrumpf nicht mehr.
+  /**
+   * Im Browser gibt es keinen Kern, der einordnen könnte – dort ist alles ein Titel.
+   * Spiegelt `deuten::nur_titel` im Kern; die Beispieldaten sollen trotzdem etwas zeigen.
+   */
+  function nurTitel(text: string): Deutung {
+    return {
+      befund: {
+        quelle: text.trim(),
+        vorschlag: { titel: text.trim(), vorlage: 'generisch' },
+        funde: [],
+        angesehen: 0,
+        abgebrochen: false,
+        weitere_dokumente: 0,
+      },
+    };
+  }
+
+  async function weiter(e?: Event) {
+    e?.preventDefault();
+    if (laeuft) return;
+    const text = eingabe.trim();
+    if (!text) {
+      fehler = 'Schreib etwas hinein: einen Ordner, einen Link oder einen Namen.';
+      return;
+    }
+    ordnerPfad = undefined;
+    if (!echteDaten) {
+      uebernehmen(nurTitel(text));
+      return;
+    }
+    await deute(async () => {
+      const d = await deuten.eingabe({ art: 'text', text });
+      ordnerPfad = ordnerAus(d);
+      return d;
+    });
+  }
+
+  async function deutePfade(pfade: string[]) {
+    if (!pfade.length) return;
+    eingabe = pfade.length === 1 ? pfade[0] : `${pfade.length} Dateien`;
+    await deute(async () => {
+      const d = await deuten.eingabe({ art: 'pfade', pfade });
+      ordnerPfad = ordnerAus(d);
+      return d;
+    });
+  }
+
+  /**
+   * Der Ordner, auf den der Befund sich bezieht. `befund.quelle` trägt ihn bei einer
+   * Ordner-Quelle als lesbaren Pfad; die Markerdatei gehört genau dorthin.
+   */
+  function ordnerAus(d: Deutung): string | undefined {
+    const bekannt = d.befund.funde.find((f) => f.art === 'schon_bekannt');
+    if (bekannt && bekannt.art === 'schon_bekannt') return bekannt.pfad;
+    // Unterprojekte und Dokumente liegen im gedeuteten Ordner; ist die Quelle keiner,
+    // stehen dort eine Adresse oder eine Dateizahl, und dann gibt es nichts zu markieren.
+    return d.befund.angesehen > 0 || d.befund.funde.some((f) => f.art === 'unterprojekt')
+      ? d.befund.quelle
+      : undefined;
+  }
+
+  async function ordnerWaehlen() {
+    const pfad = await system.ordnerWaehlen();
+    if (!pfad) return;
+    eingabe = pfad;
+    ordnerPfad = pfad;
+    await deute(() => deuten.quelle({ art: 'ordner', pfad }));
+  }
+
+  async function dateienWaehlen() {
+    const pfade = await system.dateienWaehlen();
+    if (!pfade.length) return;
+    eingabe = pfade.length === 1 ? pfade[0] : `${pfade.length} Dateien`;
+    ordnerPfad = undefined;
+    await deute(() => deuten.quelle({ art: 'dateien', pfade }));
+  }
+
   const funde = $derived.by((): Fund[] => deutung?.befund.funde ?? []);
   const remote = $derived.by(() => funde.find((f): f is FundRemote => f.art === 'remote'));
   const unterprojekte = $derived.by(() => funde.filter((f): f is FundUnterprojekt => f.art === 'unterprojekt'));
   const dokumente = $derived.by(() => funde.filter((f): f is FundDokument => f.art === 'dokument'));
-  /** Gehört die Quelle schon zu einem Projekt? Dann wird angehängt, nicht angelegt. */
+  /** Gehört die Quelle schon zu einem Vorhaben? Dann wird angehängt, nicht angelegt. */
   const bekannt = $derived.by(() => deutung?.bekannt);
   const kannSpeichern = $derived(!!bekannt || titel.trim().length > 0);
 
-  function gewaehltePfade(liste: Fund[]): string[] {
-    return liste
-      .filter((f) => gewaehlt[schluessel(f)])
-      .map((f) => ('pfad' in f ? f.pfad : ''))
-      .filter((p) => p.length > 0);
+  function gewaehltePfade(liste: { pfad: string }[]): string[] {
+    return liste.filter((f) => gewaehlt[schluessel(f as Fund)]).map((f) => f.pfad);
   }
 
   async function anlegen(e: Event) {
@@ -161,13 +236,12 @@
         fertig(p.id, `„${p.titel}" angelegt.`);
         return;
       }
-      const remoteGewaehlt = remote && gewaehlt[schluessel(remote)] ? remote.url : undefined;
       const b = await deuten.anlegen({
         titel: titel.trim(),
         kurs: kurs.trim() || undefined,
         vorlage,
         ordner: ordnerPfad,
-        remote: remoteGewaehlt,
+        remote: remote && gewaehlt[schluessel(remote)] ? remote.url : undefined,
         unterprojekte: gewaehltePfade(unterprojekte),
         dokumente: gewaehltePfade(dokumente),
         an_projekt: bekannt?.id,
@@ -198,7 +272,6 @@
   }
 
   function zurueck() {
-    schritt = 'herkunft';
     deutung = null;
     ordnerPfad = undefined;
     fehler = null;
@@ -208,7 +281,7 @@
     if (e.key === 'Escape' && offen) offen = false;
   }
 
-  function markenText(b: Befund): string {
+  function randText(b: Befund): string {
     const teile: string[] = [];
     if (b.angesehen > 0) teile.push(`${b.angesehen} Ordner angesehen`);
     if (b.weitere_dokumente > 0) teile.push(`${b.weitere_dokumente} weitere Dokumente nicht aufgeführt`);
@@ -222,71 +295,63 @@
   <div class="ueberlagerung">
     <button type="button" class="rueckwand" aria-label="Dialog schließen" onclick={() => (offen = false)}></button>
 
-    {#if schritt === 'herkunft'}
-      <div class="dialog" role="dialog" aria-label="Neues Projekt: Herkunft">
-        <h2>Woher kommt es?</h2>
+    {#if !deutung}
+      <form class="dialog" class:ueber-ziehen={ueberZiehen} onsubmit={weiter} aria-label="Neues Vorhaben">
+        <h2>Was gibt's?</h2>
+
+        <input
+          bind:this={eingabeEl}
+          bind:value={eingabe}
+          type="text"
+          class="gross"
+          placeholder="Ordner, Link, Datei – oder einfach ein Name"
+          aria-label="Ordner, Link, Datei oder Name"
+          autocomplete="off"
+          spellcheck="false"
+        />
+
         <p class="hinweis">
-          Lotse sieht sich die Quelle an und schlägt Titel, Kurs und Vorlage selbst vor. Gefragt wird danach nur noch,
-          was es behalten soll.
+          Lotse sieht sich an, was du hineinschreibst, und füllt Titel, Kurs und Vorlage selbst aus.
+          {#if echteDaten}
+            Ordner und Dateien kannst du auch einfach hierher ziehen.
+          {/if}
         </p>
 
-        <div class="wege">
-          <button type="button" class="weg" onclick={deuteOrdner} disabled={laeuft}>
-            <strong>Ordner</strong>
-            <span>Ein Ordner auf diesem Gerät. Unterprojekte, Git-Historie und Dokumente kommen mit.</span>
-          </button>
-          <button type="button" class="weg" onclick={deuteDateien} disabled={laeuft}>
-            <strong>Dateien</strong>
-            <span>PDFs, Notizen, Tabellen. Werden als Referenzen angehängt.</span>
-          </button>
-        </div>
-
-        <label>
-          <span>Adresse eines Repos oder einer Seite</span>
-          <span class="zeile">
-            <input
-              bind:this={adresseEl}
-              bind:value={adresse}
-              type="text"
-              placeholder="https://github.com/name/vorhaben"
-              onkeydown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  deuteAdresse();
-                }
-              }}
-            />
-            <button type="button" onclick={deuteAdresse} disabled={laeuft || !adresse.trim()}>Deuten</button>
-          </span>
-        </label>
-
-        {#if laeuft}
-          <p class="hinweis" role="status" aria-live="polite">Sehe nach …</p>
-        {/if}
         {#if fehler}
           <p class="fehler">{fehler}</p>
         {/if}
 
         <div class="aktionen">
+          {#if echteDaten}
+            <span class="durchsuchen">
+              <span class="hinweis klein">Durchsuchen:</span>
+              <button type="button" onclick={ordnerWaehlen} disabled={laeuft}>Ordner …</button>
+              <button type="button" onclick={dateienWaehlen} disabled={laeuft}>Dateien …</button>
+            </span>
+          {/if}
           <button type="button" onclick={() => (offen = false)}>Abbrechen</button>
-          <button type="button" onclick={() => uebernehmen(ohneQuelle())}>Ohne Quelle</button>
+          <button type="submit" class="primaer" disabled={laeuft}>
+            {laeuft ? 'Sehe nach …' : 'Weiter'}
+          </button>
         </div>
-      </div>
-    {:else if deutung}
-      <form class="dialog" onsubmit={anlegen} aria-label="Neues Projekt: Befund">
+      </form>
+    {:else}
+      <form class="dialog" onsubmit={anlegen} aria-label="Befund">
         {#if bekannt}
           <h2>Gehört schon zu „{bekannt.titel}"</h2>
           <p class="hinweis">
-            In diesem Ordner liegt eine Kennung von Lotse. Es entsteht also kein zweites Projekt – was unten
-                        angehakt bleibt, kommt zu „{bekannt.titel}" dazu.
+            Dort liegt eine Kennung von Lotse. Es entsteht also kein zweites Vorhaben – was unten angehakt bleibt,
+            kommt zu „{bekannt.titel}" dazu.
           </p>
         {:else}
           <h2>Befund</h2>
-          <p class="hinweis">{deutung.befund.quelle}</p>
+          {#if deutung.befund.quelle && deutung.befund.quelle !== titel}
+            <p class="hinweis"><code>{deutung.befund.quelle}</code></p>
+          {/if}
 
           <label>
             <span>Titel</span>
-            <input bind:this={titelEl} bind:value={titel} type="text" placeholder="Gartenhaus" required />
+            <input bind:value={titel} type="text" placeholder="Gartenhaus" required />
           </label>
 
           <label>
@@ -304,18 +369,12 @@
           </label>
         {/if}
 
-        {#if ordnerPfad}
-          <p class="fund-zeile"><span class="marke">Ordner</span> <code>{ordnerPfad}</code></p>
-        {/if}
-
         {#if remote}
           <fieldset>
             <legend>Gegenseite</legend>
             <label class="haken">
               <input type="checkbox" bind:checked={gewaehlt[schluessel(remote)]} />
-              <span>
-                {remote.dienst ?? 'Adresse'} – <code>{remote.url}</code>
-              </span>
+              <span>{remote.dienst ?? 'Adresse'} – <code>{remote.url}</code></span>
             </label>
             <p class="hinweis klein">
               Wird als Referenz angehängt. Damit Lotse dort auch nachsieht, braucht es später einen Zugang – das sagt
@@ -327,7 +386,7 @@
         {#if unterprojekte.length}
           <fieldset>
             <legend>Eigene Vorhaben darin ({unterprojekte.length})</legend>
-            <p class="hinweis klein">Jedes abgehakte wird ein eigenes Projekt. Was weg soll, hier abwählen.</p>
+            <p class="hinweis klein">Jedes abgehakte wird ein eigenes Vorhaben. Was weg soll, hier abwählen.</p>
             <div class="liste">
               {#each unterprojekte as f (f.pfad)}
                 <label class="haken">
@@ -357,14 +416,21 @@
           </fieldset>
         {/if}
 
+        {#if !bekannt && funde.length === 0}
+          <p class="hinweis klein">
+            Nichts weiter gefunden – das ist kein Mangel. Ordner, Adressen und Dateien lassen sich später unter
+            <em>Referenzen</em> nachtragen.
+          </p>
+        {/if}
+
         {#if deutung.befund.abgebrochen}
           <p class="hinweis klein">
             Die Suche hat an ihrer Grenze aufgehört – der Ordner ist groß. Was tiefer liegt, steht nicht in dieser
             Liste; einzelne Unterordner lassen sich später nachtragen.
           </p>
         {/if}
-        {#if markenText(deutung.befund)}
-          <p class="hinweis klein">{markenText(deutung.befund)}</p>
+        {#if randText(deutung.befund)}
+          <p class="hinweis klein">{randText(deutung.befund)}</p>
         {/if}
 
         {#if fehler}
@@ -372,11 +438,7 @@
         {/if}
 
         <div class="aktionen">
-          {#if echteDaten}
-            <button type="button" onclick={zurueck}>Zurück</button>
-          {:else}
-            <button type="button" onclick={() => (offen = false)}>Abbrechen</button>
-          {/if}
+          <button type="button" onclick={zurueck}>Zurück</button>
           <button type="submit" class="primaer" disabled={!kannSpeichern || wirdGespeichert}>
             {#if wirdGespeichert}
               {bekannt ? 'Hänge an …' : 'Lege an …'}
@@ -425,6 +487,11 @@
     flex-direction: column;
     gap: 0.9rem;
   }
+  /* Sichtbar machen, dass der Wurf hier ankommt. */
+  .dialog.ueber-ziehen {
+    border-color: var(--akzent, currentColor);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 0 2px var(--akzent, currentColor);
+  }
   h2 {
     margin: 0;
     font-size: 1.15rem;
@@ -456,53 +523,17 @@
     font: inherit;
     width: 100%;
   }
+  /* Das eine Feld, das alles annimmt: es darf aussehen wie die Hauptsache. */
+  input.gross {
+    font-size: 1.05rem;
+    padding: 0.6rem 0.7rem;
+  }
   select {
     color: inherit;
     background: var(--hintergrund);
     border: 1px solid var(--rahmen);
     border-radius: 0.4rem;
     padding: 0.5rem 0.6rem;
-  }
-  .zeile {
-    display: flex;
-    gap: 0.4rem;
-    align-items: stretch;
-  }
-  .zeile button {
-    border: 1px solid var(--rahmen);
-    background: transparent;
-    color: inherit;
-    border-radius: 0.4rem;
-    padding: 0.4rem 0.8rem;
-    white-space: nowrap;
-  }
-  /* Die Wege sind gleichwertig und gleich groß: keiner ist der empfohlene. */
-  .wege {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.5rem;
-  }
-  .weg {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    text-align: left;
-    border: 1px solid var(--rahmen);
-    border-radius: 0.5rem;
-    background: transparent;
-    color: inherit;
-    padding: 0.7rem 0.8rem;
-    cursor: pointer;
-  }
-  .weg:hover:not(:disabled) {
-    border-color: var(--text-gedaempft);
-  }
-  .weg:disabled {
-    opacity: 0.5;
-  }
-  .weg span {
-    font-size: 0.78rem;
-    color: var(--text-gedaempft);
   }
   fieldset {
     border: 1px solid var(--rahmen);
@@ -544,17 +575,6 @@
   .haken em.marken {
     font-size: 0.75rem;
   }
-  .fund-zeile {
-    margin: 0;
-    font-size: 0.8rem;
-    display: flex;
-    gap: 0.4rem;
-    align-items: baseline;
-    flex-wrap: wrap;
-  }
-  .marke {
-    color: var(--text-gedaempft);
-  }
   code {
     font-size: 0.78rem;
     word-break: break-all;
@@ -562,7 +582,15 @@
   .aktionen {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .durchsuchen {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-right: auto;
   }
   .aktionen button {
     border: 1px solid var(--rahmen);
