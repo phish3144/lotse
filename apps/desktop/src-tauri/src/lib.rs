@@ -1713,8 +1713,25 @@ fn forge_lauf(
                     break;
                 }
                 if let Some(n) = lotse_core::forge::notiz(p.id, &z, &stand, now_ms()) {
-                    mit(state, |s| s.store.notiz_speichern(&n))?;
-                    notizen += 1;
+                    // Von Hand angestoßen umgeht die Zeitbremse; die Gleichheitsbremse
+                    // gilt immer. Sonst füllt ein tagelang roter Prüflauf das Logbuch
+                    // im Halbstundentakt und begräbt alles von Hand Eingetragene.
+                    let von_hand = nur.is_some();
+                    let geschrieben = mit(state, |s| {
+                        let bisher = s.store.notizen(p.id)?;
+                        let letzte = lotse_core::forge::letzte_maschinelle(
+                            &bisher,
+                            lotse_core::model::Quelle::Git,
+                        );
+                        if lotse_core::forge::schreiben_faellig(letzte, &n, von_hand) {
+                            s.store.notiz_speichern(&n)?;
+                            return Ok(true);
+                        }
+                        Ok(false)
+                    })?;
+                    if geschrieben {
+                        notizen += 1;
+                    }
                 }
             }
             Err(e) => fehler.push(format!("{}: {e}", z.anzeige())),

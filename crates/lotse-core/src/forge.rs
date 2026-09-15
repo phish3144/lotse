@@ -501,6 +501,44 @@ pub fn abfragen(zeiger: &RepoZeiger, token: Option<&str>) -> Result<Stand> {
 
 /// Eine verdichtete Zeile für das Logbuch. `None`, wenn es nichts zu sagen gibt –
 /// eine Notiz „nichts offen, CI unbekannt" jeden Tag wäre Lärm.
+/// Kürzester Abstand zwischen zwei selbsttätigen Einträgen desselben Projekts.
+///
+/// Gerechnet wird rollend über 24 Stunden statt über Kalendertage: Lotse speichert
+/// Unix-Millisekunden und kennt keine Zeitzone, und »einmal am Tag« soll nicht davon
+/// abhängen, ob jemand um 23:50 oder um 00:10 nachsieht.
+pub const TAG_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// Entscheidet, ob ein maschineller Eintrag wirklich geschrieben wird.
+///
+/// Zwei Bremsen, und beide werden gebraucht:
+///
+/// 1. **Gleicher Text wie zuletzt.** Ein roter Prüflauf bleibt tagelang rot. Ihn alle
+///    dreißig Minuten erneut ins Logbuch zu schreiben, fügt dem Wissen nichts hinzu und
+///    begräbt dafür alles, was von Hand eingetragen wurde.
+/// 2. **Schon vor Kurzem geschrieben.** Auch ein geänderter Text soll das Logbuch nicht
+///    im Halbstundentakt füllen.
+///
+/// Von Hand angestoßene Abfragen umgehen die Zeitbremse: Wer selbst auf den Knopf
+/// drückt, will eine Antwort und keine Erziehung. Die Gleichheitsbremse gilt auch dann –
+/// derselbe Satz zweimal ist auch von Hand kein Gewinn.
+pub fn schreiben_faellig(letzte: Option<&Notiz>, neu: &Notiz, von_hand: bool) -> bool {
+    let Some(letzte) = letzte else {
+        return true;
+    };
+    if letzte.text == neu.text {
+        return false;
+    }
+    von_hand || neu.ts.saturating_sub(letzte.ts) >= TAG_MS
+}
+
+/// Der jüngste maschinelle Eintrag dieser Quelle, oder nichts.
+pub fn letzte_maschinelle(notizen: &[Notiz], quelle: Quelle) -> Option<&Notiz> {
+    notizen
+        .iter()
+        .filter(|n| n.quelle == quelle)
+        .max_by_key(|n| n.ts)
+}
+
 pub fn notiz(projekt_id: Ulid, zeiger: &RepoZeiger, stand: &Stand, jetzt_ms: i64) -> Option<Notiz> {
     let erwaehnenswert = stand.offene_prs > 0 || stand.ci == Ci::Rot || stand.offene_issues > 0;
     if !erwaehnenswert {
@@ -1077,5 +1115,67 @@ mod live {
             "https://gitlab.com/gitlab-org/gitlab-runner",
             std::env::var("GITLAB_TOKEN").ok(),
         );
+    }
+}
+
+#[cfg(test)]
+mod verdichtung_tests {
+    use super::*;
+    use crate::model::{Art, Notiz, Quelle};
+
+    fn n(text: &str, ts: i64) -> Notiz {
+        let mut x = Notiz::neu(Ulid::new(), Quelle::Git, Art::Log, text.to_string(), ts);
+        x.ts = ts;
+        x
+    }
+
+    #[test]
+    fn ohne_vorgaenger_wird_geschrieben() {
+        assert!(schreiben_faellig(None, &n("a", 0), false));
+    }
+
+    #[test]
+    fn derselbe_text_wird_nie_wiederholt() {
+        // Ein roter Prüflauf bleibt tagelang rot. Er gehört einmal ins Logbuch.
+        let alt = n("Prüflauf rot", 0);
+        let neu = n("Prüflauf rot", 10 * TAG_MS);
+        assert!(!schreiben_faellig(Some(&alt), &neu, false));
+        assert!(
+            !schreiben_faellig(Some(&alt), &neu, true),
+            "auch von Hand nicht"
+        );
+    }
+
+    #[test]
+    fn neuer_text_wartet_auf_den_tag() {
+        let alt = n("Prüflauf rot", 0);
+        let frueh = n("Prüflauf grün", TAG_MS - 1);
+        let spaet = n("Prüflauf grün", TAG_MS);
+        assert!(!schreiben_faellig(Some(&alt), &frueh, false));
+        assert!(schreiben_faellig(Some(&alt), &spaet, false));
+    }
+
+    #[test]
+    fn von_hand_geht_sofort() {
+        // Wer selbst auf den Knopf drückt, will eine Antwort und keine Erziehung.
+        let alt = n("Prüflauf rot", 0);
+        let frueh = n("Prüflauf grün", 60_000);
+        assert!(schreiben_faellig(Some(&alt), &frueh, true));
+    }
+
+    #[test]
+    fn nur_die_eigene_quelle_zaehlt() {
+        let notizen = vec![
+            n("maschinell", 100),
+            Notiz::neu(
+                Ulid::new(),
+                Quelle::Mensch,
+                Art::Log,
+                "von Hand".to_string(),
+                900,
+            ),
+        ];
+        let l = letzte_maschinelle(&notizen, Quelle::Git).expect("Git-Notiz");
+        assert_eq!(l.text, "maschinell");
     }
 }
