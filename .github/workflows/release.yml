@@ -188,8 +188,9 @@ jobs:
           releaseName: "Lotse ${{ env.RELEASE_TAG }}"
           releaseBody: |
             Frühe Fassung. Die Installer sind **nicht code-signiert**: Windows SmartScreen
-            und macOS Gatekeeper warnen beim ersten Start. Prüfsummen liegen als
-            `.sha256`-Dateien bei.
+            und macOS Gatekeeper warnen beim ersten Start. Zu jedem Installer liegt eine
+            `.sha256`-Datei zum Vergleichen von Hand; die `.sig`-Dateien daneben sind die
+            Update-Signatur, die die App selbst prüft – keine Prüfsumme.
 
             Ab dieser Fassung aktualisiert sich Lotse selbst: es lädt die neue Fassung,
             prüft ihre Signatur gegen den eingebauten öffentlichen Schlüssel und tauscht
@@ -209,6 +210,53 @@ jobs:
           # Ohne das baut auf macOS beide Male derselbe Bogen (aarch64) und der zweite
           # Job überschreibt die Artefakte des ersten - Intel-Macs bekaemen nie ein Update.
           args: ${{ matrix.args }}
+
+      # Prüfsummen für die Installer, weil der Release-Text sie verspricht und sie bis
+      # 0.8.0 nur bei der Kommandozeile lagen. Die `.sig`-Dateien, die tauri-action
+      # daneben legt, sind kein Ersatz: die prüft die App beim Selbsttausch, nicht der
+      # Mensch, der eine unsignierte `.exe` von einer Website geladen hat.
+      #
+      # Format wie beim CLI-Job (`<hash>  <dateiname>`), damit `sha256sum -c` und
+      # `shasum -a 256 -c` beide damit umgehen können.
+      - name: Prüfsummen bilden
+        shell: bash
+        run: |
+          set -euo pipefail
+          wurzel="apps/desktop/src-tauri/target"
+          # Mit `--target` legt Cargo das Bundle eine Ebene tiefer ab.
+          ziel=$(printf '%s' '${{ matrix.args }}' | sed -n 's/.*--target[= ]\{1,\}\([^ ]\{1,\}\).*/\1/p')
+          if [ -n "$ziel" ]; then wurzel="$wurzel/$ziel"; fi
+          bundle="$wurzel/release/bundle"
+          summe() {
+            if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi
+          }
+          mkdir -p pruefsummen
+          gefunden=0
+          while IFS= read -r datei; do
+            name=$(basename "$datei")
+            # Im Unterordner rechnen, damit nur der Dateiname in der Prüfsumme steht.
+            ( cd "$(dirname "$datei")" && summe "$name" ) > "pruefsummen/$name.sha256"
+            gefunden=$((gefunden + 1))
+            echo "$name"
+          done < <(find "$bundle" -maxdepth 2 -type f \
+                     \( -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+                        -o -name '*-setup.exe' -o -name '*.msi' \) | sort)
+          # Kein Fund heißt: der Bundle-Pfad hat sich geändert und der Release-Text
+          # verspricht wieder etwas, das nicht dabeiliegt. Das soll auffallen.
+          if [ "$gefunden" -eq 0 ]; then
+            echo "::error::Keine Installer unter $bundle gefunden. Pfad in release.yml nachziehen."
+            exit 1
+          fi
+          echo "$gefunden Pruefsumme(n) gebildet."
+
+      # `gh release upload` hängt nur Dateien an und lässt Titel, Text und Vorab-Kennung
+      # unberührt – anders als eine zweite Release-Aktion, die den Text überschreiben
+      # könnte, den tauri-action gerade gesetzt hat.
+      - name: Prüfsummen anhängen
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" pruefsummen/*.sha256 --clobber
 
   # Die fertige `latest.json` auf die Landing Page spiegeln. Nötig, weil die Releases
   # Vorabversionen sind und GitHub die aus `/releases/latest` heraushält – die App

@@ -20,15 +20,25 @@ Das ist **etwas anderes** als die Update-Signatur: jede Fassung wird mit einem
 Schlüssel unterschrieben, dessen öffentliche Hälfte in der App steckt, und nur was dazu
 passt, installiert Lotse als Update. Siehe **[[Updates]]** und **[[Sicherheit]]**.
 
-Neben jedem Archiv liegt eine `.sha256`-Prüfsumme. Vergleichen lohnt sich:
+Neben jeder Datei liegt eine `.sha256`-Prüfsumme. Vergleichen lohnt sich:
 
 ```bash
 # Linux/macOS
-shasum -a 256 -c lotse-cli-v0.6.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+shasum -a 256 -c Lotse_0.8.0_amd64.deb.sha256
 
-# Windows (PowerShell)
-Get-FileHash .\lotse-cli-v0.6.0-x86_64-pc-windows-msvc.zip -Algorithm SHA256
+# Windows (PowerShell) – und mit der .sha256-Datei daneben vergleichen
+Get-FileHash .\Lotse_0.8.0_x64-setup.exe -Algorithm SHA256
 ```
+
+Nicht zu verwechseln mit den `.sig`-Dateien, die ebenfalls dabeiliegen: das ist die
+**Update-Signatur**, die die App beim Selbsttausch prüft, keine Prüfsumme zum Vergleichen
+von Hand. Und die Prüfsumme liegt auf demselben Server wie die Datei – sie findet einen
+kaputten Download, keinen bösen Server. Gegen den hilft die Update-Signatur, deren
+öffentliche Hälfte fest in der schon installierten App steckt.
+
+> Bei **0.8.0** tragen nur die vier Kommandozeilen-Archive eine `.sha256`-Datei; für die
+> Installer sind die Summen nachträglich gebildet worden und stehen im Release-Text. Ab
+> 0.9.0 legt der Bau-Job sie für jeden Installer selbst mit an.
 
 ---
 
