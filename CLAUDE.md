@@ -2,7 +2,8 @@
 
 Lotse ist das Logbuch für alle Vorhaben einer Person. Das verbindliche Konzept steht in
 `docs/CONCEPT.md`; Sicherheit in `docs/THREAT_MODEL.md`; was bewusst nicht gebaut wird in
-`docs/NON_GOALS.md`; die Sync-Schnittstelle in `docs/SYNC_PROTOCOL.md`.
+`docs/NON_GOALS.md`; die Sync-Schnittstelle in `docs/SYNC_PROTOCOL.md`; der geplante
+Web-Client in `docs/WEB_CLIENT.md`.
 
 ## Aufbau
 

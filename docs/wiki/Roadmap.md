@@ -71,6 +71,12 @@ Das ist die größte echte Lücke. Die Vorarbeit ist getan – die Oberfläche s
 durch **eine** Schnittstelle, und der Kern ist WASM-tauglich gehalten ([[App-Schnittstelle]]).
 Was fehlt, ist die Brücke dazwischen.
 
+**Der Weg dorthin ist geplant:** `docs/WEB_CLIENT.md`, fünf Phasen mit Abschlusskriterien.
+Die tragende Entscheidung darin: der Browser braucht `store` nicht. Er hält versiegelte
+Umschläge und baut den Index im Speicher – kein zweites Schema, keine zweite SQL-Schicht.
+Ziel ist in einem Satz: auf jedem Gerät mit E-Mail und Master-Passwort anmelden und seine
+Vorhaben sehen.
+
 Für den Tresor ist der Fall schon vorgesehen: die Stufe `nur_desktop` ist im Browser
 konstruktionsbedingt nicht lesbar, weil der Desktop-Schlüssel nie dorthin kommt.
 
