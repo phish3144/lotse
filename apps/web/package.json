@@ -3,13 +3,15 @@
   "version": "0.10.0",
   "private": true,
   "type": "module",
-  "description": "Lotse UI-Skelett (Svelte 5 + Vite + TypeScript). Läuft im Tauri-2-Webview und als eigenständige Web-App auf Cloudflare Pages. Datenschicht ist ein Mock-Provider, wird später durch lotse-core als WebAssembly ersetzt.",
+  "description": "Lotse UI-Skelett (Svelte 5 + Vite + TypeScript). L\u00e4uft im Tauri-2-Webview und als eigenst\u00e4ndige Web-App auf Cloudflare Pages. Datenschicht ist ein Mock-Provider, wird sp\u00e4ter durch lotse-core als WebAssembly ersetzt.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "wasm": "bash ../../scripts/wasm-bauen.sh",
+    "test:browser": "node scripts/wasm-browsertest.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

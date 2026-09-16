@@ -1,0 +1,28 @@
+[package]
+name = "lotse-wasm"
+description = "WebAssembly-Anbindung des Lotse-Kerns: Krypto, Umschläge, Brief. Enthält keine Logik, nur Adapter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Ohne `native`: kein rusqlite, kein Dateisystem, kein ureq.
+# Ausdrücklich mit Pfad statt `workspace = true`: beim Erben würde cargo das
+# `default-features = false` verwerfen, und dann käme SQLCipher samt ureq mit in den
+# WASM-Bau. Das fällt nur an der Fehlermeldung von `ring` auf.
+lotse-core = { path = "../lotse-core", default-features = false }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde.workspace = true
+serde_json.workspace = true
+ulid.workspace = true
+base64.workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

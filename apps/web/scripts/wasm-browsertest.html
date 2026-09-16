@@ -1,0 +1,196 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Lotse – WASM im Browser</title>
+<pre id="log"></pre>
+<script type="module">
+  // Läuft im Browser, gestartet von scripts/wasm-browsertest.mjs. Meldet jedes Ergebnis
+  // zurück, auch das Scheitern – Stille wäre hier nicht von Erfolg zu unterscheiden.
+  const faelle = []
+  const log = document.getElementById('log')
+  function pruefe(name, fn) {
+    try {
+      const grund = fn()
+      faelle.push(grund ? { name, ok: false, grund } : { name, ok: true })
+    } catch (e) {
+      faelle.push({ name, ok: false, grund: String(e && e.message ? e.message : e) })
+    }
+    const letzter = faelle[faelle.length - 1]
+    log.textContent += `${letzter.ok ? 'ok' : 'FEHL'} ${name}${letzter.ok ? '' : ` – ${letzter.grund}`}\n`
+  }
+
+  const hexZuB64 = (hex) => {
+    const bytes = new Uint8Array(hex.length / 2)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+    let s = ''
+    for (const b of bytes) s += String.fromCharCode(b)
+    return btoa(s)
+  }
+
+  let fehler = null
+  try {
+    const kern = await import('/wasm/lotse_wasm.js')
+    await kern.default()
+    const v = await (await fetch('/vektoren.json')).json()
+
+    pruefe('Formatversion stimmt mit den Vektoren überein', () =>
+      kern.formatVersion() === v.format_version
+        ? null
+        : `${kern.formatVersion()} statt ${v.format_version}`,
+    )
+
+    pruefe('Die Uhr liefert eine plausible Gegenwart', () => {
+      const t = kern.jetztMs()
+      return t > 1.7e12 && t < 4e12 ? null : `jetztMs() = ${t}`
+    })
+
+    for (const f of v.faelle) {
+      pruefe(`auth_key aus dem Vektor: ${f.was}`, () => {
+        const pk = kern.Passwortschluessel.ausPasswort(v.passwort, v.salt_b64, f.m_kib, f.t, f.p)
+        const soll = hexZuB64(f.auth_hex)
+        const ist = pk.authKeyB64()
+        pk.free()
+        return ist === soll ? null : `${ist} statt ${soll}`
+      })
+    }
+
+    pruefe('Zu schwache KDF-Parameter werden abgelehnt', () => {
+      try {
+        kern.Passwortschluessel.ausPasswort(v.passwort, v.salt_b64, 1024, 1, 1)
+        return 'm = 1 MiB wurde angenommen'
+      } catch {
+        return null
+      }
+    })
+
+    const test = v.faelle[0]
+    let konto = kern.kontoEinrichten('probe-passwort', test.m_kib, test.t, test.p)
+    const code = konto.wiederherstellungscode()
+
+    pruefe('Der Wiederherstellungscode hat Anzeigeform', () =>
+      /[0-9A-Za-z]/.test(code) && code.length >= 16 ? null : `»${code}«`,
+    )
+    pruefe('Ein abgetippter Code wird erkannt', () => (konto.codeStimmt(code) ? null : 'abgelehnt'))
+    pruefe('Ein falsch abgetippter Code fällt auf', () =>
+      konto.codeStimmt('AAAA-BBBB-CCCC-DDDD') ? 'angenommen' : null,
+    )
+
+    const header = JSON.parse(konto.headerJson())
+    pruefe('Der Konto-Header enthält keinen offenen Schlüssel', () => {
+      const felder = Object.keys(header).join(',')
+      return 'account_key' in header || 'wrap' in header ? `Felder: ${felder}` : null
+    })
+
+    const schluessel = konto.kontoschluessel()
+    pruefe('Der Kontoschlüssel wird nur einmal herausgegeben', () => {
+      try {
+        konto.kontoschluessel()
+        return 'zweimal bekommen'
+      } catch {
+        return null
+      }
+    })
+
+    // Umschlag: siegeln und wieder öffnen, mit dem Schlüssel aus dem eigenen Konto.
+    const id = kern.neueId()
+    const geraet = kern.neueId()
+    const uhr = new kern.Logikuhr(geraet, undefined)
+    const hlc = uhr.weiter(kern.jetztMs())
+    const projekt = {
+      id,
+      titel: 'Gartenhaus',
+      vorlage: 'haus_garten',
+      status: 'aktiv',
+      kurs: 'Fundament fertig machen',
+      erwartungsintervall_tage: 14,
+      tags: [],
+      angelegt: 1700000000000,
+      zuletzt_beruehrt: 1700000000000,
+    }
+    let umschlag = null
+    pruefe('Ein Datensatz lässt sich versiegeln', () => {
+      umschlag = schluessel.umschlagSiegeln('project', id, hlc, geraet, JSON.stringify(projekt))
+      return umschlag ? null : 'kein Umschlag zurückgekommen'
+    })
+    pruefe('Eine unbekannte Datensatzart nennt die bekannten', () => {
+      try {
+        schluessel.umschlagSiegeln('projekt', id, hlc, geraet, JSON.stringify(projekt))
+        return 'wurde angenommen'
+      } catch (e) {
+        return String(e.message).includes('project') ? null : `Meldung: ${e.message}`
+      }
+    })
+
+    pruefe('Der Umschlag besteht die Prüfung des Dienstes', () => {
+      kern.umschlagPruefen(umschlag)
+      return null
+    })
+    pruefe('Der Umschlag enthält den Titel nicht im Klartext', () =>
+      umschlag.includes('Gartenhaus') ? 'Titel steht drin' : null,
+    )
+    pruefe('Der Umschlag lässt sich wieder öffnen', () => {
+      const wieder = JSON.parse(schluessel.umschlagOeffnen(umschlag))
+      return wieder.titel === 'Gartenhaus' && wieder.kurs === projekt.kurs
+        ? null
+        : JSON.stringify(wieder)
+    })
+    pruefe('Ein vertauschter Umschlag fällt auf', () => {
+      const gefaelscht = JSON.parse(umschlag)
+      gefaelscht.id = kern.neueId()
+      try {
+        schluessel.umschlagOeffnen(JSON.stringify(gefaelscht))
+        return 'wurde geöffnet'
+      } catch {
+        return null
+      }
+    })
+
+    // Die Konfliktregel des Protokolls.
+    pruefe('Konfliktregel: der höhere HLC gewinnt', () => {
+      const spaeter = uhr.weiter(kern.jetztMs() + 1000)
+      if (!kern.gewinnt(spaeter, hlc)) return 'der spätere verliert'
+      if (kern.gewinnt(hlc, spaeter)) return 'der frühere gewinnt'
+      if (!kern.gewinnt(hlc, undefined)) return 'ohne Vorhandenes verliert der neue'
+      return null
+    })
+
+    // Der Brief – reine Funktion, dieselbe wie nativ.
+    pruefe('Der Brief zählt offene Fäden und findet die Übergabe', () => {
+      const jetzt = 1700000000000
+      const notizen = [
+        {
+          id: kern.neueId(),
+          projekt_id: id,
+          text: 'Beton bestellt',
+          art: 'uebergabe',
+          quelle: 'mensch',
+          ts: jetzt - 86400000,
+        },
+        {
+          // Ein offener Faden ist art = offen ohne erledigt_am – nicht ein Schalter.
+          id: kern.neueId(),
+          projekt_id: id,
+          text: 'Statik prüfen lassen',
+          art: 'offen',
+          quelle: 'mensch',
+          ts: jetzt - 3600000,
+        },
+      ]
+      const b = JSON.parse(kern.brief(JSON.stringify(projekt), JSON.stringify(notizen), jetzt))
+      if (b.letzte_uebergabe !== 'Beton bestellt') return `Übergabe: ${b.letzte_uebergabe}`
+      if (b.offene_faeden.length !== 1) return `offene Fäden: ${b.offene_faeden.length}`
+      const vorschlag = kern.uebergabeVorschlag(JSON.stringify(b))
+      return vorschlag.includes('Statik') ? null : `Vorschlag: ${vorschlag}`
+    })
+
+    schluessel.free()
+    konto.free()
+  } catch (e) {
+    fehler = String(e && e.stack ? e.stack : e)
+  }
+
+  await fetch('/ergebnis', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ faelle, fehler, browser: navigator.userAgent }),
+  })
+</script>

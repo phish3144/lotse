@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/lotse-core", "crates/lotse-cli"]
+members = ["crates/lotse-core", "crates/lotse-cli", "crates/lotse-wasm"]
 exclude = ["apps/desktop/src-tauri"]
 # apps/desktop/src-tauri wird aufgenommen, sobald die Tauri-Hülle steht (braucht GTK/WebKit zum Bauen).
 

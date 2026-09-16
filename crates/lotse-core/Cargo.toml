@@ -50,6 +50,9 @@ keyring = { version = "3", optional = true, default-features = false, features =
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+# Nur für die Uhr: `now_ms` liest im Browser `Date.now()`. Ohne das wäre der Zeitanteil
+# jedes HLC-Werts im Browser 0 und jeder dortige Schreibvorgang verlöre jeden Konflikt.
+js-sys = "0.3"
 
 [dev-dependencies]
 tempfile = "3"

@@ -1,0 +1,26 @@
+{
+  "hinweis": "Testvektoren der Schlüsselableitung. Diese Datei wird von zwei Seiten gelesen: vom nativen Test crates/lotse-core/tests/kdf_vektoren.rs und vom Browsertest apps/web/scripts/wasm-browsertest.mjs. Ändert sich einer der Werte, hat sich die Krypto-Komposition geändert - dann steigt FORMAT_VERSION und THREAT_MODEL.md wird nachgezogen (CLAUDE.md).",
+  "format_version": 1,
+  "passwort": "Hafeneinfahrt 7 · Kurs halten",
+  "salt_b64": "TG90c2UtVGVzdHZla3Rvcg==",
+  "faelle": [
+    {
+      "was": "Testparameter, unterhalb der Produktionsuntergrenze",
+      "m_kib": 8192,
+      "t": 1,
+      "p": 1,
+      "stretched_hex": "6907068542dbd7d022068e5f78832227303a65a77a04f852eedf9ae971fba1b5",
+      "auth_hex": "f63b8e59994f11e29332f69bff9587dafee60d8963a7abdc53dc09676e8eb5f1",
+      "wrap_hex": "04df8780c543ee0fd32da2030bb22e5ab5f4ecdd7b880c774af63454b5d32d43"
+    },
+    {
+      "was": "Produktionsparameter: m = 64 MiB, t = 3, p = 1",
+      "m_kib": 65536,
+      "t": 3,
+      "p": 1,
+      "stretched_hex": "62f8a4f9bfa93c79d37a6b54433da78210c3d82d5e289f22d3738073f4971b67",
+      "auth_hex": "007bb02b89daf4d996ab14ae785b354e1a16dfdb1a38f4e742c6784e377df563",
+      "wrap_hex": "190ac5121e291ba900a7c77284513aa7ba4fb50542a8aa6140d79144632621af"
+    }
+  ]
+}

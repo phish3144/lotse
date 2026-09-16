@@ -25,6 +25,12 @@ Abhängigkeit mit Meldung hinzufügt.
 | `services/sync-worker` | **keine** — ausgeliefert wird nur eigenes TypeScript | 0 Meldungen |
 | `apps/web` | `svelte`, `@tauri-apps/api` | 0 Meldungen |
 
+Der Browsertest der WASM-Anbindung (`apps/web/scripts/wasm-browsertest.mjs`) kommt
+absichtlich **ohne** Abhängigkeit: ein http-Server aus der Node-Standardbibliothek und ein
+Chromium, das auf Entwicklerrechner und CI-Läufer ohnehin liegt. Playwright wäre der
+bequeme Weg gewesen und hätte einen Browsertreiber samt Baum in den Werkzeugbaum geholt —
+für einen Test, der eine Seite lädt und eine Zahl vergleicht.
+
 Dass der Worker null Laufzeit-Abhängigkeiten hat, ist kein Zufall, sondern das Ergebnis
 der Entscheidung, das Protokoll selbst zu schreiben statt ein Framework zu nehmen. Es ist
 auch der Grund, warum ein Wechsel weg von Cloudflare ein Nachmittag wäre.

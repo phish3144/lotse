@@ -54,13 +54,17 @@ pub const FORMAT_VERSION: u16 = 1;
 /// Version des Datenschemas im lokalen Speicher und in den Klartext-Datensätzen.
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Aktuelle Zeit in Unix-Millisekunden. Im Browser wird diese Funktion später über
-/// `js_sys::Date::now` bereitgestellt; nativ über die Systemuhr.
+/// Aktuelle Zeit in Unix-Millisekunden. Nativ aus der Systemuhr, im Browser aus
+/// `Date.now()`.
+///
+/// Die Uhr ist kein Detail: aus ihr entsteht der Zeitanteil jedes HLC-Werts, und damit
+/// entscheidet sie mit, welcher Stand bei einem Konflikt gewinnt. Ein festes `0` im
+/// Browser – was hier bis 0.10 stand – hätte jeden Browser-Schreibvorgang ganz nach hinten
+/// sortiert.
 pub fn now_ms() -> i64 {
     #[cfg(target_arch = "wasm32")]
     {
-        // Platzhalter bis zur WASM-Anbindung; die Uhr wird dort von außen gesetzt.
-        0
+        js_sys::Date::now() as i64
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

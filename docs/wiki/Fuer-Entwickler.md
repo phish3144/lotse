@@ -34,13 +34,38 @@ etwas hinzufügt, fügt es an beiden Stellen hinzu.
 
 `lotse-core` baut mit dem Feature `native` (Standard) alles mit Dateisystem und Netz.
 **Ohne** das Feature bleibt der Kern WebAssembly-tauglich – Modell, Krypto und
-Sync-Umschläge. Das ist die Vorbereitung für einen Browser-Client.
+Sync-Umschläge.
 
 Deshalb steht in der Prüfliste:
 
 ```bash
 cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 ```
+
+### `crates/lotse-wasm`
+
+Die Anbindung an den Browser. Sie enthält **keine Logik**: jede Funktion ist ein Adapter
+von JS-Werten auf einen Aufruf im Kern und zurück. Schlüssel sind undurchsichtige Griffe
+(`Passwortschluessel`, `Kontoschluessel`) ohne Auslesefunktion – einzige Ausnahme ist der
+`auth_key`, der per Konstruktion zum Dienst geht.
+
+```bash
+scripts/wasm-bauen.sh                          # braucht wasm-bindgen in der Fassung aus Cargo.lock
+cd apps/web && node scripts/wasm-browsertest.mjs   # derselbe Vektor, echter Browser
+```
+
+Das Ergebnis landet in `apps/web/src/lib/wasm/` und ist Bauergebnis, nicht Quelltext.
+Der Browsertest startet einen kleinen http-Server aus der Node-Standardbibliothek und ein
+Chromium im Kopflosmodus – **kein** Playwright, damit kein Browsertreiber als
+Abhängigkeit mitkommt. Pfad notfalls über `LOTSE_BROWSER` setzen.
+
+### Die Testvektoren
+
+`tests/vektoren/kdf.json` hält die Schlüsselableitung mit festen Werten fest, gelesen von
+zwei Seiten: `crates/lotse-core/tests/kdf_vektoren.rs` und dem Browsertest. Ein Rundlauf
+allein würde nur beweisen, dass der Code mit sich selbst übereinstimmt – er bliebe auch
+nach einer versehentlichen Änderung der Schlüsselhierarchie grün, und dann wäre jedes
+bestehende Konto ausgesperrt.
 
 ## Bauen
 
@@ -74,6 +99,8 @@ cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 scripts/sync-e2e.sh
 cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
+cargo clippy -p lotse-wasm --target wasm32-unknown-unknown -- -D warnings
+scripts/wasm-bauen.sh && (cd apps/web && node scripts/wasm-browsertest.mjs)
 (cd apps/web && npm run check && npm test && npm run build)
 (cd services/sync-worker && npm run typecheck && npm test)
 ```

@@ -34,6 +34,44 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 
+  wasm:
+    name: WASM-Anbindung im Browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p lotse-wasm --target wasm32-unknown-unknown -- -D warnings
+      # wasm-bindgen muss genau zur Fassung im Cargo.lock passen, sonst entsteht eine
+      # Anbindung, die erst zur Laufzeit auffällt. Die Fassung wird deshalb aus dem Lock
+      # gelesen, nicht hier eingetragen – scripts/wasm-bauen.sh prüft das noch einmal.
+      - name: wasm-bindgen holen
+        run: |
+          set -euo pipefail
+          fassung="$(awk '/^name = "wasm-bindgen"$/ { g = 1; next }
+                          g && /^version = / { gsub(/[",]/, "", $3); print $3; exit }' Cargo.lock)"
+          echo "wasm-bindgen $fassung"
+          datei="wasm-bindgen-$fassung-x86_64-unknown-linux-musl"
+          curl -sSfL -o wb.tar.gz \
+            "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$fassung/$datei.tar.gz"
+          tar xzf wb.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          mv "$datei/wasm-bindgen" "$HOME/.local/bin/"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: scripts/wasm-bauen.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Ein echter Browser, kein Mock: derselbe Vektor wie im nativen Test
+      # crates/lotse-core/tests/kdf_vektoren.rs. Das ist das Abschlusskriterium der
+      # Phase W1 aus docs/WEB_CLIENT.md.
+      - name: Vektoren im Browser
+        working-directory: apps/web
+        run: node scripts/wasm-browsertest.mjs
+
   desktop:
     name: Desktop-Hülle (cargo check)
     runs-on: ubuntu-22.04

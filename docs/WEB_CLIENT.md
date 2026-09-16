@@ -1,6 +1,6 @@
 # Der Web-Client: auf jedem Gerät anmelden und seine Vorhaben sehen
 
-Stand: 2026-09-16. Dieses Dokument plant die größte offene Lücke aus `CONCEPT.md`
+Stand: 2026-09-16, Phase W1 erledigt. Dieses Dokument plant die größte offene Lücke aus `CONCEPT.md`
 Abschnitt 11, Phase 2. Verbindlich bleiben `THREAT_MODEL.md` (was der Dienst nie sieht),
 `SYNC_PROTOCOL.md` (die Schnittstelle) und `NON_GOALS.md` (der Aufnahmetest).
 
@@ -19,7 +19,8 @@ Kein Link kopieren, keine Dienstadresse eintragen, keine Datei mitnehmen.
 | Konto mit E-Mail und Passwort | **läuft.** Nullwissen: das Passwort verlässt das Gerät nie, der Dienst kennt nur einen Hash des abgeleiteten `auth_key` und den gewrappten Kontoschlüssel. |
 | Konto löschen | **läuft** (seit 0.9.x). |
 | Konto **anlegen** | **läuft** am Desktop und in der Kommandozeile (`lotse init`); im Browser geplant für W2 (4d). |
-| **Browser** | **fehlt.** `apps/web` läuft dort gegen Beispieldaten. |
+| Kern im Browser | **läuft** (W1). `crates/lotse-wasm` bindet Krypto, Umschläge, Logikuhr und Brief an; 18 Prüfungen laufen in einem echten Chromium in CI. |
+| **Browser-Oberfläche** | **fehlt.** `apps/web` läuft dort weiter gegen Beispieldaten – die Anbindung ist da, der Datenweg noch nicht. |
 
 Gemessen, nicht geschätzt:
 
@@ -85,16 +86,22 @@ die Seite ein. Also: Worker, sichtbarer Fortschritt, und die Parameter kommen vo
 Auf schwachen Telefonen dauert das mehrere Sekunden. Das ist zu **zeigen**, nicht zu
 verstecken, und es ist der Preis dafür, dass der Dienst das Passwort nie sieht.
 
-### 4c. Ein Transport-Trait statt eines zweiten Protokoll-Clients
+### 4c. Das Protokoll bleibt an einer Stelle – der Weg dorthin wurde korrigiert
 
 `sync::client` spricht ureq und ist damit nativ. Die Protokolllogik darf aber nicht zweimal
 existieren – ein in TypeScript nachgebautes Protokoll ist der sicherste Weg zu zwei
-Wahrheiten.
+Wahrheiten. Das gilt unverändert.
 
-Deshalb: ein schmales `Transport`-Trait im Kern (`ausfuehren(methode, pfad, rumpf) ->
-antwort`), eine Implementierung mit ureq (nativ), eine mit `fetch` (WASM). Die
-Anfragekonstruktion ist im Client schon an einer Stelle gebündelt; der Eingriff ist
-überschaubar.
+Geplant war dafür ein schmales `Transport`-Trait im Kern. Beim Bauen von W1 kam ein
+Hindernis heraus, das im Plan fehlte: **`fetch` ist asynchron, `ureq` ist blockierend.**
+Ein gemeinsames Trait muss also `async` sein, und damit werden alle Client-Methoden
+`async` – samt der rund zwanzig nativen Aufrufstellen in CLI und Hülle, die dann einen
+`block_on` brauchen. Das ist machbar, aber es ist ein Eingriff in den fertigen, nativ
+getesteten Weg, und er ließe sich erst prüfen, wenn der Browser ihn wirklich benutzt.
+
+Deshalb steht das Trait jetzt in **W2**, dort wo es gebraucht und mitgetestet wird. In W1
+wurde absichtlich keine Abstraktion gebaut, die nichts benutzt: sie wäre grün, ohne etwas
+zu beweisen. Die Richtung bleibt: **eine** Protokollwahrheit, im Kern.
 
 ### 4d. Der Browser ist zuerst lesend – plus Schnellerfassung
 
@@ -134,20 +141,31 @@ Schlüsselableitung mittragen (`BUSINESS.md`). Getrennt lassen; später gemeinsa
 
 Jede Phase endet an etwas Nachprüfbarem, nicht an »fertig«.
 
-### Phase W1 · Der Kern spricht im Browser
+### Phase W1 · Der Kern spricht im Browser — **erledigt (0.10.x)**
 
-`wasm-bindgen`-Anbindung für `crypto`, `model`, `sync`, `brief`, `vault`. Transport-Trait
-nach 4c, `fetch`-Implementierung. Build-Schritt in `apps/web`, in CI geprüft.
+`wasm-bindgen`-Anbindung für `crypto`, `model`, `sync`, `brief`, `vault` in
+`crates/lotse-wasm`. Bau über `scripts/wasm-bauen.sh` (Fassung von `wasm-bindgen` wird aus
+`Cargo.lock` gelesen, nicht geraten), Ergebnis nach `apps/web/src/lib/wasm/`. Eigener
+CI-Job. Das Transport-Trait ist nach 4c in W2 gewandert.
 
-**Abschluss:** ein Test im Browser leitet aus einem Passwort mit den Parametern aus
-`prelogin` denselben `auth_key` ab wie die nativen Tests – gegen dieselben Vektoren.
+**Abschluss erreicht:** `tests/vektoren/kdf.json` hält Passwort, Salt und beide
+Parametersätze samt erwarteter Schlüssel fest. Dieselbe Datei lesen
+`crates/lotse-core/tests/kdf_vektoren.rs` und `apps/web/scripts/wasm-browsertest.mjs`; der
+Browsertest leitet in einem echten Chromium denselben `auth_key` ab — auch mit den
+Produktionsparametern m = 64 MiB, t = 3. Gegengeprüft: ein verfälschter Vektor macht beide
+Seiten rot.
+
+Nebenbefund, der schwerer wog als die Anbindung selbst: `now_ms()` gab unter `wasm32`
+schlicht **0** zurück. Aus dieser Uhr kommt der Zeitanteil jedes HLC-Werts, also hätte
+jeder Schreibvorgang aus dem Browser jeden Konflikt verloren. Jetzt `Date.now()`.
 
 ### Phase W2 · Anmelden und den Hafen sehen
 
-Login über den eingebauten Dienst, Argon2id im Worker mit Fortschritt, Pull aller
-Umschläge, Entsiegeln in den Speicher, `brief`-Funktionen darüber, Hafen und Projektseite
-durch den vorhandenen `DataProvider`. Dazu das Anlegen eines Kontos nach 4d, samt
-Abtippschritt für den Wiederherstellungscode.
+Transport-Trait nach 4c (asynchron, `ureq` nativ und `fetch` im Browser) samt Umstellung
+der nativen Aufrufstellen. Darauf: Login über den eingebauten Dienst, Argon2id im Worker
+mit Fortschritt, Pull aller Umschläge, Entsiegeln in den Speicher, `brief`-Funktionen
+darüber, Hafen und Projektseite durch den vorhandenen `DataProvider`. Dazu das Anlegen
+eines Kontos nach 4d, samt Abtippschritt für den Wiederherstellungscode.
 
 **Abschluss:** in einem echten Browser gegen einen echten Dienst anmelden und die Vorhaben
 sehen, mit gezählten Datensätzen – kein Mock, kein Screenshot als Beweis.
@@ -185,7 +203,8 @@ ausgelieferten Kopfzeilen sind nachgemessen, nicht behauptet.
 | Der ganze Bestand im Arbeitsspeicher | Für einen persönlichen Bestand unkritisch; **vor** W3 an echten Daten messen, nicht schätzen. Wird es zu groß, holt der Pull seitenweise und der Index bleibt schlank. |
 | IndexedDB ist kein Tresor | Deshalb liegen dort nur Umschläge, nie Schlüssel. Wer strenger will, nimmt »fremder Rechner«. |
 | Zwei Oberflächenwege laufen auseinander | Es bleibt **eine** Schnittstelle (`provider.ts`). Was im Browser fehlt, wird ausgegraut mit Grund, nicht weggelassen. |
-| Der Bau wird schwerfällig (WASM + Vite + CI) | In W1 einmal sauber, danach ein Schritt wie jeder andere. |
+| Der Bau wird schwerfällig (WASM + Vite + CI) | In W1 einmal sauber gemacht: ein Skript, ein CI-Job, keine neue npm-Abhängigkeit. Der Browsertest fährt einen vorhandenen Chromium, statt Playwright mitzuschleppen. |
+| Die Anbindung wächst zu einer zweiten Fassung der Logik | `crates/lotse-wasm` enthält ausschließlich Adapter. Das ist eine Regel in `CLAUDE.md`, keine Absicht – sie fällt beim Lesen auf, weil jede Funktion sonst länger als drei Zeilen wird. |
 
 ## 7. Was hier ausdrücklich nicht gebaut wird
 

@@ -2,3 +2,6 @@ node_modules
 dist
 .DS_Store
 *.local
+
+# Bauergebnis von scripts/wasm-bauen.sh – Anbindung, nicht Quellcode.
+src/lib/wasm/

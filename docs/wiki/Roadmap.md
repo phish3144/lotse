@@ -63,8 +63,8 @@ mehr Features nicht besser – es wird nur größer.
 | Soll | Stand |
 |---|---|
 | MCP-Server | **läuft** – über stdin/stdout *und* aus der laufenden App auf `127.0.0.1`, fünf Werkzeuge, Tresor unsichtbar ([[Assistenten (MCP)\|Assistenten-MCP]]) |
-| `lotse-core` als WebAssembly | **halb** – der Kern baut ohne das Feature `native` und das wird in CI geprüft; eine Anbindung an den Browser gibt es nicht |
-| Web-App im Browser | **fehlt** – `apps/web` läuft dort gegen Beispieldaten, nicht gegen den Kern |
+| `lotse-core` als WebAssembly | **läuft** – `crates/lotse-wasm` bindet Krypto, Umschläge, Logikuhr und Brief an. 18 Prüfungen laufen in CI in einem echten Chromium, darunter die Schlüsselableitung mit den Produktionsparametern gegen dieselben Testvektoren wie nativ |
+| Web-App im Browser | **fehlt** – `apps/web` läuft dort gegen Beispieldaten. Die Anbindung an den Kern steht, der Datenweg (Anmelden, Abgleich holen) noch nicht |
 | Modus »fremder Rechner« ohne Persistenz | **fehlt** |
 
 Das ist die größte echte Lücke. Die Vorarbeit ist getan – die Oberfläche spricht überall
