@@ -250,7 +250,7 @@
       {#if dienstOffen}
         <label>Adresse des Sync-Dienstes <input type="url" bind:value={syncUrl} required /></label>
       {:else}
-        <p class="gedaempft klein">
+        <p class="gedaempft">
           Dienst: <code>{syncUrl || '…'}</code>
           <button class="leise" type="button" onclick={() => (dienstOffen = true)}>ändern</button>
         </p>
