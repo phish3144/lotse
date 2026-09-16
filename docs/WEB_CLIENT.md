@@ -18,6 +18,7 @@ Kein Link kopieren, keine Dienstadresse eintragen, keine Datei mitnehmen.
 | Zweites **installiertes** Gerät | **läuft.** `lotse sync login --email …`, seit dem eingebauten Standarddienst ohne Adresse. Der E2E-Test führt zwei Geräte vor, die sich gegenseitig abgleichen. |
 | Konto mit E-Mail und Passwort | **läuft.** Nullwissen: das Passwort verlässt das Gerät nie, der Dienst kennt nur einen Hash des abgeleiteten `auth_key` und den gewrappten Kontoschlüssel. |
 | Konto löschen | **läuft** (seit 0.9.x). |
+| Konto **anlegen** | **läuft** am Desktop und in der Kommandozeile (`lotse init`); im Browser geplant für W2 (4d). |
 | **Browser** | **fehlt.** `apps/web` läuft dort gegen Beispieldaten. |
 
 Gemessen, nicht geschätzt:
@@ -105,11 +106,16 @@ das gibt es dort nicht. Statt einer halben Fassung dieser Dinge:
 | Hafen, Projektseite, Brief, offene Punkte, Suche, Referenzen ansehen | **ja** |
 | Faden abhaken, Notiz schreiben, Status setzen | **ja** – das sind Umschläge, kein Dateisystem |
 | Vorhaben anlegen (Befund), Ordner scannen, Export, Gegenseite, MCP | **nein**, sichtbar ausgegraut mit Grund |
+| Konto anlegen und anmelden | **ja** – mit abgetipptem Wiederherstellungscode, siehe unten |
 | Tresor Stufe `ueberall` lesen | **ja** |
 | Tresor Stufe `nur_desktop` | **konstruktionsbedingt nein** – der Desktop-Schlüssel kommt nie in einen Browser. Wird als solches angezeigt, nicht als Fehler. |
 
-Kein Konto **anlegen** im Browser: dabei entsteht der Wiederherstellungscode, und der will
-einmal an einem Ort angezeigt werden, dem man traut. Anmelden genügt.
+**Konto anlegen geht auch im Browser** – mit derselben Strenge wie am Desktop. Der
+Wiederherstellungscode entsteht dabei im Browser und verlässt ihn nie; er wird angezeigt
+**und muss abgetippt werden**, bevor es weitergeht – genau wie bei `lotse init`. Ohne
+richtig abgetippten Code wird kein Konto beim Dienst angelegt. Das ist die eine Stelle, an
+der die Oberfläche bewusst im Weg steht: ein verlorener Code heißt verlorene Daten, denn
+der Dienst kann nicht helfen (`THREAT_MODEL.md`).
 
 ### 4e. Ein Browser ist ein Gerät
 
@@ -140,7 +146,8 @@ nach 4c, `fetch`-Implementierung. Build-Schritt in `apps/web`, in CI geprüft.
 
 Login über den eingebauten Dienst, Argon2id im Worker mit Fortschritt, Pull aller
 Umschläge, Entsiegeln in den Speicher, `brief`-Funktionen darüber, Hafen und Projektseite
-durch den vorhandenen `DataProvider`.
+durch den vorhandenen `DataProvider`. Dazu das Anlegen eines Kontos nach 4d, samt
+Abtippschritt für den Wiederherstellungscode.
 
 **Abschluss:** in einem echten Browser gegen einen echten Dienst anmelden und die Vorhaben
 sehen, mit gezählten Datensätzen – kein Mock, kein Screenshot als Beweis.
@@ -163,7 +170,7 @@ und ein Konflikt landet als Notiz im Logbuch statt still zu verschwinden.
 
 ### Phase W5 · Ausliefern
 
-Statisches Bündel auf `app.lotse.sanctora.eu` (Cloudflare), eigene Kopfzeilen mit
+Statisches Bündel auf **`app.lotse.sanctora.eu`** (entschieden, Cloudflare), eigene Kopfzeilen mit
 `connect-src` nur auf den Sync-Dienst, keine Fremdressourcen – dieselbe Regel wie für
 `site/`.
 
@@ -185,5 +192,6 @@ ausgelieferten Kopfzeilen sind nachgemessen, nicht behauptet.
 - Keine Zweitfassung der Erkennung, des Git-Lesers oder des Exports in JavaScript.
 - Kein Schema-Editor, keine Team-Funktionen, kein Mehrbenutzerbetrieb (`NON_GOALS.md`).
 - Keine eigene Identitätsschicht (4f).
-- Kein Konto-Anlegen im Browser (4d).
+- Kein Konto-Anlegen **ohne** abgetippten Wiederherstellungscode – im Browser so wenig wie
+  am Desktop (4d).
 - Keine Absenkung der KDF-Kosten, um im Browser schneller zu sein.

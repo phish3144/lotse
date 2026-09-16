@@ -75,7 +75,9 @@ Was fehlt, ist die Brücke dazwischen.
 Die tragende Entscheidung darin: der Browser braucht `store` nicht. Er hält versiegelte
 Umschläge und baut den Index im Speicher – kein zweites Schema, keine zweite SQL-Schicht.
 Ziel ist in einem Satz: auf jedem Gerät mit E-Mail und Master-Passwort anmelden und seine
-Vorhaben sehen.
+Vorhaben sehen. Entschieden ist auch die Adresse – `app.lotse.sanctora.eu` – und dass ein
+Konto sich **auch im Browser** anlegen lässt, mit demselben Abtippschritt für den
+Wiederherstellungscode wie bei `lotse init`.
 
 Für den Tresor ist der Fall schon vorgesehen: die Stufe `nur_desktop` ist im Browser
 konstruktionsbedingt nicht lesbar, weil der Desktop-Schlüssel nie dorthin kommt.
