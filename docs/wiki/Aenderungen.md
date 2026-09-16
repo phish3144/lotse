@@ -13,7 +13,51 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.9.0 — laufende Fassung
+## 0.10.0 — laufende Fassung
+
+**Ein zweites Gerät braucht nur E-Mail und Passwort.** Bisher musste dafür die Adresse des
+Sync-Dienstes abgetippt werden — im Anmeldefenster stand ein Platzhalter
+(`https://api.example.invalid`), auf der Kommandozeile war `--url` Pflicht. Genau das hat
+Anmelden wie Einrichtungsarbeit aussehen lassen. Die Adresse ist jetzt eingebaut: in der
+Oberfläche vorbelegt und hinter »ändern« versteckt, auf der Kommandozeile optional.
+Sichtbar bleibt sie, weil man wissen soll, wohin die Umschläge gehen; änderbar, weil
+Selbsthosten möglich bleibt — es ist nur nicht mehr die Voraussetzung. Siehe
+[[Einstellungen]].
+
+**Das Konto lässt sich löschen.** `lotse sync konto-loeschen` oder Einstellungen →
+Abgleich. Weg sind Konto, Umschläge, Anhänge, Geräte und Sitzungen; die E-Mail-Adresse ist
+danach wieder frei, sonst wäre Löschen eine Sperre. Es verlangt dein Master-Passwort und
+nicht nur die offene Sitzung — ein gestohlenes Token darf kein Konto ausradieren. Den
+Wiederherstellungscode verlangt es dagegen **nicht**: wer nicht mehr hineinkommt, hat
+trotzdem das Recht, seine Daten loszuwerden.
+
+Was es ausdrücklich **nicht** anfasst: die Daten auf diesem Gerät. Das sind zwei
+Entscheidungen mit zwei Knöpfen — »nicht mehr abgleichen« und »hier alles weg«
+(`lotse zuruecksetzen`). Ein Knopf, der still beides täte, wäre eine Falle.
+
+**Die Kommandozeile kennt den Befund.** `lotse deuten` nimmt dasselbe wie das Feld »Was
+gibt's?« in der App: einen Ordner, eine Repo-Adresse, eine Datei oder einfach einen Namen.
+Dann kommt der Befund mit Nummern und eine Frage: Enter übernimmt alles, `n` bricht ab,
+Nummern lassen einzelne Funde weg — das Gegenstück zum Häkchen in der Oberfläche. Ohne
+Terminal und ohne `--ja` entsteht nichts: in einer Pipeline soll nichts anfallen, was
+niemand bestätigt hat. Siehe [[Kommandozeile]].
+
+Dabei sind zwei Fehler herausgekommen, die beide auch die App betrafen. Ein Ordner, der
+schon zu einem Vorhaben gehörte, ergab einen **leeren** Befund — das Anhängen hatte also
+nie etwas anzuhängen. Jetzt wird weitergesucht, nur ohne Vorschlag: ein zweiter Aufruf
+nach Wochen findet genau die Unterprojekte und Dokumente, die seitdem dazugekommen sind.
+Und beim Anhängen wurde die Ordner-Referenz jedes Mal erneut angelegt; was mit gleichem
+Typ und Ziel schon dranhängt, wird jetzt übersprungen.
+
+**Geplant, noch nicht gebaut:** der Web-Client. Der Weg steht in `docs/WEB_CLIENT.md` —
+fünf Phasen mit Abschlusskriterien, Adresse `app.lotse.sanctora.eu`. Die tragende
+Entscheidung: der Browser braucht keine zweite Datenbank. Er hält versiegelte Umschläge und
+baut den Index im Arbeitsspeicher. Ein Konto anlegen geht dort später auch — mit demselben
+Abtippschritt für den Wiederherstellungscode wie auf der Kommandozeile. Siehe [[Roadmap]].
+
+---
+
+## 0.9.0
 
 **Eine Repo-Adresse bringt jetzt etwas mit.** Bisher ergab sie Name und Link, mehr nicht —
 Lotse hat GitHub nie gefragt. Das war kein Fehler, sondern eine nie gebaute Funktion. Jetzt
