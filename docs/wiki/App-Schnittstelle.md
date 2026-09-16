@@ -285,6 +285,7 @@ Siehe [[Assistenten (MCP)|Assistenten-MCP]].
 | `sync_jetzt` | – | Pushen, dann pullen. |
 | `sync_geraete` | – | |
 | `sync_geraet_widerrufen` | `id` | Das eigene lässt sich nicht widerrufen – dafür gibt es Sperren. |
+| `sync_konto_loeschen` | – | Löscht das Konto beim Dienst, unwiderruflich, und vergisst danach die Verbindung. Die **lokale** Datenbank bleibt – dafür ist `zuruecksetzen` da. Antwortet mit Zahlen statt »erledigt«. |
 
 Siehe [[Abgleich]] und [[Sync-Protokoll]].
 

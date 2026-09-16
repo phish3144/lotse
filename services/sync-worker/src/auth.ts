@@ -8,6 +8,8 @@
  * stop abusive requests before they burn CPU on PBKDF2.
  */
 import {
+  countRecords,
+  deleteAccountCascade,
   deleteAllSessions,
   deleteDevice,
   deleteOtherSessions,
@@ -357,6 +359,51 @@ export async function listDevicesHandler({ env, auth }: RequestContext): Promise
       last_seen_at: d.last_seen_at,
     })),
   );
+}
+
+/**
+ * POST /v1/account/delete -- irreversible. See SYNC_PROTOCOL.md section 4.
+ *
+ * Requires the `auth_key` in the body, not just a valid session: a stolen
+ * session token must not be enough to wipe an account. That is the same value
+ * `login` verifies, so the caller has to know the master password.
+ *
+ * What is NOT required is the recovery code. Deleting is the one operation
+ * where making it harder protects nobody -- somebody who cannot get in still
+ * has the right to have their data removed (GDPR Art. 17).
+ */
+export async function deleteAccountHandler({ request, env, auth }: RequestContext): Promise<Response> {
+  if (!auth) throw unauthorized("missing session");
+  const body = await parseJson(request);
+  const authKey = requireString(body, "auth_key");
+
+  const account = await getAccountById(env.DB, auth.accountId);
+  if (!account) {
+    throw new ApiError(404, "not_found", "no such account");
+  }
+  if (!(await verifySecret(account.auth_hash, authKey))) {
+    throw unauthorized("invalid auth_key", "invalid_credentials");
+  }
+
+  // R2 first: while the rows still exist, a crash here leaves objects that the
+  // next attempt finds again. Wipe the rows first and they would be unreachable
+  // garbage -- paid for, never deletable.
+  let objekte = 0;
+  let cursor: string | undefined;
+  do {
+    const liste = await env.BLOBS.list({ prefix: `${auth.accountId}/`, cursor });
+    if (liste.objects.length > 0) {
+      await env.BLOBS.delete(liste.objects.map((o) => o.key));
+      objekte += liste.objects.length;
+    }
+    cursor = liste.truncated ? liste.cursor : undefined;
+  } while (cursor);
+
+  const datensaetze = await countRecords(env.DB, auth.accountId);
+  await deleteAccountCascade(env.DB, auth.accountId);
+
+  // Counts, so the client can say what is gone instead of "done".
+  return json({ records: datensaetze, blobs: objekte });
 }
 
 export async function deleteDeviceHandler({ env, auth, params }: RequestContext): Promise<Response> {

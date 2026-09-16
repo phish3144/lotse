@@ -160,12 +160,23 @@ export interface GeraetInfo {
   last_seen_at: number;
 }
 
+/** Was beim Löschen eines Kontos wirklich weg ist. Zahlen statt »erledigt«. */
+export interface KontoGeloescht {
+  records: number;
+  blobs: number;
+}
+
 export const sync = {
   status: () => invoke<SyncStatus>('sync_status'),
   jetzt: () => invoke<SyncErgebnis>('sync_jetzt'),
   registrieren: (url: string, email: string, code: string) => invoke<void>('sync_register', { url, email, code }),
   geraete: () => invoke<GeraetInfo[]>('sync_geraete'),
   geraetWiderrufen: (id: string) => invoke<void>('sync_geraet_widerrufen', { id }),
+  /**
+   * Löscht das Konto beim Dienst – unwiderruflich, samt aller Umschläge und Anhänge.
+   * Die Daten auf **diesem** Gerät bleiben; die löscht `konto.zuruecksetzen`.
+   */
+  kontoLoeschen: () => invoke<KontoGeloescht>('sync_konto_loeschen'),
 };
 
 export interface BundleBilanz {

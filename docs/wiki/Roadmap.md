@@ -147,7 +147,7 @@ Wirkung. Zuerst muss Lotse für **eine** Person unverzichtbar sein.
 | Punkt | Stand |
 |---|---|
 | Symbol im Infobereich, globales Erfassen-Kürzel | Das Tauri-Feature `tray-icon` ist in `Cargo.toml` aktiviert, aber im Code nirgends benutzt – eine Abhängigkeit ohne Funktion. Bis dahin ist die [[Kommandozeile]] der schnellste Weg von außen. |
-| Konto im Dienst löschen | Nicht gebaut. Bis dahin: Datenordner löschen und beim Dienst alle Geräte widerrufen ([[Einstellungen]]). |
+| ~~Konto im Dienst löschen~~ | **Erledigt:** `POST /v1/account/delete`, als `lotse sync konto-loeschen` und unter Einstellungen → Abgleich. Verlangt das Master-Passwort, nicht nur die Sitzung; lässt die lokalen Daten unberührt ([[Einstellungen]], [[Sync-Protokoll]]). |
 | Selbst gehostete Git-Instanzen (GitHub Enterprise, eigenes GitLab) | Werden nicht erkannt. Der lokale Git-Log funktioniert dort ([[Gegenseite]]). |
 | Feldweises Mergen beim Abgleich | Auslöser: ein **zweiter** realer Datenverlust durch Last-Writer-Wins. Heute schreibt Lotse die unterlegene Fassung als Notiz ins Logbuch, damit nichts stumm verschwindet ([[Sync-Protokoll]]). |
 | Semantische Suche, Embeddings | Auslöser: die Volltextsuche findet **nachweislich** nicht mehr. |

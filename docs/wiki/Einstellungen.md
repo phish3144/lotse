@@ -89,6 +89,21 @@ neu. Siehe [[Kalender]].
 
 ## Abgleich
 
+### Konto beim Dienst löschen
+
+Löscht Konto, alle Umschläge, alle Anhänge, alle Geräte und alle Sitzungen beim Dienst –
+**unwiderruflich**. Die E-Mail-Adresse ist danach wieder frei. Bestätigt wird mit dem
+getippten Wort `LÖSCHEN`, nicht mit einem zweiten Klick.
+
+**Die Daten auf diesem Gerät bleiben.** Das sind zwei Entscheidungen, und sie haben zwei
+Knöpfe: *Konto löschen* hier, *Gerät zurücksetzen* unter [[#Sicherheit|Sicherheit]]. Wer
+beides will, tut beides – ein Knopf, der still beides täte, wäre eine Falle.
+
+Der Dienst verlangt dafür das Master-Passwort und nicht nur die offene Sitzung. Den
+Wiederherstellungscode verlangt er nicht: wer nicht mehr hineinkommt, hat trotzdem das
+Recht, seine Daten loszuwerden. Auf der Kommandozeile: `lotse sync konto-loeschen`.
+
+
 | Schalter | Was er tut |
 |---|---|
 | **Abgleich einrichten** | Fragt Dienst-Adresse, E-Mail-Adresse und Wiederherstellungscode ab und registriert dieses Konto. |

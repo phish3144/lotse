@@ -70,6 +70,22 @@ Basis-URL: `https://api.<domain>/v1`. Alle Bodies JSON. Fehler als
 | POST | `/auth/recover/complete` | `{ email, recovery_auth_key, new_auth_key, new_salt, new_kdf, wrapped_account_key, new_recovery_auth_key, wrapped_account_key_recovery }` | `204`; widerruft **alle** Sitzungen |
 | GET | `/devices` | – | `[{ id, name, platform, created_at, last_seen_at }]` |
 | DELETE | `/devices/:id` | – | `204`; widerruft dessen Sitzungen |
+| POST | `/account/delete` | `{ auth_key }` | `{ records, blobs }`; löscht Konto, Umschläge, Anhänge, Geräte und Sitzungen |
+
+`/account/delete` verlangt den `auth_key` im Rumpf und nicht nur eine gültige Sitzung: ein
+gestohlenes Sitzungstoken darf kein Konto ausradieren. Es ist derselbe Wert, den `login`
+prüft – der Aufrufer muss also das Master-Passwort kennen. Der Wiederherstellungscode wird
+**nicht** verlangt: wer nicht mehr hineinkommt, hat trotzdem das Recht, seine Daten
+loswerden zu können.
+
+`POST` und nicht `DELETE`, weil ein `DELETE` mit Pflicht-Rumpf eine Fußangel ist –
+Zwischenstationen und Bibliotheken dürfen den Körper streichen, und dann sähe »löschen
+ohne Nachweis« wie ein Fehler des Nutzers aus.
+
+Reihenfolge im Dienst: erst die R2-Objekte, dann die Zeilen in **einem** D1-Batch. Ein
+halb gelöschtes Konto ist schlimmer als keins; und ein verwaistes Objekt kostet Speicher,
+eine verwaiste Zeile würde noch auf einen Login antworten. Die Antwort nennt Zahlen statt
+»erledigt«, damit der Client sagen kann, was weg ist.
 
 `auth_key` ist der HKDF-abgeleitete Auth-Schlüssel (Base64, 32 B). Der Dienst speichert
 nur einen gesalzenen Hash davon (siehe unten). `session_token` wird als

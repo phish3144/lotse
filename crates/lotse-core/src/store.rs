@@ -195,6 +195,17 @@ impl Store {
             .optional()?)
     }
 
+    /// Entfernt einen Meta-Eintrag. »Vergessen« soll heißen, dass die Zeile weg ist –
+    /// eine leere Zeichenkette liest sich wie ein gesetzter Wert und führt zu Fehlern,
+    /// die nach etwas anderem klingen als nach »nicht eingerichtet«.
+    ///
+    /// Die `meta`-Tabelle wird nicht abgeglichen; hier entsteht kein Tombstone.
+    pub fn meta_loeschen(&self, key: &str) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM meta WHERE key = ?1", params![key])?;
+        Ok(())
+    }
+
     pub fn meta_set(&self, key: &str, value: &str) -> Result<()> {
         self.conn.execute(
             "INSERT INTO meta(key, value) VALUES (?1, ?2)

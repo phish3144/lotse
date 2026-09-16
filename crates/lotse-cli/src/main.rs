@@ -188,6 +188,14 @@ enum SyncCmd {
     Geraete,
     /// Ein Gerät widerrufen (seine Sitzungen verfallen)
     Widerrufen { id: String },
+    /// Das Konto beim Dienst löschen: alle Umschläge, Anhänge und Geräte.
+    /// **Unwiderruflich.** Die Daten auf diesem Gerät bleiben – die löscht
+    /// `lotse zuruecksetzen`.
+    KontoLoeschen {
+        /// Ohne Rückfrage löschen (nur für Skripte)
+        #[arg(long)]
+        ja: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1301,6 +1309,31 @@ fn sync(store: &mut Store, konto: &konto::Konto, auth_key: &Key32, c: SyncCmd) -
             let client = sync_client::client_aus_store(store)?;
             client.geraet_widerrufen(&id)?;
             println!("Gerät {id} widerrufen.");
+        }
+        SyncCmd::KontoLoeschen { ja } => {
+            let client = sync_client::client_aus_store(store)?;
+            // Erst zeigen, was verloren geht. Eine Zusage zu etwas Unwiderruflichem,
+            // dessen Umfang man nicht kennt, ist keine.
+            let stand = client.status()?;
+            println!(
+                "Beim Dienst liegen {} Umschläge und {} Anhänge.",
+                stand.record_count, stand.blob_bytes
+            );
+            println!("Löschen ist unwiderruflich. Die Daten auf diesem Gerät bleiben.");
+            if !ja {
+                // Getippt, nicht geklickt – wie bei `lotse zuruecksetzen`.
+                let antwort = zeile_lesen("Zum Löschen »LÖSCHEN« eingeben: ")?;
+                if antwort.trim() != "LÖSCHEN" {
+                    println!("Abgebrochen, nichts gelöscht.");
+                    return Ok(());
+                }
+            }
+            let weg = client.konto_loeschen(auth_key)?;
+            println!(
+                "Konto gelöscht: {} Umschläge, {} Anhänge.",
+                weg.records, weg.blobs
+            );
+            println!("Dieses Gerät gleicht nicht mehr ab. Die lokalen Daten sind unberührt.");
         }
     }
     Ok(())

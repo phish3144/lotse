@@ -29,6 +29,16 @@ pub struct Geraet {
     pub platform: String,
 }
 
+/// Was beim Löschen eines Kontos wirklich weg ist. Zahlen statt »erledigt«: der Mensch
+/// soll sagen können, was gelöscht wurde, und nicht darauf vertrauen müssen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KontoGeloescht {
+    /// Gelöschte Umschläge.
+    pub records: usize,
+    /// Gelöschte Anhänge im Objektspeicher.
+    pub blobs: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeraetInfo {
     pub id: String,
@@ -360,6 +370,23 @@ impl Client {
         Self::json(resp)
     }
 
+    /// Löscht das Konto beim Dienst – unwiderruflich, samt aller Umschläge und Anhänge.
+    ///
+    /// Verlangt den `auth_key` im Rumpf und nicht nur die Sitzung: ein gestohlenes
+    /// Sitzungstoken darf kein Konto ausradieren. Den Wiederherstellungscode braucht es
+    /// dagegen **nicht** – wer nicht mehr hineinkommt, hat trotzdem das Recht, seine
+    /// Daten loszuwerden.
+    ///
+    /// Die lokale Datenbank bleibt davon unberührt. Das ist zwei getrennte Entscheidungen
+    /// wert: »nicht mehr abgleichen« und »hier alles weg« (`konto::zuruecksetzen`).
+    pub fn konto_loeschen(&self, auth_key: &Key32) -> Result<KontoGeloescht> {
+        let resp = self
+            .mit_rumpf("/account/delete")
+            .send_json(serde_json::json!({ "auth_key": B64.encode(auth_key.as_bytes()) }))
+            .map_err(Self::netzfehler)?;
+        Self::json(resp)
+    }
+
     pub fn geraet_widerrufen(&self, id: &str) -> Result<()> {
         let resp = self
             .ohne_rumpf("DELETE", &format!("/devices/{id}"))
@@ -411,11 +438,18 @@ pub struct Abgleich {
 
 /// Verbindung aus dem lokalen Speicher herstellen (URL und Token liegen dort).
 pub fn client_aus_store(store: &Store) -> Result<Client> {
-    let url = store.meta_get(meta::URL)?.ok_or_else(|| {
-        Error::Invalid("Kein Sync eingerichtet (`lotse sync register` oder `login`)".into())
-    })?;
+    // Leere Werte gelten als »nicht gesetzt«. Sonst entsteht ein Client mit leerer
+    // Adresse, und der Fehler beim ersten Aufruf klingt nach Netzproblem statt nach
+    // »noch nicht eingerichtet«.
+    let url = store
+        .meta_get(meta::URL)?
+        .filter(|v| !v.trim().is_empty())
+        .ok_or_else(|| {
+            Error::Invalid("Kein Sync eingerichtet (`lotse sync register` oder `login`)".into())
+        })?;
     let token = store
         .meta_get(meta::TOKEN)?
+        .filter(|v| !v.trim().is_empty())
         .ok_or_else(|| Error::Invalid("Keine Sitzung; erneut anmelden".into()))?;
     Ok(Client::new(&url).with_token(&token))
 }
@@ -432,6 +466,21 @@ pub fn verbindung_merken(
     store.meta_set(meta::EMAIL, email)?;
     store.meta_set(meta::ACCOUNT_ID, account_id)?;
     store.meta_set(meta::TOKEN, token)
+}
+
+/// Vergisst die gemerkte Verbindung: Adresse, Adresse, Kennung, Token.
+///
+/// Nach dem Löschen des Kontos nötig – ein gemerkter Dienst ohne Konto dahinter ist eine
+/// Einladung, beim nächsten Abgleich in eine 401 zu laufen und sie für einen Fehler zu
+/// halten. Die **Daten** bleiben unberührt; das hier trennt nur die Leitung.
+pub fn verbindung_vergessen(store: &mut Store) -> Result<()> {
+    for schluessel in [meta::URL, meta::EMAIL, meta::ACCOUNT_ID, meta::TOKEN] {
+        store.meta_loeschen(schluessel)?;
+    }
+    // Auch der Abgleichstand muss weg. Bliebe `last_server_seq` stehen, würde ein später
+    // angelegtes Konto erst ab dieser Nummer pullen und alles darunter überspringen – und
+    // `last_local_seq` würde verhindern, dass der eigene Bestand noch einmal hochgeht.
+    store.sync_state_setzen(&crate::sync::SyncState::default())
 }
 
 /// Der Abgleich nach `SYNC_PROTOCOL.md`, Abschnitt 5: erst alle ausstehenden Umschläge in

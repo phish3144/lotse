@@ -7,6 +7,7 @@
  */
 import {
   changePassword,
+  deleteAccountHandler,
   deleteDeviceHandler,
   listDevicesHandler,
   login,
@@ -33,6 +34,12 @@ router.post("/v1/auth/recover", recover);
 router.post("/v1/auth/recover/complete", recoverComplete);
 router.get("/v1/devices", listDevicesHandler, { auth: true });
 router.delete("/v1/devices/:id", deleteDeviceHandler, { auth: true });
+// Konto löschen: unwiderruflich, verlangt den auth_key im Rumpf und nicht nur die
+// Sitzung – ein gestohlenes Token darf kein Konto ausradieren. POST und nicht DELETE,
+// weil ein DELETE mit Pflicht-Rumpf eine Fußangel ist: Proxys und Bibliotheken dürfen
+// den Körper streichen, und dann sieht »löschen ohne Nachweis« wie ein Fehler des
+// Nutzers aus.
+router.post("/v1/account/delete", deleteAccountHandler, { auth: true });
 
 // Sync
 router.post("/v1/sync/push", push, { auth: true });

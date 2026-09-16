@@ -85,6 +85,7 @@ Basis: `https://<dienst>/v1`. Alle Bodies JSON, Fehler als
 | POST | `/v1/auth/recover/complete` | Zweiter Schritt: neues Passwort setzen. Widerruft **alle** Sitzungen, auch die eigene. |
 | GET | `/v1/devices` | Geräte des Kontos. |
 | DELETE | `/v1/devices/:id` | Gerät widerrufen; seine Sitzungen verfallen. |
+| POST | `/v1/account/delete` | Konto löschen: Umschläge, Anhänge, Geräte, Sitzungen. Unwiderruflich. Verlangt den `auth_key` im Rumpf, nicht nur die Sitzung – ein gestohlenes Token darf kein Konto ausradieren. Antwortet mit Zahlen (`{records, blobs}`) statt »erledigt«. |
 
 Bemerkenswert an `register` und `login`: der Dienst bekommt nie das Passwort, sondern
 einen aus ihm abgeleiteten Auth-Schlüssel. Den hasht er noch einmal – mit PBKDF2-SHA256,

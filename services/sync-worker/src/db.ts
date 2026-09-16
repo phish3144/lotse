@@ -324,6 +324,27 @@ export async function upsertBlobMeta(
     .run();
 }
 
+/**
+ * Deletes everything that belongs to one account, in one D1 batch: records,
+ * blob metadata, sessions, devices, the sequence counter and the account row.
+ *
+ * One batch on purpose -- a half-deleted account is worse than none. D1 runs a
+ * batch as a single transaction, so either the account is gone or nothing moved.
+ * The R2 objects are removed by the caller (see `auth.ts`): they are not part of
+ * this transaction, and an orphaned object costs storage but leaks nothing --
+ * an orphaned *row* would still answer to a login.
+ */
+export async function deleteAccountCascade(db: D1Database, accountId: string): Promise<void> {
+  await db.batch([
+    db.prepare("DELETE FROM records WHERE account_id = ?1").bind(accountId),
+    db.prepare("DELETE FROM blobs WHERE account_id = ?1").bind(accountId),
+    db.prepare("DELETE FROM sessions WHERE account_id = ?1").bind(accountId),
+    db.prepare("DELETE FROM devices WHERE account_id = ?1").bind(accountId),
+    db.prepare("DELETE FROM seq WHERE account_id = ?1").bind(accountId),
+    db.prepare("DELETE FROM accounts WHERE id = ?1").bind(accountId),
+  ]);
+}
+
 export async function deleteBlobMeta(db: D1Database, accountId: string, id: string): Promise<void> {
   await db.prepare("DELETE FROM blobs WHERE account_id = ? AND id = ?").bind(accountId, id).run();
 }

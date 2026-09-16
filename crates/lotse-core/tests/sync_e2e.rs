@@ -168,5 +168,47 @@ fn zwei_geraete_gleichen_ab() {
     // Der Dienst hat nie Klartext gesehen: Status zählt nur Datensätze.
     let st = ca.status().unwrap();
     assert!(st.record_count >= 5);
-    let _ = Key32::random();
+    let vorher = st.record_count;
+
+    // Ein falscher auth_key löscht nichts – sonst genügte ein gestohlenes Sitzungstoken.
+    let err = ca.konto_loeschen(&Key32::random().unwrap()).unwrap_err();
+    assert!(
+        matches!(err, lotse_core::Error::Sync { status: 401, .. }),
+        "{err}"
+    );
+    assert_eq!(
+        ca.status().unwrap().record_count,
+        vorher,
+        "nach dem Fehlversuch muss alles noch da sein"
+    );
+
+    // Und mit dem richtigen ist es weg, mit Zahlen statt »erledigt«.
+    let weg = ca.konto_loeschen(&konto.auth_key).unwrap();
+    assert_eq!(weg.records as u64, vorher);
+
+    // Die Sitzung gilt nicht mehr …
+    let err = ca.status().unwrap_err();
+    assert!(
+        matches!(err, lotse_core::Error::Sync { status: 401, .. }),
+        "{err}"
+    );
+    // … und die Adresse ist wieder frei, sonst wäre Löschen eine Sperre.
+    match anon.prelogin(&email) {
+        Err(lotse_core::Error::Sync { status: 404, .. }) => {}
+        Err(e) => panic!("falscher Fehler: {e}"),
+        Ok(_) => panic!("die Adresse ist noch belegt – Löschen wäre eine Sperre"),
+    }
+
+    // Die lokalen Daten bleiben: das war eine andere Entscheidung.
+    assert!(a.projekt(p.id).unwrap().is_some());
+
+    // `verbindung_vergessen` trennt die Leitung und setzt den Abgleichstand zurück –
+    // sonst würde ein später angelegtes Konto alles unter der alten Sequenz überspringen.
+    client::verbindung_vergessen(&mut a).unwrap();
+    assert_eq!(a.sync_state().unwrap().last_server_seq, 0);
+    assert!(client::client_aus_store(&a).is_err());
+    assert!(
+        a.projekt(p.id).unwrap().is_some(),
+        "und die Daten sind noch da"
+    );
 }

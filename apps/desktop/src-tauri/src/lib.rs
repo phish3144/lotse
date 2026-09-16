@@ -2734,6 +2734,26 @@ fn sync_geraete(state: State<AppState>) -> R<Vec<sync_client::GeraetInfo>> {
     })
 }
 
+/// Löscht das Konto beim Dienst – unwiderruflich, samt aller Umschläge und Anhänge.
+///
+/// Die lokale Datenbank bleibt. Das sind zwei getrennte Entscheidungen: »nicht mehr
+/// abgleichen« und »auf diesem Gerät alles weg« (`zuruecksetzen`). Sie zusammenzulegen
+/// hieße, dass ein Klick beides tut und einer davon nicht gemeint war.
+///
+/// Der `auth_key` liegt in der Sitzung und wird hier hereingereicht; der Dienst verlangt
+/// ihn, weil eine Sitzung allein zum Ausradieren nicht genügen darf.
+#[tauri::command]
+fn sync_konto_loeschen(state: State<AppState>) -> R<sync_client::KontoGeloescht> {
+    mit(&state, |s| {
+        let client = sync_client::client_aus_store(&s.store)?;
+        let weg = client.konto_loeschen(&s.auth_key)?;
+        // Die Verbindung vergessen: ohne Konto ist ein gemerkter Dienst eine Einladung,
+        // beim nächsten Abgleich in eine 401 zu laufen.
+        sync_client::verbindung_vergessen(&mut s.store)?;
+        Ok(weg)
+    })
+}
+
 /// Entzieht einem Gerät den Zugang. Das eigene lässt sich nicht widerrufen –
 /// dafür gibt es Sperren.
 #[tauri::command]
@@ -3035,6 +3055,7 @@ pub fn run() {
             sync_status,
             sync_geraete,
             sync_geraet_widerrufen,
+            sync_konto_loeschen,
             sync_jetzt,
             sync_register,
             sync_login

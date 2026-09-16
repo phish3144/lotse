@@ -602,6 +602,31 @@
     }
   }
 
+  // --- Konto beim Dienst löschen --------------------------------------------
+  // Getrennt vom Zurücksetzen dieses Geräts, und das muss auch so aussehen: das eine
+  // löscht beim Dienst, das andere hier. Wer beides will, tut beides.
+  let klOffen = $state(false);
+  let klEingabe = $state('');
+  let klLaeuft = $state(false);
+
+  async function kontoLoeschen() {
+    if (klEingabe.trim() !== 'LÖSCHEN') return;
+    klLaeuft = true;
+    try {
+      const weg = await sync.kontoLoeschen();
+      klOffen = false;
+      klEingabe = '';
+      await statusLaden();
+      meldungen.zeigen(
+        `Konto beim Dienst gelöscht: ${weg.records} Umschläge, ${weg.blobs} Anhänge. Die Daten auf diesem Gerät sind unberührt.`,
+      );
+    } catch (e) {
+      meldungen.fehler(e);
+    } finally {
+      klLaeuft = false;
+    }
+  }
+
   // --- Passwort wechseln ----------------------------------------------------
   let pwOffen = $state(false);
   let pwAlt = $state('');
@@ -1183,6 +1208,31 @@
           </li>
         {/each}
       </ul>
+    {/if}
+
+    <h3>Konto beim Dienst löschen</h3>
+    <p class="hinweis">
+      Löscht Konto, alle Umschläge und alle Anhänge beim Dienst – <strong>unwiderruflich</strong>. Die E-Mail-Adresse
+      ist danach wieder frei.
+    </p>
+    <p class="hinweis klein">
+      Die Daten auf <strong>diesem</strong> Gerät bleiben. Wer die auch loswerden will, nimmt zusätzlich
+      <em>Gerät zurücksetzen</em> unter <em>Sicherheit</em> – zwei Entscheidungen, zwei Knöpfe.
+      Wie viel beim Dienst liegt, zeigt <code>lotse sync status</code>.
+    </p>
+    {#if klOffen}
+      <div class="loesch-frage">
+        <p class="hinweis">Zum Löschen <strong>LÖSCHEN</strong> eingeben:</p>
+        <input bind:value={klEingabe} type="text" autocomplete="off" spellcheck="false" />
+        <div class="zeile">
+          <button type="button" onclick={() => { klOffen = false; klEingabe = ''; }}>Abbrechen</button>
+          <button type="button" class="gefahr" disabled={klEingabe.trim() !== 'LÖSCHEN' || klLaeuft} onclick={kontoLoeschen}>
+            {klLaeuft ? 'Lösche …' : 'Konto endgültig löschen'}
+          </button>
+        </div>
+      </div>
+    {:else}
+      <button type="button" class="gefahr" onclick={() => (klOffen = true)}>Konto löschen …</button>
     {/if}
   {/if}
 </section>

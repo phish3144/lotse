@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { api, registerAccount, registerBody } from "./helpers";
+import { api, makeEnvelope, randomB64, registerAccount, registerBody } from "./helpers";
 
 describe("auth", () => {
   it("registers, then logs in with the same auth_key", async () => {
@@ -293,5 +293,99 @@ describe("auth", () => {
       body: JSON.stringify({ email: requestBody.email, recovery_auth_key: "d2hhdGV2ZXI=" }),
     });
     expect(bad.status).toBe(401);
+  });
+});
+
+describe("POST /v1/account/delete", () => {
+  it("wipes records, blobs and the account itself", async () => {
+    const { session_token, requestBody } = await registerAccount();
+
+    // Etwas hinlegen, damit das Löschen etwas zu tun hat.
+    const push = await api("/v1/sync/push", {
+      method: "POST",
+      token: session_token,
+      body: JSON.stringify({ records: [makeEnvelope(), makeEnvelope()] }),
+    });
+    expect(push.status).toBe(200);
+    const blobId = crypto.randomUUID().replace(/-/g, "");
+    const put = await api(`/v1/blobs/${blobId}`, {
+      method: "PUT",
+      token: session_token,
+      headers: { "content-length": "4", "content-type": "application/octet-stream" },
+      body: "abcd",
+    });
+    expect(put.status).toBe(201);
+
+    const res = await api("/v1/account/delete", {
+      method: "POST",
+      token: session_token,
+      body: JSON.stringify({ auth_key: requestBody.auth_key }),
+    });
+    expect(res.status).toBe(200);
+    // Zahlen statt "erledigt": der Client soll sagen können, was weg ist.
+    expect(await res.json()).toEqual({ records: 2, blobs: 1 });
+
+    // Die Sitzung gilt nicht mehr, weil es das Konto nicht mehr gibt.
+    const danach = await api("/v1/sync/status", { token: session_token });
+    expect(danach.status).toBe(401);
+
+    // Und die Adresse ist wieder frei – sonst wäre Löschen eine Sperre.
+    const prelogin = await api(`/v1/auth/prelogin?email=${encodeURIComponent(String(requestBody.email))}`);
+    expect(prelogin.status).toBe(404);
+  });
+
+  it("refuses without the auth_key, even with a valid session", async () => {
+    // Ein gestohlenes Sitzungstoken darf kein Konto ausradieren.
+    const { session_token, requestBody } = await registerAccount();
+
+    const ohne = await api("/v1/account/delete", {
+      method: "POST",
+      token: session_token,
+      body: JSON.stringify({}),
+    });
+    expect(ohne.status).toBe(400);
+
+    const falsch = await api("/v1/account/delete", {
+      method: "POST",
+      token: session_token,
+      body: JSON.stringify({ auth_key: randomB64() }),
+    });
+    expect(falsch.status).toBe(401);
+
+    // Das Konto steht noch.
+    const status = await api("/v1/sync/status", { token: session_token });
+    expect(status.status).toBe(200);
+    const prelogin = await api(`/v1/auth/prelogin?email=${encodeURIComponent(String(requestBody.email))}`);
+    expect(prelogin.status).toBe(200);
+  });
+
+  it("refuses without a session at all", async () => {
+    const res = await api("/v1/account/delete", {
+      method: "POST",
+      body: JSON.stringify({ auth_key: randomB64() }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("leaves another account untouched", async () => {
+    const eins = await registerAccount();
+    const zwei = await registerAccount();
+    await api("/v1/sync/push", {
+      method: "POST",
+      token: zwei.session_token,
+      body: JSON.stringify({ records: [makeEnvelope()] }),
+    });
+
+    const res = await api("/v1/account/delete", {
+      method: "POST",
+      token: eins.session_token,
+      body: JSON.stringify({ auth_key: eins.requestBody.auth_key }),
+    });
+    expect(res.status).toBe(200);
+
+    const status = await api("/v1/sync/status", { token: zwei.session_token });
+    expect(status.status).toBe(200);
+    const stand = (await status.json()) as { record_count: number };
+    expect(stand.record_count).toBe(1);
   });
 });

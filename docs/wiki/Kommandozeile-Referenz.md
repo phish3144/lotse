@@ -516,6 +516,37 @@ Alle Geräte des Kontos mit Name, Plattform und letztem Abgleich.
 Widerruft ein Gerät; seine Sitzungen verfallen sofort. Für ein verlorenes Notebook.
 Die Daten auf dem Gerät bleiben verschlüsselt liegen – Widerruf ist kein Fernlöschen.
 
+### `lotse sync konto-loeschen`
+
+Löscht das Konto beim Dienst: alle Umschläge, alle Anhänge, alle Geräte, alle Sitzungen.
+**Unwiderruflich.** Die E-Mail-Adresse ist danach wieder frei.
+
+Zeigt vorher, wie viel beim Dienst liegt, und verlangt das getippte Wort `LÖSCHEN` – wie
+`lotse zuruecksetzen`. Eine Zusage zu etwas Unwiderruflichem, dessen Umfang man nicht
+kennt, ist keine.
+
+| Option | Standard | Bedeutung |
+|---|---|---|
+| `--ja` | aus | Ohne Rückfrage löschen. Nur für Skripte. |
+
+**Was es nicht tut:** die Daten auf diesem Gerät anfassen. Das sind zwei Entscheidungen –
+»nicht mehr abgleichen« und »hier alles weg«. Für das Zweite gibt es
+`lotse zuruecksetzen`. Wer beides will, tut beides.
+
+Der Dienst verlangt dafür das Master-Passwort (genauer: den daraus abgeleiteten
+`auth_key`), nicht nur eine Sitzung – ein gestohlenes Token darf kein Konto ausradieren.
+Den Wiederherstellungscode verlangt er **nicht**: wer nicht mehr hineinkommt, hat trotzdem
+das Recht, seine Daten loszuwerden.
+
+```
+$ lotse sync konto-loeschen
+Beim Dienst liegen 412 Umschläge und 0 Anhänge.
+Löschen ist unwiderruflich. Die Daten auf diesem Gerät bleiben.
+Zum Löschen »LÖSCHEN« eingeben: LÖSCHEN
+Konto gelöscht: 412 Umschläge, 0 Anhänge.
+Dieses Gerät gleicht nicht mehr ab. Die lokalen Daten sind unberührt.
+```
+
 ---
 
 ## Export
