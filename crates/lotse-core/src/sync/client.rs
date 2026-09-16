@@ -14,6 +14,25 @@ use crate::sync::{PullResponse, PushRequest, PushResponse, StatusResponse, MAX_P
 use crate::{Error, Result};
 
 /// Meta-Schlüssel im lokalen Speicher, unter denen der Sync-Stand liegt.
+/// Der Dienst, den Lotse benutzt, wenn nichts anderes gesagt wird.
+///
+/// Fest eingebaut, damit niemand eine Adresse abtippen muss, um auf einem zweiten Gerät
+/// an die eigenen Daten zu kommen. Dass er überschreibbar bleibt, ist kein Widerspruch,
+/// sondern der Fluchtweg: der Client läuft gegen jede Basis-Adresse, die dasselbe
+/// Protokoll spricht (`docs/SYNC_PROTOCOL.md`) – Selbsthosten bleibt möglich, es ist nur
+/// nicht mehr die Voraussetzung.
+pub const STANDARD_DIENST: &str = "https://lotse-sync.sanctora.eu";
+
+/// Die Adresse, die gelten soll: die angegebene, sonst der Standard.
+pub fn dienst_oder_standard(angegeben: Option<&str>) -> String {
+    angegeben
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .unwrap_or(STANDARD_DIENST)
+        .trim_end_matches('/')
+        .to_string()
+}
+
 pub mod meta {
     pub const URL: &str = "sync_url";
     pub const EMAIL: &str = "sync_email";

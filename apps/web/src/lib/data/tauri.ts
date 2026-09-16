@@ -116,8 +116,12 @@ export const konto = {
   /** Minuten bis zum selbsttätigen Sperren; 0 heißt nie. */
   autoLock: () => invoke<number>('auto_lock'),
   autoLockSetzen: (minuten: number) => invoke<void>('auto_lock_setzen', { minuten }),
-  syncLogin: (url: string, email: string, passwort: string, geraet: string) =>
-    invoke<void>('sync_login', { url, email, passwort, geraet }),
+  /**
+   * Zweites Gerät an ein bestehendes Konto anmelden. `url` weglassen heißt: der
+   * eingebaute Dienst – niemand soll eine Adresse abtippen, um an eigene Daten zu kommen.
+   */
+  syncLogin: (email: string, passwort: string, geraet: string, url?: string) =>
+    invoke<void>('sync_login', { url: url ?? null, email, passwort, geraet }),
   /** Vergessenes Passwort: mit dem Wiederherstellungscode öffnen und neu setzen. */
   wiederherstellen: (code: string, neuesPasswort: string) =>
     invoke<void>('konto_wiederherstellen', { code, neuesPasswort }),
@@ -169,7 +173,11 @@ export interface KontoGeloescht {
 export const sync = {
   status: () => invoke<SyncStatus>('sync_status'),
   jetzt: () => invoke<SyncErgebnis>('sync_jetzt'),
-  registrieren: (url: string, email: string, code: string) => invoke<void>('sync_register', { url, email, code }),
+  /** Der eingebaute Dienst. Sichtbar, damit man weiß, wohin die Umschläge gehen. */
+  standardDienst: () => invoke<string>('sync_standard_dienst'),
+  /** `url` weglassen heißt: der eingebaute Dienst. */
+  registrieren: (email: string, code: string, url?: string) =>
+    invoke<void>('sync_register', { url: url ?? null, email, code }),
   geraete: () => invoke<GeraetInfo[]>('sync_geraete'),
   geraetWiderrufen: (id: string) => invoke<void>('sync_geraet_widerrufen', { id }),
   /**

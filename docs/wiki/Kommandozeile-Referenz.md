@@ -480,18 +480,30 @@ als Referenz vom Typ `url` anlegen (endet auf .ics oder beginnt mit webcal://).
 
 Vollständig in **[[Abgleich]]**, Protokoll in **[[Sync-Protokoll]]**.
 
-### `lotse sync register --url <URL> --email <ADRESSE>`
+### `lotse sync register --email <ADRESSE>`
 
 Meldet ein **bestehendes** lokales Konto beim Dienst an. Fragt den
 Wiederherstellungscode ab, weil daraus der Wiederherstellungsweg gewrappt wird.
 
-### `lotse sync login --url <URL> --email <ADRESSE>`
+| Option | Standard |
+|---|---|
+| `--url <URL>` | `https://lotse-sync.sanctora.eu` – der eingebaute Dienst. Nur nötig, wer selbst hostet. |
 
-Meldet ein **neues Gerät** an einem bestehenden Konto an und holt alles herunter.
+### `lotse sync login --email <ADRESSE>`
+
+Meldet ein **neues Gerät** an einem bestehenden Konto an und holt alles herunter. Mehr
+braucht es nicht: E-Mail und Master-Passwort, den Dienst kennt Lotse.
 
 | Option | Standard |
 |---|---|
+| `--url <URL>` | Der eingebaute Dienst, wie oben. |
 | `--geraet <NAME>` | Name des Rechners laut System |
+
+```
+$ lotse sync login --email du@example.org
+Master-Passwort: ********
+Angemeldet als du@example.org. 412 Datensätze heruntergeladen.
+```
 
 ### `lotse sync jetzt`
 

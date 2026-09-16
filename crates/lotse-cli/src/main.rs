@@ -165,15 +165,18 @@ enum Cmd {
 enum SyncCmd {
     /// Bestehendes lokales Konto beim Sync-Dienst registrieren (fragt den Wiederherstellungscode ab)
     Register {
+        /// Adresse des Dienstes. Ohne Angabe der eingebaute Standard – nur nötig, wer
+        /// selbst hostet.
         #[arg(long)]
-        url: String,
+        url: Option<String>,
         #[arg(long)]
         email: String,
     },
     /// Neues Gerät an einem bestehenden Konto anmelden und alles herunterladen
     Login {
+        /// Adresse des Dienstes. Ohne Angabe der eingebaute Standard.
         #[arg(long)]
-        url: String,
+        url: Option<String>,
         #[arg(long)]
         email: String,
         /// Name dieses Geräts (Standard: der Name, unter dem das System diesen Rechner kennt)
@@ -339,7 +342,7 @@ fn run() -> Result<()> {
     if let Cmd::Sync(SyncCmd::Login { url, email, geraet }) = &cli.cmd {
         return sync_login(
             &home,
-            url,
+            &sync_client::dienst_oder_standard(url.as_deref()),
             email,
             &geraet.clone().unwrap_or_else(konto::rechnername),
         );
@@ -1247,6 +1250,7 @@ fn sync(store: &mut Store, konto: &konto::Konto, auth_key: &Key32, c: SyncCmd) -
                 name: konto.geraet_name.clone(),
                 platform: "cli".into(),
             };
+            let url = sync_client::dienst_oder_standard(url.as_deref());
             let client = Client::new(&url);
             let (account_id, token) = client
                 .register(&email, auth_key, &recovery_auth, &konto.header, &sg)

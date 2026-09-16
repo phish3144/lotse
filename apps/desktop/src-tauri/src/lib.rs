@@ -2865,14 +2865,23 @@ async fn sync_jetzt(state: State<'_, AppState>) -> R<SyncErgebnis> {
     })
 }
 
+/// Der eingebaute Dienst. Die Oberfläche zeigt ihn, statt ein leeres Feld anzubieten –
+/// sichtbar, weil man wissen soll, wohin die Umschläge gehen, und änderbar, weil
+/// Selbsthosten möglich bleibt.
+#[tauri::command]
+fn sync_standard_dienst() -> String {
+    sync_client::STANDARD_DIENST.to_string()
+}
+
 /// Bestehendes Konto beim Dienst registrieren. Braucht den Wiederherstellungscode.
 #[tauri::command]
 async fn sync_register(
     state: State<'_, AppState>,
-    url: String,
+    url: Option<String>,
     email: String,
     code: String,
 ) -> R<()> {
+    let url = sync_client::dienst_oder_standard(url.as_deref());
     let h = home(&state)?;
     let konto = konto::lesen(&h).map_err(fehler)?;
     let code = RecoveryCode::parse(&code).map_err(fehler)?;
@@ -2903,11 +2912,14 @@ async fn sync_register(
 #[tauri::command]
 async fn sync_login(
     state: State<'_, AppState>,
-    url: String,
+    url: Option<String>,
     email: String,
     passwort: String,
     geraet: String,
 ) -> R<()> {
+    // Ohne Angabe der eingebaute Dienst: niemand soll eine Adresse abtippen, um auf einem
+    // zweiten Gerät an die eigenen Daten zu kommen.
+    let url = sync_client::dienst_oder_standard(url.as_deref());
     let h = home(&state)?;
     let passwort = Zeroizing::new(passwort);
     let client = sync_client::Client::new(&url);
@@ -3058,6 +3070,7 @@ pub fn run() {
             sync_konto_loeschen,
             sync_jetzt,
             sync_register,
+            sync_standard_dienst,
             sync_login
         ])
         .run(tauri::generate_context!())

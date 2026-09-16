@@ -281,6 +281,7 @@ Siehe [[Assistenten (MCP)|Assistenten-MCP]].
 |---|---|---|
 | `sync_status` | – | Ausstehende Änderungen, Stand lokal und entfernt. |
 | `sync_register` | `url`, `email`, `code` | Bestehendes Konto anmelden. Braucht den Wiederherstellungscode. |
+| `sync_standard_dienst` | – | Der eingebaute Dienst. Die Oberfläche belegt damit das Adressfeld vor, statt es leer anzubieten – sichtbar, weil man wissen soll, wohin die Umschläge gehen, änderbar, weil Selbsthosten möglich bleibt. |
 | `sync_login` | `url`, `email`, `passwort`, `geraet` | Neues Gerät – ersetzt die Einrichtung. |
 | `sync_jetzt` | – | Pushen, dann pullen. |
 | `sync_geraete` | – | |

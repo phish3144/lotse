@@ -5,6 +5,18 @@ Standardmäßig bleibt alles auf einem Rechner. Das ist ein gültiger Zustand, k
 Wer mehrere Geräte hat, kann einen **Sync-Dienst** dazwischenschalten. Der Dienst sieht
 dabei **nur verschlüsselte Umschläge** – keine Titel, keine Texte, keine Zugänge.
 
+## Der Dienst steht schon drin
+
+Es muss keine Adresse abgetippt werden. Lotse bringt den Dienst
+`https://lotse-sync.sanctora.eu` eingebaut mit; zum Anmelden auf einem zweiten Gerät
+genügen **E-Mail und Master-Passwort**.
+
+Die Adresse bleibt sichtbar und änderbar – hinter *ändern* im Formular, und auf der
+Kommandozeile mit `--url`. Sichtbar, weil man wissen soll, wohin die Umschläge gehen;
+änderbar, weil Selbsthosten möglich bleiben soll ([[Sync-Protokoll]]). Es ist nur nicht
+mehr die Voraussetzung.
+
+
 ## Was der Dienst sieht
 
 | Sichtbar | Nicht sichtbar |

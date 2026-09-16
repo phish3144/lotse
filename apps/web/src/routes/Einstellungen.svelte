@@ -378,6 +378,7 @@
     try {
       sysBericht = await systemeintrag.anlegen();
       sysStand = await systemeintrag.stand();
+      if (!url) url = await sync.standardDienst();
       kalVorrat = await kalender.vorrat();
       meldungen.zeigen('Menüeintrag angelegt.');
     } catch (e) {
@@ -525,6 +526,9 @@
   let widerrufKandidat: string | null = $state(null);
 
   let registrierenOffen = $state(false);
+  // Der Dienst steht vorbelegt und liegt unter »ändern«: abzutippen war er nur, weil
+  // niemand einen Standard eingebaut hatte.
+  let dienstOffen = $state(false);
   let url = $state('');
   let email = $state('');
   let code = $state('');
@@ -579,7 +583,7 @@
     if (syncLaeuft) return;
     syncLaeuft = true;
     try {
-      await sync.registrieren(url.trim(), email.trim(), code.trim());
+      await sync.registrieren(email.trim(), code.trim(), url.trim() || undefined);
       code = '';
       registrierenOffen = false;
       await statusLaden();
@@ -1145,10 +1149,6 @@
     {#if registrierenOffen}
       <form class="formular" onsubmit={registrieren}>
         <label>
-          <span>Adresse des Dienstes</span>
-          <input bind:value={url} type="url" placeholder="https://sync.example.org" required />
-        </label>
-        <label>
           <span>E-Mail</span>
           <input bind:value={email} type="email" placeholder="du@example.org" required />
         </label>
@@ -1157,6 +1157,17 @@
           <input bind:value={code} type="text" placeholder="5YD6-AR19-…" required autocomplete="off" />
           <small class="hinweis">Der Code von der Einrichtung. Er bleibt auf diesem Gerät.</small>
         </label>
+        {#if dienstOffen}
+          <label>
+            <span>Adresse des Dienstes</span>
+            <input bind:value={url} type="url" required />
+          </label>
+        {:else}
+          <p class="hinweis klein">
+            Dienst: <code>{url || '…'}</code>
+            <button type="button" class="schlicht" onclick={() => (dienstOffen = true)}>ändern</button>
+          </p>
+        {/if}
         <div class="aktionen">
           <button type="button" onclick={() => (registrierenOffen = false)}>Abbrechen</button>
           <button type="submit" class="primaer" disabled={syncLaeuft}>{syncLaeuft ? 'Melde an …' : 'Konto anlegen'}</button>

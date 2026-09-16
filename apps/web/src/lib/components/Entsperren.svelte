@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { konto, type Geheimnisse, type KontoStatus } from '../data/tauri';
+  import { konto, sync, type Geheimnisse, type KontoStatus } from '../data/tauri';
 
   let { fertig }: { fertig: () => void } = $props();
 
@@ -16,8 +16,25 @@
   let codeEingabe = $state('');
   let gesichert = $state(false);
 
+  // Die Adresse des Dienstes steht vorbelegt und liegt unter »Anderer Dienst«. Sie
+  // abzutippen, nur um an eigene Daten zu kommen, war der Grund, warum ein zweites Gerät
+  // anzumelden sich wie Einrichtungsarbeit anfühlte.
   let syncUrl = $state('');
+  let dienstOffen = $state(false);
   let email = $state('');
+
+  /// Zum Anmelde-Bildschirm und dabei den eingebauten Dienst holen. Sichtbar, damit man
+  /// weiß, wohin die Umschläge gehen – aber nicht abzutippen.
+  async function loginZeigen() {
+    modus = 'login';
+    fehler = '';
+    try {
+      syncUrl = await sync.standardDienst();
+    } catch {
+      // Kein Standard zu holen: dann eben das Feld ausklappen und selbst eintragen.
+      dienstOffen = true;
+    }
+  }
 
   // Vergessenes Passwort: mit dem Wiederherstellungscode öffnen und dabei ein neues
   // Passwort setzen. Ohne diesen Weg wäre die App hier eine Sackgasse.
@@ -115,7 +132,7 @@
     fehler = '';
     beschaeftigt = true;
     try {
-      await konto.syncLogin(syncUrl.trim(), email.trim(), passwort, geraet.trim() || 'Dieser Rechner');
+      await konto.syncLogin(email.trim(), passwort, geraet.trim() || 'Dieser Rechner', syncUrl.trim() || undefined);
       fertig();
     } catch (e) {
       fehler = String(e);
@@ -159,7 +176,7 @@
       <label>Name dieses Rechners <input type="text" bind:value={geraet} /></label>
       <button type="submit" disabled={beschaeftigt}>{beschaeftigt ? 'Leite Schlüssel ab …' : 'Konto einrichten'}</button>
     </form>
-    <button class="leise" type="button" onclick={() => (modus = 'login')}>Ich habe schon ein Konto auf einem anderen Rechner</button>
+    <button class="leise" type="button" onclick={loginZeigen}>Ich habe schon ein Konto auf einem anderen Rechner</button>
   {:else if modus === 'geheimnisse' && geheimnisse}
     <h1>Zwei Dinge, die du jetzt sicher ablegst.</h1>
     <p class="gedaempft">Beides wird genau einmal angezeigt. Leg es in deinen Passwortmanager.</p>
@@ -227,10 +244,17 @@
     <h1>Diesen Rechner anmelden</h1>
     <p class="gedaempft">Der Sync-Dienst liefert deinen Konto-Header, das Master-Passwort entsperrt ihn hier. Der Dienst sieht das Passwort nie.</p>
     <form onsubmit={login}>
-      <label>Adresse des Sync-Dienstes <input type="url" bind:value={syncUrl} placeholder="https://api.example.invalid" required /></label>
       <label>E-Mail <input type="email" bind:value={email} required /></label>
       <label>Master-Passwort <input type="password" bind:value={passwort} autocomplete="current-password" required /></label>
       <label>Name dieses Rechners <input type="text" bind:value={geraet} /></label>
+      {#if dienstOffen}
+        <label>Adresse des Sync-Dienstes <input type="url" bind:value={syncUrl} required /></label>
+      {:else}
+        <p class="gedaempft klein">
+          Dienst: <code>{syncUrl || '…'}</code>
+          <button class="leise" type="button" onclick={() => (dienstOffen = true)}>ändern</button>
+        </p>
+      {/if}
       <button type="submit" disabled={beschaeftigt}>{beschaeftigt ? 'Melde an …' : 'Anmelden und herunterladen'}</button>
     </form>
     <button class="leise" type="button" onclick={() => (modus = 'einrichten')}>Zurück</button>
