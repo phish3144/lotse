@@ -122,6 +122,22 @@ eine Runde statt drei). Damit läuft die Testsuite in Sekunden statt Minuten.
 Angriff mit erbeuteter Datei wesentlich schlechter geschützt. Die Variable existiert
 nur, weil eine Testsuite, die zehn Minuten braucht, nicht gelaufen wird.
 
+### `LOTSE_MENGE`
+
+Wählt die Bestandsgrößen der Mengenmessung – der Sache, die prüft, was Lotse bei einem
+Logbuch von zehn Jahren noch aushält. Kommagetrennt, Voreinstellung `1000,20000`:
+
+```bash
+LOTSE_MENGE=1000,20000,100000 \
+  cargo test --release -p lotse-core --test menge_nativ -- --ignored --nocapture
+```
+
+Die Notizen entstehen dabei im Test selbst; es wird kein vorhandener Bestand angefasst.
+Dieselbe Variable wählt im Browser die Zahl der Notizen
+(`apps/web/scripts/wasm-mengentest.mjs`, dort auch als Argument). Die Messung hat schon
+einen echten Fehler gefunden – den vollen Durchlauf des Suchindex bei jeder geschriebenen
+Notiz ([[Fuer Entwickler|Fuer-Entwickler]]).
+
 ---
 
 ## Was Lotse **nicht** liest

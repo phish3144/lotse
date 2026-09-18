@@ -26,7 +26,10 @@ sha2 = "0.10"
 chacha20poly1305 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
 getrandom = "0.2"
-rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+# `trace` ist für einen Test da, der prüfen muss, *welches* SQL der Store wirklich
+# ausführt – nicht, welches er ausführen sollte. Ohne das lässt sich der Full Scan auf
+# dem Suchindex nicht mechanisch fernhalten.
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl", "trace"] }
 walkdir = "2"
 globset = "0.4"
 notify = "8"

@@ -129,15 +129,35 @@ Daraus folgen vier Regeln, die **nicht** von der Bestandsgröße abhängen:
 3. **Der Brief bekommt ein Fenster, nicht das Logbuch.** `brief::brief` liest genau: die
    letzte Notiz, die letzte Übergabe, die offenen Fäden und die Aktivität seit dem letzten
    menschlichen Kontakt. Alles davon ist klein oder gezielt abfragbar – die Funktion
-   *bekommt* aber alle Notizen eines Vorhabens, nativ über `store::brief`. Im Browser ist
-   das der falsche Weg, weil dort jede Notiz einzeln entsiegelt werden müsste. Ob es auch
-   nativ zu teuer ist, misst `crates/lotse-core/tests/menge_nativ.rs` (bis 100 000 Notizen
-   in einem Vorhaben); nachgezogen wird es in W2, an einer Stelle, für beide Seiten.
+   *bekommt* aber alle Notizen eines Vorhabens, nativ über `store::brief`.
+
+   **Nativ ist das nicht das Problem**, und hier stand vorher eine Behauptung, die die
+   Messung nicht trägt: `crates/lotse-core/tests/menge_nativ.rs` sagt 53 ms für das Laden
+   und 51 ms für den ganzen Brief bei 20 000 Notizen in *einem* Vorhaben. SQLite liest die
+   Zeilen einfach. Im Browser ist es der falsche Weg, weil dort jede Notiz **einzeln
+   entsiegelt** werden muss – 20 000 Sätze sind 0,4 s allein für die Kryptografie, und der
+   Brief wird bei jedem Öffnen gezeigt. Das Fenster ist also eine Browser-Notwendigkeit,
+   keine allgemeine; es kommt in W2.
 4. **Die Suche ist begrenzt, mit Fortschritt und Abbruch.** Voreinstellung ist das offene
    Vorhaben (Tausende Sätze, unter einer Zehntelsekunde). Global läuft sie streamend aus
    IndexedDB mit Fortschritt, Abbruchknopf und Trefferdeckel – bei 500 000 Sätzen sind das
    rund 8 Sekunden. Ein Volltextindex im Browser wäre das zweite Schema, das 4a gerade
    vermeidet.
+
+#### Was die Messung nebenbei gefunden hat
+
+Der native Teil des Mengentests hat einen Fehler im ausgelieferten Kern aufgedeckt, der
+nichts mit dem Browser zu tun hat: `suche_ersetzen` löschte den alten Suchindex-Eintrag über
+`kind` und `ref_id`. In FTS5 sind beide Spalten `UNINDEXED`, es gibt keinen Index darauf,
+und SQLite lief die ganze Suchtabelle ab – bei **jeder** geschriebenen Notiz. Gemessen:
+307 µs je Satz bei 2 000 Einträgen, 5 308 µs bei 16 000, ohne das Löschen konstant 4 µs.
+Quadratisch, und am teuersten genau dann, wenn der Beobachter viele Notizen auf einmal
+schreibt. Behoben in Schema-Migration 2 über eine Abbildung `(kind, ref_id) → rowid`.
+Nachgemessen: 20 000 Notizen zu schreiben dauerte 118 s und dauert jetzt 44 s, und die
+Kosten je Notiz wachsen nicht mehr mit dem Bestand (1,3–2,3 ms, Streuung der Platte) statt
+von 1,4 auf 5,9 ms zu steigen.
+
+Das ist der Grund, warum diese Messung im Repo bleibt und nicht ein einmaliger Versuch war.
 
 Der Mengentest bleibt als Sicherung im Repo: mit kleiner Menge in CI, damit der Weg nicht
 verrottet, und auf Abruf mit 500 000. `LOTSE_HEAP_MB` engt das Speicherbudget auf

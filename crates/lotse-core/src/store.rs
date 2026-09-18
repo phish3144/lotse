@@ -20,7 +20,7 @@ use crate::hlc::Hlc;
 use crate::model::*;
 use crate::sync::{self, RecordKind, SyncState, Umschlag};
 use crate::vault::TresorEintrag;
-use crate::{now_ms, Error, Result, SCHEMA_VERSION};
+use crate::{now_ms, Error, Result};
 
 pub struct Store {
     conn: Connection,
@@ -101,6 +101,29 @@ const MIGRATIONEN: &[&str] = &[
         tokenize = 'unicode61 remove_diacritics 2'
     );
     "#,
+    // 2
+    //
+    // Abbildung (kind, ref_id) → rowid der Suchzeile.
+    //
+    // Ohne sie musste eine Zeile über `DELETE FROM suche WHERE kind = ? AND ref_id = ?`
+    // gefunden werden. `kind` und `ref_id` sind in FTS5 aber UNINDEXED – es gibt keinen
+    // Index darauf, und SQLite läuft die ganze Suchtabelle ab
+    // (`EXPLAIN QUERY PLAN` sagt wörtlich `SCAN suche VIRTUAL TABLE INDEX 0:`).
+    //
+    // Jede geschriebene Notiz kostete damit einen vollen Durchlauf des Suchindex, und das
+    // wächst mit dem Bestand: gemessen 0,3 ms je Satz bei 2 000 Sätzen, 5,3 ms bei 16 000.
+    // Quadratisch – bei einem Logbuch von zehn Jahren wäre jede neue Notiz unbenutzbar
+    // teuer geworden, und zwar genau dann, wenn der Beobachter viele auf einmal schreibt.
+    // Mit der Abbildung wird über `rowid` gelöscht, und das kann FTS5 direkt.
+    r#"
+    CREATE TABLE suche_zeile (
+        kind TEXT NOT NULL, ref_id TEXT NOT NULL, zeile INTEGER NOT NULL,
+        PRIMARY KEY (kind, ref_id)
+    ) WITHOUT ROWID;
+    INSERT OR REPLACE INTO suche_zeile (kind, ref_id, zeile)
+        SELECT kind, ref_id, rowid FROM suche
+        WHERE kind IS NOT NULL AND ref_id IS NOT NULL;
+    "#,
 ];
 
 impl Store {
@@ -172,9 +195,16 @@ impl Store {
             )?;
             tx.commit()?;
         }
-        if version != SCHEMA_VERSION {
+        // Die Zahl der Migrationen ist die Schema-Version der *lokalen* Datenbank. Sie hat
+        // nichts mit `SCHEMA_VERSION` zu tun, das im Export steht und das Format der
+        // Datensätze beschreibt: eine zusätzliche Indextabelle ändert kein Datenformat.
+        // Solange beide dasselbe waren, hätte jede lokale Migration die Zahl im Export
+        // mitgezogen und behauptet, die Datensätze hätten sich geändert.
+        if version as usize != MIGRATIONEN.len() {
             return Err(Error::Other(format!(
-                "Schema-Version {version} passt nicht zum Kern ({SCHEMA_VERSION})"
+                "Diese Datenbank hat Schema-Version {version}; dieser Kern kennt {}. \
+                 Sie kommt aus einer neueren Lotse-Fassung – bitte die neuere benutzen.",
+                MIGRATIONEN.len()
             )));
         }
         Ok(())
@@ -856,6 +886,18 @@ impl Store {
 
     // ---------------------------------------------------------------- suche
 
+    /// Ersetzt den Suchindex-Eintrag eines Datensatzes.
+    ///
+    /// Gelöscht wird über die `rowid` aus `suche_zeile`, **nie** über `kind`/`ref_id`:
+    /// die sind in FTS5 UNINDEXED, eine Bedingung darauf läuft die ganze Tabelle ab, und
+    /// das kostet mit wachsendem Bestand immer mehr (Migration 2 erklärt es mit Zahlen).
+    /// Steht nichts in der Abbildung, gibt es auch nichts zu löschen – dann wird hier
+    /// nicht ersatzweise gesucht, sonst wäre der Full Scan zurück.
+    ///
+    /// Zwischen dem Einfügen in `suche` und dem Eintrag in `suche_zeile` liegt kein
+    /// gemeinsames Commit. Bricht der Vorgang genau dazwischen ab, bleibt eine Suchzeile
+    /// ohne Abbildung stehen; die Folge ist ein doppelter Treffer für diesen Datensatz,
+    /// kein falscher Inhalt. Der Suchindex ist abgeleitet und jederzeit neu baubar.
     fn suche_ersetzen(
         &self,
         kind: &str,
@@ -864,19 +906,32 @@ impl Store {
         text: &str,
         deleted: bool,
     ) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM suche WHERE kind = ?1 AND ref_id = ?2",
-            params![kind, ref_id.to_string()],
-        )?;
+        let ids = ref_id.to_string();
+        let zeile: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT zeile FROM suche_zeile WHERE kind = ?1 AND ref_id = ?2",
+                params![kind, ids],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(z) = zeile {
+            self.conn
+                .execute("DELETE FROM suche WHERE rowid = ?1", params![z])?;
+            self.conn.execute(
+                "DELETE FROM suche_zeile WHERE kind = ?1 AND ref_id = ?2",
+                params![kind, ids],
+            )?;
+        }
         if !deleted && !text.trim().is_empty() {
             self.conn.execute(
                 "INSERT INTO suche (text, kind, ref_id, projekt_id) VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    text,
-                    kind,
-                    ref_id.to_string(),
-                    projekt_id.map(|u| u.to_string())
-                ],
+                params![text, kind, ids, projekt_id.map(|u| u.to_string())],
+            )?;
+            let neue = self.conn.last_insert_rowid();
+            self.conn.execute(
+                "INSERT INTO suche_zeile (kind, ref_id, zeile) VALUES (?1, ?2, ?3)",
+                params![kind, ids, neue],
             )?;
         }
         Ok(())
@@ -1197,6 +1252,216 @@ fn opt_ulid_col_idx(r: &Row, idx: usize) -> rusqlite::Result<Option<Ulid>> {
 
 #[cfg(test)]
 mod tests {
+    // `use super::*` steht weiter unten in diesem Modul – Rust ist die Reihenfolge egal.
+
+    thread_local! {
+        /// SQL, das der Store wirklich ausgeführt hat. `thread_local`, damit parallel
+        /// laufende Tests sich nicht in die Quere kommen.
+        static GESEHENES_SQL: std::cell::RefCell<Vec<String>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+
+    fn sql_mitschreiben(sql: &str) {
+        GESEHENES_SQL.with(|v| v.borrow_mut().push(sql.to_string()));
+    }
+
+    /// Der Suchindex wird über die `rowid` gepflegt, nicht über eine Bedingung auf
+    /// UNINDEXED-Spalten.
+    ///
+    /// Das ist keine Geschmacksfrage: die alte Bedingung
+    /// `DELETE FROM suche WHERE kind = ? AND ref_id = ?` läuft die ganze Suchtabelle ab,
+    /// weil FTS5 auf `kind` und `ref_id` keinen Index hat. Gemessen kostete jede
+    /// geschriebene Notiz dadurch 0,3 ms bei 2 000 Sätzen und 5,3 ms bei 16 000 –
+    /// quadratisch.
+    ///
+    /// Geprüft wird deshalb am **mitgeschriebenen SQL**, nicht am Abfrageplan eines
+    /// Beispielsatzes, den der Test selbst formuliert: der erste Anlauf dieses Tests tat
+    /// genau das und blieb grün, als der Fehler zum Gegenbeweis wieder eingebaut wurde.
+    /// Ein Wächter, der den geprüften Code nicht anfasst, wacht nicht.
+    #[test]
+    fn suchindex_loescht_ueber_die_rowid_ohne_durchlauf() {
+        use crate::model::{Art, Notiz, Projekt, Quelle, Vorlage};
+        let ak = crate::crypto::Key32::random().unwrap();
+        let mut s = Store::open_in_memory(&ak, Ulid::new()).unwrap();
+        let p = Projekt::neu("Gartenhaus", Vorlage::HausGarten, now_ms());
+        s.projekt_speichern(&p).unwrap();
+
+        let plan = |sql: &str| -> String {
+            let mut st = s
+                .conn
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .unwrap();
+            let zeilen: Vec<String> = st
+                .query_map([], |r| r.get::<_, String>(3))
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect();
+            zeilen.join(" | ")
+        };
+
+        // Das Wort »SCAN« im Abfrageplan taugt hier nicht als Merkmal: FTS5 ist eine
+        // virtuelle Tabelle, und SQLite schreibt für jeden Zugriff darauf »SCAN«. Was
+        // zählt, ist der Anhang hinter `INDEX 0:` – das ist die Zeichenkette, mit der
+        // FTS5 meldet, welche Bedingung es tatsächlich bekommen hat:
+        //
+        //   `INDEX 0:`    keine  → die ganze Tabelle wird abgelaufen
+        //   `INDEX 0:=`   rowid  → direkter Zugriff
+        //   `INDEX 0:M4`  MATCH  → über den Volltextindex
+        //
+        // Wer hier nur auf »SCAN« prüft, hält beide Wege für gleich – genau deshalb ist
+        // der Fehler so lange unbemerkt geblieben.
+        let bedingung_von = |plan: &str| -> String {
+            plan.rsplit("INDEX 0:")
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+        };
+
+        let alter = plan("DELETE FROM suche WHERE kind = 'notiz' AND ref_id = 'x'");
+        assert_eq!(
+            bedingung_von(&alter),
+            "",
+            "Die Bedingung auf UNINDEXED-Spalten kommt bei FTS5 nicht an – deshalb läuft \
+             sie die ganze Tabelle ab. SQLite sagt: {alter}"
+        );
+
+        let neuer = plan("DELETE FROM suche WHERE rowid = 1");
+        assert_eq!(
+            bedingung_von(&neuer),
+            "=",
+            "Löschen über die rowid muss als Gleichheitsbedingung bei FTS5 ankommen. \
+             SQLite sagt: {neuer}"
+        );
+
+        // Die Abbildung bleibt im Gleichschritt mit der Suchtabelle.
+        let mut ids = Vec::new();
+        for i in 0..20 {
+            let n = Notiz::neu(
+                p.id,
+                Quelle::Git,
+                Art::Log,
+                format!("Bewehrung {i} gesetzt"),
+                now_ms() + i,
+            );
+            ids.push(n.id);
+            s.notiz_speichern(&n).unwrap();
+        }
+        let zeilen = |s: &Store, tabelle: &str| -> i64 {
+            s.conn
+                .query_row(&format!("SELECT count(*) FROM {tabelle}"), [], |r| r.get(0))
+                .unwrap()
+        };
+        // 20 Notizen plus das Vorhaben selbst.
+        assert_eq!(zeilen(&s, "suche"), 21);
+        assert_eq!(zeilen(&s, "suche_zeile"), 21);
+
+        // Zweimal dieselbe Notiz schreiben darf keinen zweiten Eintrag hinterlassen –
+        // genau das würde passieren, wenn die Abbildung nicht griffe. Und dieser zweite
+        // Schreibvorgang ist der, bei dem gelöscht wird: hier wird mitgeschrieben.
+        let noch_mal = s.notiz(ids[0]).unwrap().unwrap();
+        GESEHENES_SQL.with(|v| v.borrow_mut().clear());
+        s.conn.trace(Some(sql_mitschreiben));
+        s.notiz_speichern(&noch_mal).unwrap();
+        s.conn.trace(None);
+
+        let ausgefuehrt = GESEHENES_SQL.with(|v| v.borrow().join("\n"));
+        let normiert = ausgefuehrt.to_lowercase();
+        assert!(
+            normiert.contains("delete from suche where rowid"),
+            "Der Store muss über die rowid löschen. Ausgeführt wurde:\n{ausgefuehrt}"
+        );
+        for zeile in ausgefuehrt.lines() {
+            let k = zeile.to_lowercase();
+            let trifft_suche = k.contains("from suche ") || k.contains("from suche\n");
+            if trifft_suche && (k.contains("kind =") || k.contains("ref_id =")) {
+                panic!(
+                    "Auf dem Suchindex darf keine Bedingung über kind/ref_id laufen – das \
+                     ist der Full Scan, der 0,3 ms je Satz bei 2 000 und 5,3 ms bei 16 000 \
+                     gekostet hat. Diese Anweisung tut es:\n  {zeile}"
+                );
+            }
+        }
+
+        assert_eq!(zeilen(&s, "suche"), 21);
+        assert_eq!(zeilen(&s, "suche_zeile"), 21);
+        assert_eq!(
+            s.suche("Bewehrung").unwrap().len(),
+            20,
+            "jede Notiz genau einmal"
+        );
+
+        // Eine einzelne Notiz aus dem Index nehmen räumt beide Tabellen.
+        s.suche_ersetzen("notiz", ids[0], Some(p.id), "", true)
+            .unwrap();
+        assert_eq!(zeilen(&s, "suche"), 20);
+        assert_eq!(zeilen(&s, "suche_zeile"), 20);
+        assert_eq!(s.suche("Bewehrung").unwrap().len(), 19);
+
+        // Und das Löschen des Vorhabens nimmt alles mit – kein Rest in der Abbildung.
+        s.projekt_loeschen(p.id).unwrap();
+        assert_eq!(zeilen(&s, "suche"), 0, "keine Suchzeile bleibt übrig");
+        assert_eq!(zeilen(&s, "suche_zeile"), 0, "keine Abbildung bleibt übrig");
+    }
+
+    /// Eine Datenbank aus der Zeit vor der Abbildung wird beim Öffnen nachgetragen.
+    ///
+    /// Ohne diesen Nachtrag hätte `suche_ersetzen` für Altbestände nichts zu löschen
+    /// gefunden und bei jedem Schreiben einen zweiten Eintrag angelegt: die Suche hätte
+    /// doppelte Treffer geliefert, und niemand hätte es mit einem Test gemerkt.
+    #[test]
+    fn alte_datenbank_bekommt_die_abbildung_nachgetragen() {
+        let ak = crate::crypto::Key32::random().unwrap();
+        let db_key = ak.subkey(crypto::info::LOCAL_DB);
+        let hex = db_key.to_hex();
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("alt.db");
+
+        // Eine Datenbank auf dem Stand von Schema 1, mit einem Eintrag im Suchindex.
+        let ref_id = Ulid::new();
+        {
+            let conn = Connection::open(&pfad).unwrap();
+            conn.pragma_update(None, "key", format!("x'{}'", hex.as_str()))
+                .unwrap();
+            conn.execute_batch(MIGRATIONEN[0]).unwrap();
+            conn.execute(
+                "INSERT INTO meta(key, value) VALUES ('schema_version', '1')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO suche (text, kind, ref_id, projekt_id) VALUES (?1,?2,?3,NULL)",
+                params!["Fundament nachgemessen", "notiz", ref_id.to_string()],
+            )
+            .unwrap();
+        }
+
+        let s = Store::open(&pfad, &ak, Ulid::new()).unwrap();
+        let zeile: Option<i64> = s
+            .conn
+            .query_row(
+                "SELECT zeile FROM suche_zeile WHERE kind = 'notiz' AND ref_id = ?1",
+                params![ref_id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()
+            .unwrap();
+        assert!(
+            zeile.is_some(),
+            "der alte Eintrag muss in der Abbildung angekommen sein"
+        );
+
+        // Und er lässt sich ersetzen, ohne einen zweiten zu hinterlassen.
+        s.suche_ersetzen("notiz", ref_id, None, "Fundament doch nicht", false)
+            .unwrap();
+        let anzahl: i64 = s
+            .conn
+            .query_row("SELECT count(*) FROM suche", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(anzahl, 1);
+        assert_eq!(s.suche("Fundament").unwrap().len(), 1);
+    }
+
     /// Eine Adresse ist kein Dateipfad.
     ///
     /// `git_repo` steht für beides: einen Ordner mit `.git` und eine Adresse. Früher lief

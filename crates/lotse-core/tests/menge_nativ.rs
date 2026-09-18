@@ -29,6 +29,10 @@ fn store_mit(n: usize) -> (tempfile::TempDir, Store, Ulid) {
     let projekt_id = p.id;
     store.projekt_speichern(&p).expect("Projekt");
 
+    // In Blöcken, weil nur die *Entwicklung* der Kosten etwas verrät. Ein Mittelwert
+    // verdeckt genau den Fall, der hier schon einmal gelauert hat: bis 0.10 lief bei jeder
+    // Notiz ein voller Durchlauf des Suchindex, und das wächst mit dem Bestand.
+    let block = (n / 5).max(1);
     let t0 = Instant::now();
     for i in 0..n {
         let art = if i % 50 == 0 { Art::Offen } else { Art::Log };
@@ -44,16 +48,36 @@ fn store_mit(n: usize) -> (tempfile::TempDir, Store, Ulid) {
             format!("Commit {i}: Datei geändert, Zeitstempel notiert"),
             1_700_000_000_000 + (i as i64) * 60_000,
         );
+        let t = Instant::now();
         store.notiz_speichern(&notiz).expect("Notiz");
+        let dauer = t.elapsed();
+        if (i + 1) % block == 0 {
+            println!(
+                "    bis {:>7}: {:>6} µs für die letzte Notiz",
+                i + 1,
+                dauer.as_micros()
+            );
+        }
     }
-    println!("  {n} Notizen schreiben: {:?}", t0.elapsed());
+    println!(
+        "  {n} Notizen schreiben: {:?} ({} µs je Satz im Mittel)",
+        t0.elapsed(),
+        t0.elapsed().as_micros() / n.max(1) as u128
+    );
     (dir, store, projekt_id)
 }
 
 #[test]
 #[ignore = "Messung, keine Prüfung: von Hand mit --ignored --nocapture aufrufen"]
 fn brief_bei_grossem_logbuch() {
-    for n in [1_000usize, 20_000, 100_000] {
+    let groessen: Vec<usize> = match std::env::var("LOTSE_MENGE") {
+        Ok(v) => v
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect::<Vec<usize>>(),
+        Err(_) => vec![1_000, 20_000],
+    };
+    for n in groessen {
         println!("Bestand {n}:");
         let (_dir, store, projekt_id) = store_mit(n);
 

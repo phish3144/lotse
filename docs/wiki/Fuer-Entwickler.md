@@ -74,6 +74,19 @@ Speicherbudget ein – mit der Einschränkung, dass V8 sich nicht zuverlässig d
 Beide Browserläufe teilen `scripts/browserlauf.mjs`: http-Server aus der
 Node-Standardbibliothek, Chromium im Kopflosmodus, Ergebnis per POST.
 
+Er hat sich bezahlt: dabei kam heraus, dass `suche_ersetzen` den alten Suchindex-Eintrag
+über `kind` und `ref_id` löschte. Beide Spalten sind in FTS5 `UNINDEXED` – es gibt keinen
+Index darauf, also lief SQLite bei **jeder** geschriebenen Notiz die ganze Suchtabelle ab.
+Gemessen 307 µs je Satz bei 2 000 Einträgen und 5 308 µs bei 16 000, ohne das Löschen
+konstant 4 µs. Behoben in Schema-Migration 2 (Abbildung `(kind, ref_id) → rowid`).
+
+Zwei Dinge daran sind zum Merken: im Abfrageplan steht bei FTS5 **immer** »SCAN«, auch beim
+direkten Zugriff – der Unterschied steckt hinter `INDEX 0:` (leer = Durchlauf, `=` = rowid).
+Und der Wächter dafür (`store::tests::suchindex_loescht_ueber_die_rowid_ohne_durchlauf`)
+schreibt mit, *welches* SQL der Store wirklich ausführt, statt einen Abfrageplan zu prüfen,
+den der Test selbst formuliert. Die erste Fassung tat Letzteres und blieb grün, als der
+Fehler zur Gegenprobe wieder eingebaut wurde.
+
 ### Die Testvektoren
 
 `tests/vektoren/kdf.json` hält die Schlüsselableitung mit festen Werten fest, gelesen von
