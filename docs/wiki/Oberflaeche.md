@@ -13,8 +13,12 @@ Fünf Bereiche in der Kopfzeile, zwei Dialoge auf Tastendruck.
 
 ## Hafen
 
-Die Startseite. Links die Vorhaben in vier Blöcken (**Heute wichtig**, **Auf See**,
+Die Startseite. Links die Vorhaben in vier Blöcken (**Wartet auf dich**, **Auf See**,
 **Vor Anker**, **Ideen**), rechts die **Hafeneinfahrt**.
+
+*Wartet auf dich* sind die drei, bei denen am längsten nichts passiert ist – nicht die
+wichtigsten. Die Überschrift hieß bis 0.10 »Heute wichtig« und stand über Vorhaben, die
+zuletzt vor Wochen berührt wurden: ein Versprechen, das der Inhalt nicht hielt.
 
 Jede Karte zeigt Titel, Kurs, den letzten Logbuch-Eintrag und wie lange er her ist. Der
 Zustand steht zweimal: als Punkt neben dem Titel und als farbige Kante links – auf einem

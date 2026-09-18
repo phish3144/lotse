@@ -117,26 +117,30 @@
 {#await datenPromise}
   <p class="hinweis">Lade Hafen…</p>
 {:then { eintraege, kandidaten }}
-  {@const heuteWichtig = sortiertNachAuffaelligkeit(
+  <!-- Diese drei sind nicht die wichtigsten, sondern die, bei denen am längsten nichts
+       passiert ist. Die Überschrift hieß »Heute wichtig« und stand über Vorhaben, die
+       zuletzt vor 45 Tagen berührt wurden – sie versprach Dringlichkeit und lieferte eine
+       Schuldliste. Was hier steht, wartet; das ist etwas anderes. -->
+  {@const wartet = sortiertNachAuffaelligkeit(
     eintraege.filter((e) => e.grad !== 'ruhig' && e.projekt.status !== 'abgeschlossen' && e.projekt.status !== 'eingemottet'),
   ).slice(0, 3)}
   <!-- Was oben schon Aufmerksamkeit bekommt, wird unten nicht wiederholt. -->
-  {@const obenGezeigt = new Set(heuteWichtig.map((e) => e.projekt.id))}
+  {@const obenGezeigt = new Set(wartet.map((e) => e.projekt.id))}
   {@const uebrig = eintraege.filter((e) => !obenGezeigt.has(e.projekt.id))}
   {@const aufSee = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'aktiv'))}
   {@const vorAnker = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'pausiert' || e.projekt.status === 'wartet'))}
   {@const ideen = sortiertNachAuffaelligkeit(uebrig.filter((e) => e.projekt.status === 'idee'))}
 
   <!-- Zwei Bahnen: die Vorhaben links, die Hafeneinfahrt rechts. Sie war vorher
-       zwischen „Heute wichtig“ und „Auf See“ eingeschoben und hat den Blick auf die
+       zwischen „Wartet auf dich“ und „Auf See“ eingeschoben und hat den Blick auf die
        Projekte zerschnitten. Unter 64rem fällt sie wieder darunter. -->
   <div class="hafen-flaeche">
     <div class="hafen-haupt">
-    {#if heuteWichtig.length > 0}
-      <section aria-labelledby="heute-wichtig-titel">
-        <h2 id="heute-wichtig-titel">Heute wichtig</h2>
+    {#if wartet.length > 0}
+      <section aria-labelledby="wartet-titel">
+        <h2 id="wartet-titel">Wartet auf dich</h2>
         <div class="karten-raster">
-          {#each heuteWichtig as e (e.projekt.id)}
+          {#each wartet as e (e.projekt.id)}
             <ProjektKarte projekt={e.projekt} letzteNotiz={e.letzteNotiz} auffaelligkeit={e.grad} />
           {/each}
         </div>
@@ -249,7 +253,7 @@
       <aside class="hafen-neben">
         <section class="einfahrt" aria-labelledby="hafeneinfahrt-titel">
           <h2 id="hafeneinfahrt-titel">Hafeneinfahrt</h2>
-          <p class="hinweis">Beim Beobachten gefunden. Nichts davon ist übernommen.</p>
+          <p class="hinweis">Beim Beobachten gefunden.</p>
           <ul class="kandidaten-liste">
             {#each kandidaten as kandidat (kandidat.id)}
               <li class="kandidat">

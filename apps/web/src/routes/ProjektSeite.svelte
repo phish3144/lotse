@@ -633,11 +633,26 @@
           <p class="brief-zeile"><strong>Offene Fäden:</strong> {brief.offeneFaeden.length}</p>
         {/if}
         {#if Object.keys(brief.aktivitaetSeitLetztemBesuch).length > 0}
+          <!-- Nicht nach Quellen zählen, sondern sagen, was passiert ist. »Git: 1
+               Einträge« ist eine Buchhaltungszeile – und die Mehrzahl stand auch bei
+               einem einzigen Eintrag da. Der Wortlaut sagt mehr als die Zahl. -->
           <div class="brief-aktivitaet">
-            <strong>Aktivität seit dem letzten Besuch:</strong>
+            <strong>Seit deinem letzten Besuch:</strong>
             <ul>
               {#each Object.entries(brief.aktivitaetSeitLetztemBesuch) as [quelle, eintraege]}
-                <li>{QUELLE_LABEL[quelle as keyof typeof QUELLE_LABEL]}: {eintraege?.length} Einträge</li>
+                {@const liste = eintraege ?? []}
+                {@const neuestes = liste[liste.length - 1]}
+                <li>
+                  <span class="quelle-marke">{QUELLE_LABEL[quelle as keyof typeof QUELLE_LABEL]}</span>
+                  {#if neuestes}
+                    {neuestes.text.split('\n')[0]}
+                    {#if liste.length > 1}
+                      <span class="hinweis">und {liste.length - 1} weitere</span>
+                    {/if}
+                  {:else}
+                    {liste.length === 1 ? 'ein Eintrag' : `${liste.length} Einträge`}
+                  {/if}
+                </li>
               {/each}
             </ul>
           </div>
@@ -1182,6 +1197,13 @@
 {/await}
 
 <style>
+  .quelle-marke {
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted, inherit);
+    margin-right: 0.4em;
+  }
   .referenz-genauer {
     display: grid;
     gap: 0.5rem;

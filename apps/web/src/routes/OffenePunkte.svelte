@@ -136,14 +136,9 @@
     </main>
 
     <aside class="punkte-neben">
-      <section class="karte">
-        <h2>Was das hier nicht ist</h2>
-        <p>
-          Keine Aufgabenliste mit Prioritäten, Zuweisungen und Fristen. Ein offener Faden ist eine Frage, die beim
-          nächsten Mal im Weg steht – mehr nicht. Wer Tickets braucht, braucht ein Ticketsystem.
-        </p>
-      </section>
-
+      <!-- Hier stand »Was das hier nicht ist«: ein Absatz, der dem Menschen erklärte,
+           warum das keine Aufgabenliste sei. Ein Werkzeug, das trägt, muss sich nicht
+           verteidigen – und wer die Seite offen hat, sucht keinen Aufsatz. -->
       {#if aeltesteZuerst.length > 0}
         <section class="karte">
           <h2>Am längsten offen</h2>
@@ -161,10 +156,7 @@
       {#if ohneFaden.length > 0}
         <section class="karte">
           <h2>Ohne Faden <span class="zahl">{ohneFaden.length}</span></h2>
-          <p>
-            Diese aktiven Vorhaben haben keinen offenen Faden. Das ist in Ordnung – nur weiß beim nächsten Mal
-            niemand, wo es weitergeht.
-          </p>
+          <p>Bei diesen Vorhaben steht nirgends, wo es weitergeht.</p>
           <ul class="mini-liste">
             {#each ohneFaden as p (p.id)}
               <li><a href={`#/projekt/${p.id}`}>{p.titel}</a></li>

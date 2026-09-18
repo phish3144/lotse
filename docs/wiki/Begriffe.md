@@ -135,7 +135,7 @@ Nicht dafür gedacht: die Web-Logins des Alltags. Siehe **[[Tresor]]**.
 
 Die Startseite. Zeigt in dieser Reihenfolge:
 
-1. **Heute wichtig** – bis zu drei Vorhaben, die auffallen
+1. **Wartet auf dich** – bis zu drei Vorhaben, bei denen am längsten nichts passiert ist
 2. **Auf See** – die übrigen aktiven
 3. **Vor Anker** – pausiert und wartet, eingeklappt
 4. **Ideen** – ohne Kurs, liegen still
