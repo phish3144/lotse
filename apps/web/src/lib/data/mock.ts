@@ -6,6 +6,7 @@ import type {
   Projekt,
   Pruefstatus,
   Referenz,
+  ReferenzTyp,
   TresorEintrag,
   VorlagenId,
 } from './types';
@@ -513,14 +514,23 @@ export function createMockProvider(): DataProvider {
       return clone(references.filter((r) => r.projekt_id === projectId));
     },
 
-    async addReference(projectId, typ, ziel, rolle) {
+    async addReference(projectId, ziel, typ, rolle) {
+      // Dieselbe Regel wie im Kern, nur grob: hier gibt es kein Dateisystem.
+      const geraten: ReferenzTyp = /^(https?|ssh|git):\/\/|^git@/.test(ziel.trim())
+        ? /\.git$|^git@|^git:\/\//.test(ziel.trim())
+          ? 'git_repo'
+          : 'url'
+        : /^([/~]|\.\/|[A-Za-z]:)/.test(ziel.trim())
+          ? 'ordner'
+          : 'physisch';
+      const art = typ ?? geraten;
       const referenz: Referenz = {
         id: nextId('r'),
         projekt_id: projectId,
-        typ,
+        typ: art,
         ziel: ziel.trim(),
-        rolle,
-        pruefstatus: typ === 'physisch' || typ === 'passwortmanager' ? 'nicht_pruefbar' : 'ok',
+        rolle: rolle ?? 'material',
+        pruefstatus: art === 'physisch' || art === 'passwortmanager' ? 'nicht_pruefbar' : 'ok',
       };
       references.push(referenz);
       return clone(referenz);

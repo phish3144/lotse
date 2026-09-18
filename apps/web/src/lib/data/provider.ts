@@ -58,7 +58,12 @@ export interface DataProvider {
   listOpenThreads(): Promise<Notiz[]>;
 
   listReferences(projectId: Id): Promise<Referenz[]>;
-  addReference(projectId: Id, typ: ReferenzTyp, ziel: string, rolle: ReferenzRolle): Promise<Referenz>;
+  /**
+   * Hängt eine Referenz an. `typ` und `rolle` sind **optional**: ohne Angabe sieht der
+   * Kern sich das Ziel an (`model::typ_raten`). Das Formular verlangte bis 0.10 beides
+   * als Auswahl, bevor überhaupt etwas dastand.
+   */
+  addReference(projectId: Id, ziel: string, typ?: ReferenzTyp, rolle?: ReferenzRolle): Promise<Referenz>;
   /** Prüft, ob eine Referenz noch erreichbar ist. `nicht_pruefbar` ist ein ehrlicher Zustand. */
   checkReference(id: Id): Promise<Pruefstatus>;
 

@@ -643,13 +643,21 @@ fn referenzen(state: State<AppState>, projekt_id: String) -> R<Vec<Referenz>> {
 fn referenz_anlegen(
     state: State<AppState>,
     projekt_id: String,
-    typ: String,
+    typ: Option<String>,
     ziel: String,
-    rolle: String,
+    rolle: Option<String>,
 ) -> R<Referenz> {
     let id = ulid(&projekt_id)?;
-    let typ = ReferenzTyp::parse(&typ).ok_or_else(|| "Unbekannter Referenztyp".to_string())?;
-    let rolle = Rolle::parse(&rolle).unwrap_or(Rolle::Material);
+    // Ohne Angabe wird die Art angesehen, nicht erfragt. Das Formular verlangte bis 0.10
+    // zwei Auswahlfelder, bevor überhaupt etwas dastand.
+    let typ = match typ.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        Some(t) => ReferenzTyp::parse(t).ok_or_else(|| format!("Unbekannter Referenztyp: {t}"))?,
+        None => lotse_core::model::typ_raten(&ziel),
+    };
+    let rolle = rolle
+        .as_deref()
+        .and_then(Rolle::parse)
+        .unwrap_or(Rolle::Material);
     mit(&state, |s| {
         let r = Referenz::neu(id, typ, ziel, rolle);
         s.store.referenz_speichern(&r)?;

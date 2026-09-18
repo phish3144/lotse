@@ -236,8 +236,10 @@ enum ProjektCmd {
 enum RefCmd {
     Add {
         projekt: String,
-        typ: String,
         ziel: String,
+        /// Art der Referenz. Ohne Angabe sieht Lotse sie dem Ziel an.
+        #[arg(long)]
+        typ: Option<String>,
         #[arg(long, default_value = "material")]
         rolle: String,
     },
@@ -1577,19 +1579,24 @@ fn referenz(store: &mut Store, c: RefCmd) -> Result<()> {
     match c {
         RefCmd::Add {
             projekt,
-            typ,
             ziel,
+            typ,
             rolle,
         } => {
             let p = finde_projekt(store, &projekt)?;
-            let typ = ReferenzTyp::parse(&typ).ok_or_else(|| {
-                anyhow!("Typ: ordner, git_repo, url, datei, physisch, geraet, passwortmanager")
-            })?;
+            // Ohne --typ wird die Art angesehen, nicht erfragt: eine Adresse ist eine
+            // Adresse, ein Ordner ist einer, und »Keller, Regal 3« ist ein Ort.
+            let typ = match typ.as_deref() {
+                Some(t) => ReferenzTyp::parse(t).ok_or_else(|| {
+                    anyhow!("Typ: ordner, git_repo, url, datei, physisch, geraet, passwortmanager")
+                })?,
+                None => lotse_core::model::typ_raten(&ziel),
+            };
             let rolle =
                 Rolle::parse(&rolle).ok_or_else(|| anyhow!("Rolle: material, ergebnis, doku"))?;
-            let r = Referenz::neu(p.id, typ, ziel, rolle);
+            let r = Referenz::neu(p.id, typ, &ziel, rolle);
             store.referenz_speichern(&r)?;
-            println!("Referenz {} angelegt.", r.id);
+            println!("Referenz {} angelegt ({}).", r.id, typ.as_str());
         }
         RefCmd::Liste { projekt } => {
             let p = finde_projekt(store, &projekt)?;

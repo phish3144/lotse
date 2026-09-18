@@ -320,20 +320,25 @@ crypto-geshreddert (siehe [[Tresor]]). Fragt nach.
 Referenzen sind Zeiger nach draußen: Ordner, Repos, Adressen, physische Dinge. Mehr in
 **[[Referenzen]]**.
 
-### `lotse ref add <PROJEKT> <TYP> <ZIEL>`
+### `lotse ref add <PROJEKT> <ZIEL>`
 
-Typ ist einer von `ordner`, `git_repo`, `url`, `datei`, `physisch`, `geraet`,
-`passwortmanager`, `anhang`.
+Die Art wird dem Ziel angesehen: eine Adresse ist eine Adresse, ein Ordner auf der Platte
+ein Ordner (mit `.git` darin ein Repo), und was wie keins von beidem aussieht, ist ein
+Ort. Nur `passwortmanager`, `geraet` und `anhang` lassen sich nicht ansehen – die sagt man
+mit `--typ`.
 
 | Option | Standard | Bedeutung |
 |---|---|---|
+| `--typ <T>` | angesehen | `ordner`, `git_repo`, `url`, `datei`, `physisch`, `geraet`, `passwortmanager`, `anhang`. |
 | `--rolle <R>` | `material` | `material` (Eingang), `ergebnis` (Ausgang), `doku`. |
 
 ```
-$ lotse ref add Gartenhaus ordner /home/du/bau --rolle material
-Referenz 01M28KB1CS4X6NSVFFXDK063EN angelegt.
-$ lotse ref add Gartenhaus url https://example.com/statik --rolle doku
-Referenz 01M28KB1GMB5R9FV7F1TZ7THG8 angelegt.
+$ lotse ref add Gartenhaus /home/du/bau
+Referenz 01M28KB1CS4X6NSVFFXDK063EN angelegt (ordner).
+$ lotse ref add Gartenhaus https://example.com/statik --rolle doku
+Referenz 01M28KB1GMB5R9FV7F1TZ7THG8 angelegt (url).
+$ lotse ref add Gartenhaus "Keller, Regal 3, blaue Kiste"
+Referenz 01M28KB1M4Q2W8TDVS0P6XA1YT angelegt (physisch).
 ```
 
 ### `lotse ref liste <PROJEKT>`

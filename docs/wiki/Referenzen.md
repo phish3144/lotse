@@ -64,7 +64,9 @@ nebeneinander auch.
 
 ## Rollen
 
-Wofür die Referenz im Vorhaben steht. Drei Werte, zum Sortieren, nicht zum Steuern.
+Wofür die Referenz im Vorhaben steht. Drei Werte, zum Sortieren, nicht zum Steuern – und
+**keine Frage beim Anlegen**. Ohne Angabe ist es `material`, und was `material` ist, steht
+auch nicht an jedem Eintrag: das wäre die Voreinstellung als Auskunft ausgegeben.
 
 | Rolle | Bedeutung | Beispiel |
 |---|---|---|
@@ -80,10 +82,16 @@ Ergebnis« ohne Suchen.
 ## Anlegen
 
 ```
-lotse ref add Gartenhaus ordner /home/du/bau --rolle material
-lotse ref add Gartenhaus url https://example.com/statik --rolle doku
-lotse ref add Gartenhaus physisch "Aktenordner im Regal links, zweites Fach"
+lotse ref add Gartenhaus /home/du/bau
+lotse ref add Gartenhaus https://example.com/statik --rolle doku
+lotse ref add Gartenhaus "Aktenordner im Regal links, zweites Fach"
 ```
+
+**Die Art wird angesehen, nicht erfragt.** Bis 0.10 standen im Formular zwei Auswahlfelder
+vor dem Eingabefeld – acht Typen und drei Rollen, also 24 Kombinationen für das, was ein
+Mensch als »da liegt das« denkt. Jetzt ist es ein Feld. Wer eine der drei Arten braucht,
+die sich nicht ansehen lassen (`passwortmanager`, `geraet`, `anhang`), klappt in der App
+*Genauer* auf oder nimmt auf der Kommandozeile `--typ`.
 
 In der App: auf der Projektseite rechts, *Referenz hinzufügen*. Für Ordner und Dateien
 gibt es einen Auswahldialog – bequemer und weniger fehleranfällig als Tippen.

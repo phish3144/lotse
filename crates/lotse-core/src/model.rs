@@ -381,6 +381,61 @@ pub fn ziel_ist_adresse(ziel: &str) -> bool {
         || (z.starts_with("git@") && z.contains(':'))
 }
 
+/// Rät die Art einer Referenz aus dem, was jemand hingeschrieben hat.
+///
+/// Das Formular verlangte bis 0.10 zwei Auswahlfelder, bevor überhaupt etwas dastand:
+/// acht Typen und drei Rollen, also 24 Kombinationen für das, was ein Mensch als »da
+/// liegt das« denkt. Die Art lässt sich aber ansehen: eine Adresse ist eine Adresse, ein
+/// Ordner ist einer, und »Keller, Regal 3, blaue Kiste« ist nichts davon.
+///
+/// Geraten wird nur, was sich sicher erkennen lässt. `Passwortmanager`, `Geraet` und
+/// `Anhang` kommen hier nie heraus – die sagt man ausdrücklich.
+pub fn typ_raten(ziel: &str) -> ReferenzTyp {
+    let z = ziel.trim();
+    if ziel_ist_adresse(z) {
+        let klein = z.to_lowercase();
+        // Eine Adresse, die auf ein Repo zeigt: `.git` am Ende oder die SSH-Kurzform.
+        if klein.ends_with(".git") || klein.starts_with("git@") || klein.starts_with("git://") {
+            return ReferenzTyp::GitRepo;
+        }
+        return ReferenzTyp::Url;
+    }
+    // Auf der Platte nachsehen, solange es sie gibt. Ein Pfad, der nicht existiert, wird
+    // nicht zum Ordner erklärt – sonst stünde dort dauerhaft »nicht erreichbar«.
+    #[cfg(feature = "native")]
+    {
+        let pfad = std::path::Path::new(z);
+        if pfad.is_dir() {
+            return if pfad.join(".git").is_dir() {
+                ReferenzTyp::GitRepo
+            } else {
+                ReferenzTyp::Ordner
+            };
+        }
+        if pfad.is_file() {
+            return ReferenzTyp::Datei;
+        }
+    }
+    // Sieht es wenigstens wie ein Pfad aus? Dann ist es einer, den es (noch) nicht gibt –
+    // ein abgezogener Stick etwa. Ein Satz mit Leerzeichen und Komma ist ein Ort.
+    let wie_pfad = z.starts_with('/')
+        || z.starts_with("~/")
+        || z.starts_with("./")
+        || z.starts_with("\\\\")
+        || (z.len() > 2 && z.as_bytes()[1] == b':' && z.as_bytes()[0].is_ascii_alphabetic());
+    if wie_pfad {
+        let hat_endung = std::path::Path::new(z)
+            .extension()
+            .is_some_and(|e| !e.is_empty());
+        return if hat_endung {
+            ReferenzTyp::Datei
+        } else {
+            ReferenzTyp::Ordner
+        };
+    }
+    ReferenzTyp::Physisch
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Rolle {
@@ -552,6 +607,72 @@ pub fn slug(titel: &str) -> String {
         "projekt".to_string()
     } else {
         out
+    }
+}
+
+#[cfg(test)]
+mod raten_tests {
+    use super::*;
+
+    /// Die Art einer Referenz lässt sich ansehen – das Auswahlfeld davor war überflüssig.
+    #[test]
+    fn typ_wird_aus_dem_ziel_erkannt() {
+        let faelle = [
+            ("https://github.com/o/r", ReferenzTyp::Url),
+            ("https://github.com/o/r.git", ReferenzTyp::GitRepo),
+            ("git@github.com:o/r.git", ReferenzTyp::GitRepo),
+            ("git://example.org/r", ReferenzTyp::GitRepo),
+            ("https://example.org/doku", ReferenzTyp::Url),
+            ("/home/ich/vorhaben", ReferenzTyp::Ordner),
+            ("~/Projekte/gartenhaus", ReferenzTyp::Ordner),
+            ("D:\\Projekte\\umbau", ReferenzTyp::Ordner),
+            ("/home/ich/plan.pdf", ReferenzTyp::Datei),
+            ("Keller, Regal 3, blaue Kiste", ReferenzTyp::Physisch),
+            ("Aktenordner „Steuer 2025“", ReferenzTyp::Physisch),
+        ];
+        for (ziel, erwartet) in faelle {
+            assert_eq!(typ_raten(ziel), erwartet, "für »{ziel}«");
+        }
+    }
+
+    /// Was sich nicht sicher erkennen lässt, wird nicht geraten.
+    #[test]
+    fn nie_geraten_werden_passwortmanager_geraet_und_anhang() {
+        for ziel in [
+            "Proton Pass",
+            "mein Laptop",
+            "anhang.zip",
+            "",
+            "   ",
+            "irgendwas",
+        ] {
+            let t = typ_raten(ziel);
+            assert!(
+                !matches!(
+                    t,
+                    ReferenzTyp::Passwortmanager | ReferenzTyp::Geraet | ReferenzTyp::Anhang
+                ),
+                "»{ziel}« ergab {t:?}"
+            );
+        }
+    }
+
+    /// Ein echter Ordner mit `.git` ist ein Repo, einer ohne ein Ordner.
+    #[test]
+    #[cfg(feature = "native")]
+    fn ordner_auf_der_platte_wird_unterschieden() {
+        let t = tempfile::tempdir().unwrap();
+        let schlicht = t.path().join("schlicht");
+        std::fs::create_dir(&schlicht).unwrap();
+        assert_eq!(typ_raten(&schlicht.to_string_lossy()), ReferenzTyp::Ordner);
+
+        let repo = t.path().join("repo");
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        assert_eq!(typ_raten(&repo.to_string_lossy()), ReferenzTyp::GitRepo);
+
+        let datei = t.path().join("plan.txt");
+        std::fs::write(&datei, "x").unwrap();
+        assert_eq!(typ_raten(&datei.to_string_lossy()), ReferenzTyp::Datei);
     }
 }
 

@@ -239,10 +239,16 @@
   }
 
   // --- Referenzen -----------------------------------------------------------
+  //
+  // Ein Feld. Die Art sieht der Kern dem Ziel an (`model::typ_raten`); hier stand bis 0.10
+  // ein Auswahlfeld mit acht Typen und eines mit drei Rollen – 24 Kombinationen für das,
+  // was ein Mensch als »da liegt das« denkt. Wer eine der drei Arten braucht, die sich
+  // nicht ansehen lassen (Passwortmanager, Gerät, Anhang), klappt »Genauer« auf.
   let referenzFormular = $state(false);
-  let rTyp: ReferenzTyp = $state('ordner');
+  let genauer = $state(false);
+  let rTyp: ReferenzTyp | '' = $state('');
   let rZiel = $state('');
-  let rRolle: ReferenzRolle = $state('material');
+  let rRolle: ReferenzRolle | '' = $state('');
   let geprueftWird: Id | null = $state(null);
 
   async function referenzSpeichern(e: Event) {
@@ -251,7 +257,12 @@
     wirdGespeichert = true;
     fehlerText = null;
     try {
-      await provider.addReference(id, rTyp, rZiel.trim(), rRolle);
+      await provider.addReference(
+        id,
+        rZiel.trim(),
+        rTyp === '' ? undefined : rTyp,
+        rRolle === '' ? undefined : rRolle,
+      );
       rZiel = '';
       referenzFormular = false;
       datenVersion.bump();
@@ -992,25 +1003,48 @@
 
         {#if referenzFormular}
           <form class="referenz-formular" onsubmit={referenzSpeichern}>
-            <select bind:value={rTyp} aria-label="Typ">
-              {#each REFERENZ_TYPEN as t (t)}
-                <option value={t}>{REFERENZ_TYP_LABEL[t]}</option>
-              {/each}
-            </select>
             <input
               bind:value={rZiel}
               type="text"
-              placeholder="Pfad, URL oder Ort – „Keller, Regal 3, blaue Kiste“"
-              aria-label="Ziel"
+              placeholder="Pfad, Adresse oder Ort – „Keller, Regal 3, blaue Kiste“"
+              aria-label="Wo liegt es?"
               required
             />
-            <select bind:value={rRolle} aria-label="Rolle">
-              {#each REFERENZ_ROLLEN as r (r)}
-                <option value={r}>{REFERENZ_ROLLE_LABEL[r]}</option>
-              {/each}
-            </select>
             <button type="submit" class="primaer" disabled={!rZiel.trim() || wirdGespeichert}>Speichern</button>
           </form>
+          <p class="hinweis klein">
+            Lotse sieht dem Ziel an, was es ist.
+            <button type="button" class="schlicht" onclick={() => (genauer = !genauer)}>
+              {genauer ? 'Genauer: zu' : 'Genauer …'}
+            </button>
+          </p>
+          {#if genauer}
+            <div class="referenz-genauer">
+              <label>
+                <span>Art</span>
+                <select bind:value={rTyp}>
+                  <option value="">ansehen lassen</option>
+                  {#each REFERENZ_TYPEN as t (t)}
+                    <option value={t}>{REFERENZ_TYP_LABEL[t]}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>
+                <span>Wofür</span>
+                <select bind:value={rRolle}>
+                  <option value="">Material (das Übliche)</option>
+                  {#each REFERENZ_ROLLEN as r (r)}
+                    <option value={r}>{REFERENZ_ROLLE_LABEL[r]}</option>
+                  {/each}
+                </select>
+              </label>
+              <p class="hinweis klein">
+                <strong>Material</strong> ist, woran du arbeitest. <strong>Ergebnis</strong> ist,
+                was dabei herauskommt. <strong>Doku</strong> beschreibt das Vorhaben, statt Teil
+                davon zu sein. Im Zweifel Material – das ändert nichts daran, was Lotse tut.
+              </p>
+            </div>
+          {/if}
           <p class="hinweis klein">
             Zwei Adressen kann Lotse selbst lesen: die Abonnement-Adresse eines Kalenders (endet auf
             <code>.ics</code> oder beginnt mit <code>webcal://</code>) erscheint als <em>Was ansteht</em>, und ein Ordner
@@ -1056,7 +1090,12 @@
                   <span class="referenz-ziel">{ref.ziel}</span>
                 {/if}
                 <span class="ref-fuss">
-                  <span class="hinweis rolle">{REFERENZ_ROLLE_LABEL[ref.rolle]}</span>
+                  <!-- »Material« an jedem Eintrag ist keine Auskunft, sondern Rauschen:
+                       es ist die Voreinstellung und steht damit fast überall. Genannt
+                       wird nur, was davon abweicht. -->
+                  {#if ref.rolle !== 'material'}
+                    <span class="hinweis rolle">{REFERENZ_ROLLE_LABEL[ref.rolle]}</span>
+                  {/if}
                   <span class="badge badge--{ref.pruefstatus}">{PRUEFSTATUS_LABEL[ref.pruefstatus]}</span>
                   <button
                     type="button"
@@ -1143,6 +1182,20 @@
 {/await}
 
 <style>
+  .referenz-genauer {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.6rem;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+  }
+  .referenz-genauer label {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    align-items: center;
+    gap: 0.5rem;
+  }
   .hinweis {
     color: var(--text-gedaempft);
   }
@@ -1565,14 +1618,6 @@
   .referenz-formular input {
     flex: 1;
     min-width: 12rem;
-  }
-  .referenz-formular select {
-    font: inherit;
-    color: inherit;
-    background: var(--hintergrund);
-    border: 1px solid var(--rahmen);
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.4rem;
   }
 
   .einfache-liste {

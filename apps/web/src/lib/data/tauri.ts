@@ -729,8 +729,15 @@ export function createTauriProvider(): DataProvider {
     async listReferences(projectId) {
       return (await invoke<RohReferenz[]>('referenzen', { projektId: projectId })).map(referenz);
     },
-    async addReference(projectId, typ, ziel, rolle) {
-      return referenz(await invoke<RohReferenz>('referenz_anlegen', { projektId: projectId, typ, ziel, rolle }));
+    async addReference(projectId, ziel, typ, rolle) {
+      return referenz(
+        await invoke<RohReferenz>('referenz_anlegen', {
+          projektId: projectId,
+          ziel,
+          typ: typ ?? null,
+          rolle: rolle ?? null,
+        }),
+      );
     },
     async checkReference(id) {
       return invoke<Pruefstatus>('referenz_pruefen', { id });

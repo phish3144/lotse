@@ -64,7 +64,7 @@ describe('DataProvider (Mock)', () => {
 
   it('legt Referenzen an; nicht prüfbare Ziele sind ein gültiger Zustand', async () => {
     const projekt = await provider.createProject('Keller', 'haus_garten');
-    const referenz = await provider.addReference(projekt.id, 'physisch', 'Keller, Regal 3, blaue Kiste', 'material');
+    const referenz = await provider.addReference(projekt.id, 'Keller, Regal 3, blaue Kiste');
     expect(referenz.pruefstatus).toBe('nicht_pruefbar');
     expect(await provider.listReferences(projekt.id)).toHaveLength(1);
     expect(await provider.checkReference(referenz.id)).toBe('nicht_pruefbar');
@@ -110,7 +110,7 @@ describe('DataProvider (Mock)', () => {
   it('löscht ein Projekt samt Notizen und Referenzen', async () => {
     const projekt = await provider.createProject('Wegwerf', 'generisch');
     await provider.addNote(projekt.id, { quelle: 'mensch', art: 'log', text: 'Eine Zeile.' });
-    await provider.addReference(projekt.id, 'url', 'https://example.invalid', 'doku');
+    await provider.addReference(projekt.id, 'https://example.invalid', undefined, 'doku');
 
     await provider.deleteProject(projekt.id);
 
