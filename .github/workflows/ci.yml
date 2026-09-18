@@ -71,6 +71,12 @@ jobs:
       - name: Vektoren im Browser
         working-directory: apps/web
         run: node scripts/wasm-browsertest.mjs
+      # Kleine Menge, damit der Weg nicht verrottet und der Umschlag-Aufschlag nicht
+      # unbemerkt wegläuft. Die großen Läufe (500 000) sind Handarbeit auf Abruf; ihre
+      # Ergebnisse stehen in docs/WEB_CLIENT.md 4a.
+      - name: Mengentest (kleine Menge)
+        working-directory: apps/web
+        run: node scripts/wasm-mengentest.mjs 2000
 
   desktop:
     name: Desktop-Hülle (cargo check)

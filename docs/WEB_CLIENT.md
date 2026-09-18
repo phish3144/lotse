@@ -54,19 +54,19 @@ Vorhaben zu zeigen, ist:
 4. `Umschlag::open` je Datensatz → `Projekt`, `Notiz`, `Referenz` im Speicher
 5. `brief::*` → Hafen, Auffälligkeit, Brief
 
-Kein SQLite, kein Schema, keine Migration. Die Suche ist ein linearer Durchlauf über die
-Notizen im Speicher – bei einem persönlichen Bestand schneller als der Netzaufruf, der ihn
-geholt hat.
+Kein SQLite, kein Schema, keine Migration. **Nicht** aber »alles in den Arbeitsspeicher und
+linear durchsuchen«: das stand hier bis 0.10 und ist gemessen zu teuer, sobald der Bestand
+groß wird. Wie es stattdessen läuft, steht in 4a.
 
 ## 4. Entscheidungen
 
-### 4a. Speicher im Browser: verschlüsselte Umschläge in IndexedDB, Index im Speicher
+### 4a. Speicher im Browser: Umschläge in IndexedDB, im Arbeitsspeicher nur Kennzahlen
 
 | Weg | Dafür | Dagegen | |
 |---|---|---|---|
 | **A** Nichts speichern, nur Arbeitsspeicher | Einfachster Fall, nichts bleibt liegen | Bei jedem Öffnen der ganze Bestand über das Netz | Grundlage |
 | **B** SQLite in WASM (OPFS) | Echtes SQL, FTS | `rusqlite` kann `wasm32-unknown-unknown` nicht; also eine Fremdanbindung und die SQL-Schicht doppelt | **verworfen** |
-| **C** Umschläge in IndexedDB, Index im Speicher | Kein zweites Schema, Cache ist undurchsichtiger Ciphertext, Wiederbesuch sofort da | Etwas mehr Code als A | **gewählt** |
+| **C** Umschläge in IndexedDB, im Speicher nur Kennzahlen | Kein zweites Schema, Cache ist undurchsichtiger Ciphertext, Wiederbesuch sofort da, Verbrauch hängt an der Zahl der **Vorhaben** statt an der Zahl der Notizen | Etwas mehr Code als A | **gewählt** |
 
 Der Kern von C: **gespeichert wird, was der Dienst liefert** – versiegelte Umschläge, Byte
 für Byte. Entschlüsselt wird beim Öffnen in den Arbeitsspeicher. Damit gilt:
@@ -76,6 +76,71 @@ für Byte. Entschlüsselt wird beim Öffnen in den Arbeitsspeicher. Damit gilt:
   nicht schlechter als das Bedrohungsmodell schon beschreibt.
 - Der Schlüssel liegt **nie** in IndexedDB, nur im Arbeitsspeicher der Sitzung.
 - »Fremder Rechner« ist keine Sonderbauweise, sondern ein Schalter: Cache aus.
+
+#### Was gemessen wurde, und was daran falsch war
+
+Dieses Dokument hat bis 0.10 gesagt: »Index im Speicher«, und die Suche sei »ein linearer
+Durchlauf über die Notizen im Speicher«. Das war für einen kleinen Bestand richtig und als
+Bauplan falsch. Gemessen mit `apps/web/scripts/wasm-mengentest.mjs` – selbst erzeugte
+Notizen, dieselbe Versiegelung, Chromium im Kopflosmodus:
+
+| Notizen | Öffnen | Umschläge (IndexedDB) | JS-Heap, wenn alles im Speicher liegt |
+|---:|---:|---:|---:|
+| 20 000 | 0,4 s | 10 MB | 37 MB |
+| 200 000 | 3,6 s | 103 MB | 179 MB |
+| 500 000 | 7,2 s | 257 MB | **464 MB** |
+
+Ein Umschlag wiegt **538 Byte**, der Klartext darin 206 – der Aufschlag ist Base64 plus die
+Kopffelder und bleibt konstant. Entsiegelt werden **rund 60 000 Umschläge je Sekunde** auf
+einem Desktop. Das ist schnell; das Problem ist nicht die Zeit, sondern der Speicher: alles
+im Arbeitsspeicher zu halten kostet **~0,9 kB je Notiz**, und das sind beim Zehn-Jahre-Fall
+464 MB nur für die Daten, ohne die Oberfläche daneben. Ein Telefonbrowser beendet einen Tab
+lange vorher.
+
+Was an dieser Stelle **nicht** gemessen ist: die Grenze eines Telefons. Der Versuch, sie mit
+`--max-old-space-size` nachzustellen, trägt nicht – V8 hält sich nicht daran, wenn der
+Speicher in Zeichenketten steckt (437 MB tatsächlich bei angeblich 352 MB Grenze). Die
+tragende Zahl ist deshalb der Verbrauch selbst, nicht ein simulierter Absturz.
+
+#### Obergrenzen, gegen die gebaut wird
+
+Nicht »mein Bestand ist klein«, sondern was in zehn Jahren zusammenkommt, wenn Beobachter,
+Git-Leser und Kalender jeden Tag etwas eintragen:
+
+| | Obergrenze | Woher |
+|---|---:|---|
+| Vorhaben | 2 000 | ein Mensch, zehn Jahre |
+| Notizen | 500 000 | ~130 am Tag, zehn Jahre – fast alles maschinell |
+| Ein Umschlag | 538 B typisch, 256 KiB maximal | gemessen; Maximum ist `sync::MAX_CIPHERTEXT` |
+| Geräte | 20 | |
+
+Daraus folgen vier Regeln, die **nicht** von der Bestandsgröße abhängen:
+
+1. **Der Pull läuft seitenweise in IndexedDB**, Seite für Seite geschrieben, nie erst in ein
+   Feld gesammelt. `pull(since, limit)` kann das schon (`SYNC_PROTOCOL.md`); der Browser darf
+   es nur nicht umgehen. 257 MB als JavaScript-Feld wären genau der Fehler.
+2. **Im Arbeitsspeicher liegen Kennzahlen je Vorhaben, nicht Einträge je Notiz.** Der Hafen
+   braucht letzte Berührung, letzten menschlichen Kontakt, Zahl der offenen Fäden und
+   Aktivität seit dem letzten Besuch – das sind Summen, und sie entstehen beim
+   Durchschreiben. Damit wächst der Verbrauch mit den **Vorhaben** (2 000), nicht mit den
+   Notizen (500 000).
+3. **Der Brief bekommt ein Fenster, nicht das Logbuch.** `brief::brief` liest genau: die
+   letzte Notiz, die letzte Übergabe, die offenen Fäden und die Aktivität seit dem letzten
+   menschlichen Kontakt. Alles davon ist klein oder gezielt abfragbar – die Funktion
+   *bekommt* aber alle Notizen eines Vorhabens, nativ über `store::brief`. Im Browser ist
+   das der falsche Weg, weil dort jede Notiz einzeln entsiegelt werden müsste. Ob es auch
+   nativ zu teuer ist, misst `crates/lotse-core/tests/menge_nativ.rs` (bis 100 000 Notizen
+   in einem Vorhaben); nachgezogen wird es in W2, an einer Stelle, für beide Seiten.
+4. **Die Suche ist begrenzt, mit Fortschritt und Abbruch.** Voreinstellung ist das offene
+   Vorhaben (Tausende Sätze, unter einer Zehntelsekunde). Global läuft sie streamend aus
+   IndexedDB mit Fortschritt, Abbruchknopf und Trefferdeckel – bei 500 000 Sätzen sind das
+   rund 8 Sekunden. Ein Volltextindex im Browser wäre das zweite Schema, das 4a gerade
+   vermeidet.
+
+Der Mengentest bleibt als Sicherung im Repo: mit kleiner Menge in CI, damit der Weg nicht
+verrottet, und auf Abruf mit 500 000. `LOTSE_HEAP_MB` engt das Speicherbudget auf
+Telefongröße ein – ein Desktop mit 4 GB Heap beweist nichts über das Gerät, auf dem es eng
+wird.
 
 ### 4b. Argon2id läuft in einem Web Worker
 
@@ -173,10 +238,12 @@ sehen, mit gezählten Datensätzen – kein Mock, kein Screenshot als Beweis.
 ### Phase W3 · Wiederkommen ohne Wartezeit
 
 Umschlag-Cache in IndexedDB nach 4a, inkrementeller Pull ab `last_server_seq`, Schalter
-»fremder Rechner« (kein Cache), Abmelden räumt auf.
+»fremder Rechner« (kein Cache), Abmelden räumt auf. Die Suche nach 4a Regel 4: im Vorhaben
+sofort, global streamend mit Fortschritt und Abbruch.
 
 **Abschluss:** zweiter Besuch zeigt den Hafen, bevor der Netzaufruf zurück ist; nach
-»Abmelden« ist in IndexedDB nichts mehr.
+»Abmelden« ist in IndexedDB nichts mehr. Und: der Mengentest mit **500 000** Notizen läuft
+durch, ohne dass der Verbrauch mit der Zahl der Notizen wächst – gemessen, nicht beteuert.
 
 ### Phase W4 · Schreiben, so weit es ohne Dateisystem geht
 
@@ -200,7 +267,7 @@ ausgelieferten Kopfzeilen sind nachgemessen, nicht behauptet.
 | Risiko | Was dagegen steht |
 |---|---|
 | Argon2id mit 64 MiB im Browser ist zäh, besonders mobil | Worker und sichtbarer Fortschritt. Die Parameter zu senken wäre der falsche Ausweg – sie schützen genau das Passwort, das der Dienst nie sieht. |
-| Der ganze Bestand im Arbeitsspeicher | Für einen persönlichen Bestand unkritisch; **vor** W3 an echten Daten messen, nicht schätzen. Wird es zu groß, holt der Pull seitenweise und der Index bleibt schlank. |
+| Der ganze Bestand im Arbeitsspeicher | **Passiert nicht mehr.** Gemessen, nicht geschätzt: 500 000 Notizen kosten 464 MB, wenn man sie hält. Deshalb schreibt der Pull seitenweise in IndexedDB und im Speicher bleiben Kennzahlen je Vorhaben (4a). Der Mengentest hält das nach. |
 | IndexedDB ist kein Tresor | Deshalb liegen dort nur Umschläge, nie Schlüssel. Wer strenger will, nimmt »fremder Rechner«. |
 | Zwei Oberflächenwege laufen auseinander | Es bleibt **eine** Schnittstelle (`provider.ts`). Was im Browser fehlt, wird ausgegraut mit Grund, nicht weggelassen. |
 | Der Bau wird schwerfällig (WASM + Vite + CI) | In W1 einmal sauber gemacht: ein Skript, ein CI-Job, keine neue npm-Abhängigkeit. Der Browsertest fährt einen vorhandenen Chromium, statt Playwright mitzuschleppen. |
@@ -214,3 +281,5 @@ ausgelieferten Kopfzeilen sind nachgemessen, nicht behauptet.
 - Kein Konto-Anlegen **ohne** abgetippten Wiederherstellungscode – im Browser so wenig wie
   am Desktop (4d).
 - Keine Absenkung der KDF-Kosten, um im Browser schneller zu sein.
+- **Kein Volltextindex im Browser.** Das wäre das zweite Schema, das 4a vermeidet. Die Suche
+  bleibt ein Durchlauf – nur ein begrenzter, mit Fortschritt und Abbruch (4a Regel 4).

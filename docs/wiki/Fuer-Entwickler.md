@@ -52,12 +52,27 @@ von JS-Werten auf einen Aufruf im Kern und zurück. Schlüssel sind undurchsicht
 ```bash
 scripts/wasm-bauen.sh                          # braucht wasm-bindgen in der Fassung aus Cargo.lock
 cd apps/web && node scripts/wasm-browsertest.mjs   # derselbe Vektor, echter Browser
+cd apps/web && node scripts/wasm-mengentest.mjs 500000   # was ein Browser aushält
 ```
 
 Das Ergebnis landet in `apps/web/src/lib/wasm/` und ist Bauergebnis, nicht Quelltext.
 Der Browsertest startet einen kleinen http-Server aus der Node-Standardbibliothek und ein
 Chromium im Kopflosmodus – **kein** Playwright, damit kein Browsertreiber als
 Abhängigkeit mitkommt. Pfad notfalls über `LOTSE_BROWSER` setzen.
+
+### Der Mengentest
+
+`apps/web/scripts/wasm-mengentest.mjs` erzeugt sich seinen Bestand selbst – dieselbe
+Versiegelung, beliebig viele Notizen – und misst Versiegeln, Öffnen, Umschlaggröße und
+Speicherverbrauch. Kein echter Bestand, also wiederholbar und nach oben skalierbar; die
+Zahlen tragen die Entscheidungen in `docs/WEB_CLIENT.md` Abschnitt 4a.
+
+In CI läuft er mit 2 000 Sätzen, damit der Weg nicht verrottet und der Umschlag-Aufschlag
+nicht unbemerkt wegläuft. Die großen Läufe sind Handarbeit. `LOTSE_HEAP_MB` engt das
+Speicherbudget ein – mit der Einschränkung, dass V8 sich nicht zuverlässig daran hält.
+
+Beide Browserläufe teilen `scripts/browserlauf.mjs`: http-Server aus der
+Node-Standardbibliothek, Chromium im Kopflosmodus, Ergebnis per POST.
 
 ### Die Testvektoren
 
@@ -101,6 +116,7 @@ scripts/sync-e2e.sh
 cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 cargo clippy -p lotse-wasm --target wasm32-unknown-unknown -- -D warnings
 scripts/wasm-bauen.sh && (cd apps/web && node scripts/wasm-browsertest.mjs)
+(cd apps/web && node scripts/wasm-mengentest.mjs 2000)
 (cd apps/web && npm run check && npm test && npm run build)
 (cd services/sync-worker && npm run typecheck && npm test)
 ```

@@ -1,0 +1,115 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Lotse – Mengentest</title>
+<pre id="log"></pre>
+<script type="module">
+  // Misst, was ein Browser mit einem großen Bestand aushält. Kein Personenbezug, kein
+  // fremder Bestand: die Datensätze entstehen hier, mit demselben Code, der sie auch
+  // echt versiegeln würde. Deshalb ist die Messung wiederholbar und nach oben skalierbar.
+  const log = document.getElementById('log')
+  const zeile = (s) => {
+    log.textContent += s + '\n'
+  }
+  const werte = {}
+  let fehler = null
+
+  try {
+    const kern = await import('/wasm/lotse_wasm.js')
+    await kern.default()
+    const n = Number(new URL(location.href).searchParams.get('n') ?? 20000)
+
+    const params = { m_kib: 8192, t: 1, p: 1 }
+    let konto = kern.kontoEinrichten('mengentest', params.m_kib, params.t, params.p)
+    const schluessel = konto.kontoschluessel()
+    konto.free()
+
+    const projektId = kern.neueId()
+    const geraet = kern.neueId()
+    const uhr = new kern.Logikuhr(geraet, undefined)
+
+    // Eine Notiz, wie sie der Beobachter erzeugt: kurzer Text, Quelle git.
+    // Jeder zehnte Satz enthält den Suchbegriff. Die Suche läuft trotzdem über alles –
+    // gemessen wird der Durchlauf, nicht die Trefferzahl.
+    const notizText = (i) =>
+      i % 10 === 0
+        ? `Commit ${i}: Fundament nachgemessen, Bewehrung korrigiert, Protokoll ergänzt`
+        : `Commit ${i}: Datei geändert, Zeitstempel notiert, nichts weiter zu sagen`
+
+    // ---------------------------------------------------------------- Siegeln
+    const t0 = performance.now()
+    const umschlaege = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const notiz = {
+        id: kern.neueId(),
+        projekt_id: projektId,
+        ts: 1700000000000 + i * 60000,
+        quelle: 'git',
+        art: 'log',
+        text: notizText(i),
+      }
+      umschlaege[i] = schluessel.umschlagSiegeln(
+        'note',
+        notiz.id,
+        uhr.weiter(notiz.ts),
+        geraet,
+        JSON.stringify(notiz),
+      )
+    }
+    const tSiegeln = performance.now() - t0
+
+    const bytes = umschlaege.reduce((s, u) => s + u.length, 0)
+    werte.n = n
+    werte.siegeln_ms = Math.round(tSiegeln)
+    werte.umschlag_bytes_mittel = Math.round(bytes / n)
+    werte.umschlag_bytes_gesamt = bytes
+
+    // ------------------------------------------------- Öffnen: alles im Speicher
+    const t1 = performance.now()
+    const alle = new Array(n)
+    for (let i = 0; i < n; i++) alle[i] = JSON.parse(schluessel.umschlagOeffnen(umschlaege[i]))
+    const tOeffnen = performance.now() - t1
+    werte.oeffnen_ms = Math.round(tOeffnen)
+    werte.oeffnen_pro_sekunde = Math.round(n / (tOeffnen / 1000))
+
+    // Volltext-Suche als linearer Durchlauf über den Klartext im Speicher.
+    const t2 = performance.now()
+    let treffer = 0
+    for (const x of alle) if (x.text.includes('Bewehrung')) treffer++
+    werte.suche_ms = Math.round(performance.now() - t2)
+    werte.suche_treffer = treffer
+
+    // ---------------------------------------------------------- Der schlanke Index
+    // Nur, was der Hafen und die Projektseite zum Sortieren und Filtern brauchen.
+    const t3 = performance.now()
+    const index = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const x = alle[i]
+      index[i] = { id: x.id, p: x.projekt_id, ts: x.ts, a: x.art, o: false }
+    }
+    werte.index_ms = Math.round(performance.now() - t3)
+
+    const grob = (o) => JSON.stringify(o).length
+    werte.index_bytes_je_satz = Math.round(grob(index[0]))
+    werte.klartext_bytes_je_satz = Math.round(grob(alle[0]))
+
+    // ------------------------------------------------------------------ Speicher
+    // performance.memory ist Chrome-spezifisch und grob, aber es ist die einzige Zahl,
+    // die der Browser überhaupt hergibt. Als Größenordnung reicht sie.
+    if (performance.memory) {
+      werte.heap_mb = Math.round(performance.memory.usedJSHeapSize / 1048576)
+      werte.heap_grenze_mb = Math.round(performance.memory.jsHeapSizeLimit / 1048576)
+    }
+
+    schluessel.free()
+  } catch (e) {
+    fehler = String(e && e.stack ? e.stack : e)
+  }
+
+  for (const [k, v] of Object.entries(werte)) zeile(`${k} = ${v}`)
+  if (fehler) zeile(fehler)
+  await fetch('/ergebnis', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ werte, fehler, browser: navigator.userAgent }),
+  })
+</script>

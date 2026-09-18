@@ -11,7 +11,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "wasm": "bash ../../scripts/wasm-bauen.sh",
-    "test:browser": "node scripts/wasm-browsertest.mjs"
+    "test:browser": "node scripts/wasm-browsertest.mjs",
+    "test:menge": "node scripts/wasm-mengentest.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

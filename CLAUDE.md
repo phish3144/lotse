@@ -32,6 +32,8 @@ cargo check -p lotse-core --no-default-features --target wasm32-unknown-unknown
 cargo clippy -p lotse-wasm --target wasm32-unknown-unknown -- -D warnings
 scripts/wasm-bauen.sh && (cd apps/web && node scripts/wasm-browsertest.mjs)   # braucht wasm-bindgen
                           # und einen Chromium/Chrome; derselbe Vektor wie tests/vektoren/kdf.json
+(cd apps/web && node scripts/wasm-mengentest.mjs 2000)   # Mengen-Sicherung; große Läufe auf Abruf:
+                          # node scripts/wasm-mengentest.mjs 500000 (siehe WEB_CLIENT.md 4a)
 (cd apps/web && npm run check && npm test && npm run build)
 (cd services/sync-worker && npm run typecheck && npm test)
 ```
