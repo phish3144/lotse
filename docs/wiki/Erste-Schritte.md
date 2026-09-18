@@ -67,17 +67,27 @@ alles:
 Ordner und Dateien kannst du auch einfach in das Fenster ziehen, oder über *Durchsuchen*
 wählen. Einen zweiten Weg gibt es nicht, weil es keinen braucht.
 
-Dann zeigt Lotse einen **Befund**: Titel, Kurs und Vorlage schon ausgefüllt, dazu was es
-gefunden hat – die Gegenseite auf GitHub oder GitLab, eigene Vorhaben in Unterordnern,
+**Ein bloßer Name ist sofort ein Vorhaben.** Kein zweiter Bildschirm, keine Rückfrage –
+was sollte Lotse auch fragen, das du nicht gerade geschrieben hast. Vorlage und Kurs lassen
+sich auf der Projektseite jederzeit nachtragen.
+
+**Steckt mehr dahinter, zeigt Lotse es:** unter *Das habe ich gefunden* stehen Titel, Kurs
+und Vorlage schon ausgefüllt – als **vorgeschlagen** gekennzeichnet, damit Geratenes nicht
+wie Getipptes aussieht; die Marke verschwindet, sobald du das Feld anfasst. Dazu, was
+gefunden wurde: die Gegenseite auf GitHub oder GitLab, eigene Vorhaben in Unterordnern,
 lesbare Dokumente. Alles vorangekreuzt, alles abwählbar. Das ist keine zweite Fragerunde:
 Lotse fragt nicht, was es selbst nachsehen kann. Wer eine GitHub-Adresse hineinschreibt,
 wird nicht gefragt, ob er von GitHub importieren will.
 
+Ist die KI eingerichtet, steht dort auch *Von der KI deuten lassen*: sie liest README,
+Dateinamen und Erkennungsmarken und schlägt Titel, Kurs, Themen und die offenen Fäden vor,
+die schon im Ordner stehen. Den Text siehst du vorher ([[KI]]).
+
 Liegt in dem Ordner schon eine Kennung von Lotse, entsteht kein zweites Vorhaben – dann
 kommt das Abgehakte zum vorhandenen dazu.
 
-Der Weg zurück, wenn der Befund zu weit ging: das einzelne Vorhaben löschen. Das gibt den
-Ordner auch wieder frei.
+Der Weg zurück, wenn es zu weit ging: das einzelne Vorhaben löschen. Das gibt den Ordner
+auch wieder frei.
 
 Den **Kurs** darf man ernst nehmen, auch wenn er vorgeschlagen ist: er ist die eine Zeile,
 die dir in drei Monaten sagt, was du eigentlich wolltest. Nicht „Gartenhaus“, sondern

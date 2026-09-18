@@ -44,6 +44,8 @@
   let vorlage: VorlagenId = $state('generisch');
   let kurs = $state('');
   let tags: string[] = $state([]);
+  /** Welche Felder hat Lotse gefüllt? Geratenes soll als solches zu erkennen sein. */
+  let vorgeschlagen = $state({ titel: false, kurs: false, vorlage: false });
 
   // Deuten durch die KI: der Schritt, der aus einem Ordnernamen ein beschriebenes
   // Vorhaben macht. Erst der Text zum Ansehen, dann das Senden – dieselbe Regel wie
@@ -171,14 +173,29 @@
     vorlage = v?.vorlage ?? 'generisch';
     kurs = v?.kurs ?? '';
     tags = v?.tags ?? [];
+    vorgeschlagen = { titel: !!v?.titel, kurs: !!v?.kurs, vorlage: !!v?.vorlage };
     fehler = null;
+  }
+
+  /**
+   * Gibt es überhaupt etwas zu zeigen?
+   *
+   * Ein getippter Name ergibt nichts als sich selbst – dann ist ein zweiter Bildschirm
+   * mit drei leeren Feldern kein Befund, sondern ein Formular, das den Menschen nach dem
+   * fragt, was er gerade geschrieben hat. Das war das »komisch« am Anlegen.
+   */
+  function nichtsZuZeigen(d: Deutung): boolean {
+    return !d.bekannt && d.befund.funde.length === 0 && !d.ordner && !d.befund.gegenseite_fehler;
   }
 
   async function deute(auftrag: () => Promise<Deutung>) {
     laeuft = true;
     fehler = null;
     try {
-      uebernehmen(await auftrag());
+      const d = await auftrag();
+      uebernehmen(d);
+      // Nichts gefunden heißt: fertig. Ein Klick, ein Vorhaben.
+      if (nichtsZuZeigen(d) && titel.trim()) await anlegen();
     } catch (e) {
       fehler = e instanceof Error ? e.message : String(e);
     } finally {
@@ -187,8 +204,8 @@
   }
 
   /**
-   * Im Browser gibt es keinen Kern, der einordnen könnte – dort ist alles ein Titel.
-   * Spiegelt `deuten::nur_titel` im Kern; die Beispieldaten sollen trotzdem etwas zeigen.
+   * Im Browser gibt es keinen Kern, der einordnen könnte. Ein getippter Name ist dort
+   * ein Titel – spiegelt `deuten::nur_titel`.
    */
   function nurTitel(text: string): Deutung {
     return {
@@ -204,6 +221,37 @@
     };
   }
 
+  /**
+   * Sieht die Eingabe im Browser nach Ordner oder Adresse aus, zeigen die Beispieldaten,
+   * wie ein Fund aussieht. Ohne das wäre dieser Bildschirm im Browser nie zu sehen – und
+   * damit auch nie zu prüfen.
+   */
+  function beispielBefund(text: string): Deutung {
+    const name = text.trim().replace(/\/+$/, '').split(/[\\/]/).pop() || text.trim();
+    return {
+      ordner: text.trim(),
+      befund: {
+        quelle: text.trim(),
+        vorschlag: {
+          titel: name.replace(/[-_]+/g, ' '),
+          vorlage: 'software',
+          tags: ['beispiel'],
+          kurs: 'Beispieldaten – im Browser deutet Lotse nicht wirklich.',
+        },
+        funde: [{ art: 'dokument', pfad: `${text.trim()}/README.md`, name: 'README.md' }],
+        angesehen: 3,
+        abgebrochen: false,
+        weitere_dokumente: 0,
+        archiviert: false,
+      },
+    };
+  }
+
+  /** Sieht der Text nach einem Ort auf der Platte oder im Netz aus? Nur für die Beispiele. */
+  function wirktWieQuelle(text: string): boolean {
+    return /^([/~]|\.\/|[A-Za-z]:[\\/]|https?:\/\/|git@)/.test(text.trim());
+  }
+
   async function weiter(e?: Event) {
     e?.preventDefault();
     if (laeuft) return;
@@ -214,7 +262,8 @@
     }
     ordnerPfad = undefined;
     if (!echteDaten) {
-      uebernehmen(nurTitel(text));
+      // Derselbe Weg wie mit Kern, damit hier nicht eine zweite Ablaufsteuerung entsteht.
+      await deute(async () => (wirktWieQuelle(text) ? beispielBefund(text) : nurTitel(text)));
       return;
     }
     await deute(async () => {
@@ -276,8 +325,8 @@
     return liste.filter((f) => gewaehlt[schluessel(f as Fund)]).map((f) => f.pfad);
   }
 
-  async function anlegen(e: Event) {
-    e.preventDefault();
+  async function anlegen(e?: Event) {
+    e?.preventDefault();
     if (!kannSpeichern || wirdGespeichert) return;
     wirdGespeichert = true;
     fehler = null;
@@ -398,19 +447,25 @@
             kommt zu „{bekannt.titel}" dazu.
           </p>
         {:else}
-          <h2>Befund</h2>
+          <h2>{bekannt ? 'Dazu gehört schon etwas' : 'Das habe ich gefunden'}</h2>
           {#if deutung.befund.quelle && deutung.befund.quelle !== titel}
             <p class="hinweis"><code>{deutung.befund.quelle}</code></p>
           {/if}
 
           <label>
-            <span>Titel</span>
-            <input bind:value={titel} type="text" placeholder="Gartenhaus" required />
+            <span>Titel {#if vorgeschlagen.titel}<em class="geraten">vorgeschlagen</em>{/if}</span>
+            <input
+              bind:value={titel}
+              oninput={() => (vorgeschlagen.titel = false)}
+              type="text"
+              placeholder="Gartenhaus"
+              required
+            />
           </label>
 
           <label>
-            <span>Vorlage</span>
-            <select bind:value={vorlage}>
+            <span>Vorlage {#if vorgeschlagen.vorlage}<em class="geraten">vorgeschlagen</em>{/if}</span>
+            <select bind:value={vorlage} onchange={() => (vorgeschlagen.vorlage = false)}>
               {#each VORLAGEN as v (v)}
                 <option value={v}>{VORLAGEN_LABEL[v]}</option>
               {/each}
@@ -418,8 +473,16 @@
           </label>
 
           <label>
-            <span>Kurs <em>(optional)</em></span>
-            <textarea bind:value={kurs} rows="2" placeholder="Worum geht es? Was ist das Ziel?"></textarea>
+            <span>
+              Kurs <em>(optional)</em>
+              {#if vorgeschlagen.kurs}<em class="geraten">vorgeschlagen</em>{/if}
+            </span>
+            <textarea
+              bind:value={kurs}
+              oninput={() => (vorgeschlagen.kurs = false)}
+              rows="2"
+              placeholder="Worum geht es? Was ist das Ziel?"
+            ></textarea>
           </label>
 
           {#if kiMoeglich}
@@ -557,8 +620,7 @@
 
         {#if !bekannt && funde.length === 0}
           <p class="hinweis klein">
-            Nichts weiter gefunden – das ist kein Mangel. Ordner, Adressen und Dateien lassen sich später unter
-            <em>Referenzen</em> nachtragen.
+            Weitere Ordner, Adressen und Dateien lassen sich später unter <em>Referenzen</em> nachtragen.
           </p>
         {/if}
 
@@ -592,6 +654,18 @@
 {/if}
 
 <style>
+  .geraten {
+    font-style: normal;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--accent, inherit);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0 0.4em;
+    margin-left: 0.35em;
+    vertical-align: 0.1em;
+  }
   .deuten-ki {
     display: grid;
     gap: 0.5rem;

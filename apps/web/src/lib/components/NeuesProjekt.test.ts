@@ -45,9 +45,10 @@ function tippen(wert: string) {
 
 async function weiter() {
   knopf('Weiter')!.click();
-  // Der Übergang läuft über ein Promise, auch im Titel-Fall.
-  await Promise.resolve();
-  await Promise.resolve();
+  // Der Übergang läuft über Promises – und bei einem bloßen Namen legt derselbe Klick
+  // gleich an, was noch einmal so viele Umläufe braucht. Lieber großzügig warten als
+  // eine Zahl, die bei der nächsten Änderung nicht mehr reicht.
+  for (let i = 0; i < 12; i++) await Promise.resolve();
   flushSync();
 }
 
@@ -62,7 +63,7 @@ describe('Anlege-Dialog', () => {
 
   it('bleibt beim Befund stehen, statt zurückzuspringen', async () => {
     oeffnen();
-    tippen('Gartenhaus');
+    tippen('~/Projekte/gartenhaus');
     await weiter();
 
     expect(formular('Befund'), 'der Befund muss erscheinen').toBeTruthy();
@@ -79,10 +80,42 @@ describe('Anlege-Dialog', () => {
 
   it('übernimmt den getippten Text als Titelvorschlag', async () => {
     oeffnen();
-    tippen('  Hochbeet Südseite  ');
+    tippen('  ~/Projekte/hochbeet-suedseite  ');
     await weiter();
     const titel = formular('Befund')?.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(titel?.value).toBe('Hochbeet Südseite');
+    expect(titel?.value).toBe('hochbeet suedseite');
+  });
+
+  /**
+   * Ein getippter Name braucht keinen zweiten Bildschirm.
+   *
+   * Vorher kam dort ein Formular mit Titel, Vorlage und Kurs – und fragte damit nach
+   * dem, was der Mensch gerade geschrieben hatte. Genau das war am Anlegen »komisch«.
+   */
+  it('legt einen getippten Namen in einem Schritt an', async () => {
+    oeffnen();
+    tippen('Dachboden ausbauen');
+    await weiter();
+
+    expect(formular('Befund'), 'kein zweiter Bildschirm für einen bloßen Namen').toBeFalsy();
+    expect(formular('Neues Vorhaben'), 'und auch nicht zurück ins Feld').toBeFalsy();
+  });
+
+  /** Was Lotse gefüllt hat, ist als solches zu erkennen. */
+  it('kennzeichnet geratene Felder und nimmt die Marke beim Tippen weg', async () => {
+    oeffnen();
+    tippen('~/Projekte/gartenhaus');
+    await weiter();
+
+    const marken = () => [...wurzel.querySelectorAll('.geraten')].map((e) => e.textContent?.trim());
+    expect(marken().length, 'Titel, Vorlage und Kurs kommen aus dem Befund').toBeGreaterThan(0);
+
+    const titel = formular('Befund')!.querySelector<HTMLInputElement>('input[type="text"]')!;
+    const vorher = marken().length;
+    titel.value = 'Selbst getippt';
+    titel.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    expect(marken().length, 'was angefasst wurde, gilt nicht mehr als geraten').toBe(vorher - 1);
   });
 
   it('sagt etwas, wenn das Feld leer ist, und springt nicht weiter', async () => {
@@ -94,9 +127,11 @@ describe('Anlege-Dialog', () => {
 
   it('führt von „Zurück" wieder zum Feld', async () => {
     oeffnen();
-    tippen('Gartenhaus');
+    tippen('~/Projekte/gartenhaus');
     await weiter();
-    formular('Befund')!.querySelector<HTMLButtonElement>('button')!.click();
+    // Über die Beschriftung, nicht über die Position: im Befund stehen inzwischen auch
+    // Knöpfe für Tags, und der erste ist längst nicht mehr »Zurück«.
+    knopf('Zurück')!.click();
     flushSync();
     expect(wurzel.querySelector('.dialog h2')?.textContent).toBe("Was gibt's?");
     expect(formular('Befund')).toBeFalsy();
