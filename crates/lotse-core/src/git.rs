@@ -130,6 +130,50 @@ pub fn verdichten(projekt_id: Ulid, commits: &[Commit], quelle: Quelle) -> Vec<N
     out
 }
 
+/// Wie viele Commits beim ersten Blick auf ein Repo geholt werden.
+pub const ERSTE_COMMITS: usize = 500;
+
+/// Liest die Vorgeschichte eines Repos und schreibt sie ins Logbuch – einmalig, ohne
+/// doppelte Tage.
+///
+/// Das ist der eine Weg, den **alle** Stellen nehmen, an denen ein Ordner zu einem
+/// Vorhaben kommt: `deuten::anlegen`, `detect::uebernehmen` und das nachträgliche
+/// Anhängen einer Referenz. Bis 0.10 tat es nur die erste; wer sein Vorhaben erst anlegte
+/// und den Ordner danach anhängte, bekam nie eine Historie – ohne Hinweis, dass etwas
+/// fehlt.
+///
+/// Tage, für die es schon eine maschinelle Log-Notiz gibt, werden übersprungen. Damit
+/// darf die Funktion mehrfach laufen: beim zweiten Anhängen desselben Ordners entsteht
+/// nichts Neues, und eine Lücke wird aufgefüllt.
+#[cfg(feature = "native")]
+pub fn historie_uebernehmen(
+    store: &mut crate::store::Store,
+    projekt_id: Ulid,
+    repo: &Path,
+    quelle: Quelle,
+) -> Result<usize> {
+    let commits = log(repo, None, ERSTE_COMMITS)?;
+    if commits.is_empty() {
+        return Ok(0);
+    }
+    let vorhanden: std::collections::HashSet<i64> = store
+        .notizen(projekt_id)?
+        .into_iter()
+        .filter(|n| n.art == Art::Log && matches!(n.quelle, Quelle::Git | Quelle::Import))
+        .map(|n| n.ts / crate::brief::MS_PRO_TAG)
+        .collect();
+
+    let mut geschrieben = 0;
+    for n in verdichten(projekt_id, &commits, quelle) {
+        if vorhanden.contains(&(n.ts / crate::brief::MS_PRO_TAG)) {
+            continue;
+        }
+        store.notiz_speichern(&n)?;
+        geschrieben += 1;
+    }
+    Ok(geschrieben)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +232,56 @@ mod tests {
         assert!(log(t.path(), Some(crate::now_ms() + 60_000), 50)
             .unwrap()
             .is_empty());
+    }
+
+    /// Die Vorgeschichte kommt einmal – auch beim zweiten Aufruf entsteht nichts Neues.
+    ///
+    /// Beide Richtungen zählen. Käme sie nie, bliebe ein nachträglich angehängtes Repo
+    /// ohne Logbuch (der Fehler bis 0.10). Käme sie zweimal, stünde jeder Tag doppelt da,
+    /// sobald der Beobachter dasselbe Repo zum ersten Mal sieht.
+    #[test]
+    #[cfg(feature = "native")]
+    fn historie_kommt_einmal_und_nicht_zweimal() {
+        use crate::model::{Projekt, Vorlage};
+        use crate::store::Store;
+
+        let t = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            Command::new("git")
+                .arg("-C")
+                .arg(t.path())
+                .args(args)
+                .env("GIT_AUTHOR_NAME", "t")
+                .env("GIT_AUTHOR_EMAIL", "t@t")
+                .env("GIT_COMMITTER_NAME", "t")
+                .env("GIT_COMMITTER_EMAIL", "t@t")
+                .output()
+                .unwrap()
+        };
+        if !run(&["init", "-q"]).status.success() {
+            return; // kein git in dieser Umgebung
+        }
+        for i in 0..3 {
+            std::fs::write(t.path().join(format!("datei{i}")), "x").unwrap();
+            run(&["add", "."]);
+            run(&["commit", "-q", "-m", &format!("Wurf {i}")]);
+        }
+
+        let ak = crate::crypto::Key32::random().unwrap();
+        let mut store = Store::open_in_memory(&ak, Ulid::new()).unwrap();
+        let p = Projekt::neu("Mit Repo", Vorlage::Software, crate::now_ms());
+        store.projekt_speichern(&p).unwrap();
+
+        let erste = historie_uebernehmen(&mut store, p.id, t.path(), Quelle::Import).unwrap();
+        assert!(erste > 0, "die Vorgeschichte muss ankommen");
+        let notizen_danach = store.notizen(p.id).unwrap().len();
+
+        let zweite = historie_uebernehmen(&mut store, p.id, t.path(), Quelle::Git).unwrap();
+        assert_eq!(
+            zweite, 0,
+            "derselbe Tag darf kein zweites Mal geschrieben werden"
+        );
+        assert_eq!(store.notizen(p.id).unwrap().len(), notizen_danach);
     }
 
     #[test]

@@ -191,17 +191,16 @@
   }
 
   /**
-   * Der Ordner, auf den der Befund sich bezieht. `befund.quelle` trägt ihn bei einer
-   * Ordner-Quelle als lesbaren Pfad; die Markerdatei gehört genau dorthin.
+   * Der Ordner, auf den der Befund sich bezieht – vom Kern beantwortet (`Befund::ordner`).
+   *
+   * Hier stand bis 0.10 eine eigene Herleitung, die Unterordner oder Unterprojekte
+   * verlangte. Ein flacher Ordner mit ein paar PDFs – der Normalfall für alles außer
+   * Software – galt damit als „kein Ordner“, und daran hingen die Ordner-Referenz, der
+   * Import der Git-Historie und die Markerdatei. Zweimal dieselbe Frage zu beantworten
+   * war der Fehler, nicht die Antwort.
    */
   function ordnerAus(d: Deutung): string | undefined {
-    const bekannt = d.befund.funde.find((f) => f.art === 'schon_bekannt');
-    if (bekannt && bekannt.art === 'schon_bekannt') return bekannt.pfad;
-    // Unterprojekte und Dokumente liegen im gedeuteten Ordner; ist die Quelle keiner,
-    // stehen dort eine Adresse oder eine Dateizahl, und dann gibt es nichts zu markieren.
-    return d.befund.angesehen > 0 || d.befund.funde.some((f) => f.art === 'unterprojekt')
-      ? d.befund.quelle
-      : undefined;
+    return d.ordner;
   }
 
   async function ordnerWaehlen() {

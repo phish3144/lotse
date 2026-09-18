@@ -341,10 +341,7 @@ pub fn uebernehmen(store: &mut Store, k: &Kandidat) -> Result<Projekt> {
     };
     store.referenz_speichern(&Referenz::neu(p.id, typ, &k.pfad, Rolle::Material))?;
     if k.hat_git {
-        let commits = git::log(pfad, None, 500)?;
-        for n in git::verdichten(p.id, &commits, Quelle::Import) {
-            store.notiz_speichern(&n)?;
-        }
+        git::historie_uebernehmen(store, p.id, pfad, Quelle::Import)?;
     }
     store.notiz_speichern(&Notiz::neu(
         p.id,

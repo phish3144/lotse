@@ -416,6 +416,11 @@ export interface Deutung {
   befund: Befund;
   /** Gesetzt, wenn die Quelle schon zu einem Projekt gehört: dann wird angehängt. */
   bekannt?: Projekt;
+  /**
+   * Der Ordner, auf den sich der Befund bezieht – vom Kern beantwortet, nicht hier
+   * hergeleitet. Daran hängen Ordner-Referenz, Git-Historie und Markerdatei.
+   */
+  ordner?: string;
 }
 
 export interface AnlegenAuftrag {
@@ -613,7 +618,10 @@ export const mcp = {
 
 export interface BeobachterStatus {
   laeuft: boolean;
+  /** Suchwurzeln für neue Kandidaten. Darf leer sein. */
   wurzeln: string[];
+  /** Ordner eigener Vorhaben, die auch ohne Suchwurzel beobachtet werden. */
+  projektordner: number;
 }
 
 export interface BeobachterBilanz {

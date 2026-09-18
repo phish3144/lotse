@@ -56,11 +56,31 @@ lotse uebernehmen ~/code/lampe --titel "Lampe ESP32"
 
 ## Beobachter: laufend mitschreiben
 
-Einstellungen → *Ordner* → *Laufend beobachten*. Oder:
+Er läuft von selbst, sobald du entsperrst – dafür musst du nichts einstellen. Anhalten und
+wieder aufnehmen: Einstellungen → *Ordner* → *Laufend beobachten*. Auf der Kommandozeile:
 
 ```bash
 lotse beobachten ~/code      # läuft bis Strg+C
 ```
+
+### Was er beobachtet
+
+Zwei getrennte Dinge:
+
+| | Woher | Braucht eine Einstellung? |
+|---|---|---|
+| **Ordner deiner Vorhaben** | die Ordner- und Repo-Referenzen | nein |
+| **Suchordner** für *neue* Vorhaben | Einstellungen → Ordner | ja, freiwillig |
+
+Das war bis 0.10 eins: ohne Suchordner beobachtete Lotse gar nichts, auch nicht die
+Ordner, die ausdrücklich an einem Vorhaben hingen.
+
+### Die Vorgeschichte
+
+Hängt ein Repo an einem Vorhaben, holt Lotse seine bisherigen Commits **einmal** – beim
+Anlegen aus einem Ordner, beim nachträglichen Anhängen einer Repo-Referenz und beim ersten
+Blick des Beobachters auf ein Repo, das noch keine hat. Tage, für die schon eine Notiz
+steht, werden dabei übersprungen; es entsteht nichts doppelt.
 
 ### Was er schreibt
 

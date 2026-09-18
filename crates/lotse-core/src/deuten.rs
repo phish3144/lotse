@@ -715,10 +715,7 @@ pub fn anlegen(store: &mut Store, auftrag: &Auftrag) -> Result<Bilanz> {
             referenzen += 1;
         }
         if hat_git {
-            let commits = crate::git::log(pf, None, 500)?;
-            for n in crate::git::verdichten(projekt.id, &commits, NotizQuelle::Import) {
-                store.notiz_speichern(&n)?;
-            }
+            crate::git::historie_uebernehmen(store, projekt.id, pf, NotizQuelle::Import)?;
         }
         // Der Marker macht den Ordner wiedererkennbar: beim nächsten Deuten steht
         // »gehört schon dazu« da, statt dass ein zweites Vorhaben entsteht.

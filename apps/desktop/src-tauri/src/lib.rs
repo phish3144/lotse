@@ -191,8 +191,16 @@ fn wiederherstellungscode_pruefen(state: State<AppState>, code: String) -> R<boo
     Ok(lotse_core::crypto::konto_wiederherstellen(&k.header, &parsed).is_ok())
 }
 
+/// Entsperrt das Konto **und** nimmt die Beobachtung wieder auf.
+///
+/// Das Wiederaufnehmen stand bis 0.10 nicht hier, sondern hinter einem Schalter tief in
+/// den Einstellungen – und der verlangte zusätzlich einen Suchordner. Wer seine Vorhaben
+/// per Hineinziehen angelegt hatte, bekam deshalb nie eine Fortschreibung: keine neuen
+/// Commits, keine Dateiänderungen, nichts. Beobachtung ist kein Sonderwunsch, sie ist
+/// der Grund, warum sich das Logbuch von selbst füllt.
 #[tauri::command]
 fn entsperren(
+    app: tauri::AppHandle,
     state: State<AppState>,
     passwort: String,
     desktop_schluessel: Option<String>,
@@ -223,6 +231,15 @@ fn entsperren(
         geraet_id: u.konto.geraet_id,
         geraet_name: u.konto.geraet_name,
     });
+    // Die gespeicherten Suchwurzeln dürfen leer sein: die Ordner der eigenen Vorhaben
+    // werden ohnehin beobachtet. Scheitert der Start, bleibt das Entsperren gültig –
+    // sonst käme man wegen eines fehlenden Ordners nicht mehr an seine Daten.
+    let wurzeln = mit(&state, |s| lotse_core::watcher::wurzeln_laden(&s.store))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    let _ = beobachter_starten(app, state, wurzeln);
     Ok(())
 }
 
@@ -636,6 +653,23 @@ fn referenz_anlegen(
     mit(&state, |s| {
         let r = Referenz::neu(id, typ, ziel, rolle);
         s.store.referenz_speichern(&r)?;
+        // Ein nachträglich angehängtes Repo bringt seine Vorgeschichte mit – derselbe
+        // Weg wie beim Anlegen aus einem Ordner. Vorher blieb das Logbuch leer, und das
+        // sah aus wie ein Fehler: »Ich habe das Repo doch verknüpft, wo ist die
+        // Historie?« Ein Ordner, den es nicht gibt, ist dabei kein Grund zu scheitern:
+        // die Referenz darf trotzdem entstehen.
+        if r.typ == ReferenzTyp::GitRepo {
+            let pfad = std::path::Path::new(&r.ziel);
+            if pfad.join(".git").is_dir() {
+                lotse_core::git::historie_uebernehmen(
+                    &mut s.store,
+                    r.projekt_id,
+                    pfad,
+                    lotse_core::model::Quelle::Import,
+                )
+                .ok();
+            }
+        }
         Ok(r)
     })
 }
@@ -743,6 +777,15 @@ struct Deutung {
     /// Gesetzt, wenn die Quelle schon zu einem Projekt gehört. Dann wird nichts angelegt,
     /// sondern angehängt.
     bekannt: Option<Projekt>,
+    /// Der Ordner, auf den sich der Befund bezieht – vom Kern beantwortet.
+    ///
+    /// Die Oberfläche hat das bis 0.10 selbst hergeleitet und dabei danebengelegen: sie
+    /// verlangte Unterordner oder Unterprojekte. Ein flacher Ordner mit ein paar PDFs –
+    /// der Normalfall für alles außer Software – galt damit als „kein Ordner“, und daran
+    /// hingen die Ordner-Referenz, der Import der Git-Historie und die Markerdatei. Der
+    /// Kern weiß es einfacher (`Befund::ordner`): ist die Quelle ein Ordner, ist das der
+    /// Ordner.
+    ordner: Option<String>,
 }
 
 /// Was in dem einen Feld stand – getippt oder hineingezogen.
@@ -825,7 +868,12 @@ fn deutung_bauen(state: &State<AppState>, q: lotse_core::deuten::Quelle) -> R<De
         lotse_core::deuten::deuten_und_pruefen(&mut s.store, &q, &opt)
     })?;
     gegenseite_anreichern(state, &mut befund);
-    Ok(Deutung { befund, bekannt })
+    let ordner = befund.ordner().map(|s| s.to_string());
+    Ok(Deutung {
+        befund,
+        bekannt,
+        ordner,
+    })
 }
 
 /// Holt, was das Repo über sich selbst sagt, und trägt es in den Befund ein.
@@ -1041,6 +1089,8 @@ async fn datei_waehlen(app: tauri::AppHandle, name: String) -> R<Option<String>>
 struct BeobachterStatus {
     laeuft: bool,
     wurzeln: Vec<String>,
+    /// Wie viele Ordner eigener Vorhaben mitbeobachtet werden – auch ohne Suchwurzel.
+    projektordner: usize,
 }
 
 #[derive(Serialize, Clone)]
@@ -1054,7 +1104,11 @@ struct BeobachterBilanz {
 fn beobachter_status(state: State<AppState>) -> R<BeobachterStatus> {
     let laeuft = sperre(&state.beobachter).is_some();
     let wurzeln = mit(&state, |s| lotse_core::watcher::wurzeln_laden(&s.store))?;
+    let projektordner = mit(&state, |s| s.store.ordner_referenzen())
+        .map(|r| r.len())
+        .unwrap_or(0);
     Ok(BeobachterStatus {
+        projektordner,
         laeuft,
         wurzeln: wurzeln
             .iter()
@@ -1080,9 +1134,10 @@ fn beobachter_starten(
         .map(|w| PathBuf::from(w.trim()))
         .filter(|p| !p.as_os_str().is_empty())
         .collect();
-    if pfade.is_empty() {
-        return Err("Kein Wurzelordner angegeben".into());
-    }
+    // Ohne Suchwurzel ist die Beobachtung nicht sinnlos, sondern das Übliche: die Ordner
+    // der eigenen Vorhaben werden ohnehin beobachtet. Eine leere Liste hier abzulehnen
+    // war der Grund, warum niemand die Beobachtung einschalten konnte, der seine
+    // Vorhaben per Hineinziehen angelegt hat.
     for p in &pfade {
         if !p.is_dir() {
             return Err(format!("Kein Ordner: {}", p.display()));
@@ -1203,8 +1258,12 @@ fn beobachter_starten(
     *handle = Some(BeobachterHandle { stop });
     drop(handle);
 
+    let projektordner = mit(&state, |s| s.store.ordner_referenzen())
+        .map(|r| r.len())
+        .unwrap_or(0);
     Ok(BeobachterStatus {
         laeuft: true,
+        projektordner,
         wurzeln: pfade
             .iter()
             .map(|p| p.to_string_lossy().to_string())

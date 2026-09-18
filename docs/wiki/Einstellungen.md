@@ -24,17 +24,27 @@ irgendetwas entschlüsselt ist, und soll trotzdem schon richtig aussehen.
 
 ## Ordner
 
-Welche Wurzelordner Lotse durchsucht und beobachtet.
+Hier stehen zwei verschiedene Dinge, und sie hängen **nicht** voneinander ab.
+
+**Die Ordner deiner Vorhaben** werden immer beobachtet – ohne Einstellung. Wer einen
+Ordner an ein Vorhaben gehängt hat, hat damit gesagt, dass er dazugehört. Die Beobachtung
+nimmt ihre Arbeit auf, sobald du entsperrst.
+
+**Ein Suchordner** kommt nur dazu, wenn Lotse dort auch nach *neuen* Vorhaben sehen soll.
+Die Funde landen in der Hafeneinfahrt, übernommen wird nichts von allein.
 
 | Schalter | Was er tut |
 |---|---|
-| **Ordner wählen …** | Öffnet den Auswahldialog des Systems und merkt den Ordner als Wurzel. |
+| **Ordner wählen …** | Öffnet den Auswahldialog des Systems und merkt den Ordner als Suchordner. |
 | **Durchsuchen** | Führt einen Scan aus und legt Funde in der Hafeneinfahrt ab. Legt nichts von selbst an. |
-| **Laufend beobachten** | Startet oder beendet den Ordner-Beobachter. |
+| **Laufend beobachten** | Hält die Beobachtung an oder nimmt sie wieder auf. Braucht keinen Suchordner. |
 
-Läuft der Beobachter, steht darunter, welche Wurzeln er beobachtet. Er sammelt nur Pfade
-und Zeitpunkte, **nie Inhalte**; `.env`, Schlüssel und Zertifikate stehen auf einer
-festen Ausschlussliste ([[Erkennungsregeln]]).
+Bis 0.10 war beides ein Schalter: ohne Suchordner ließ sich die Beobachtung gar nicht
+einschalten, und sie startete nach jedem Programmstart nicht von selbst. Wer seine
+Vorhaben per Hineinziehen angelegt hatte, bekam deshalb nie neue Commits ins Logbuch.
+
+Der Beobachter sammelt nur Pfade und Zeitpunkte, **nie Inhalte**; `.env`, Schlüssel und
+Zertifikate stehen auf einer festen Ausschlussliste ([[Erkennungsregeln]]).
 
 > **Nur in der Desktop-App.** Im Browser hat Lotse keinen Zugriff auf deine Ordner. Der
 > Reiter zeigt dort einen Hinweis statt der Schalter.

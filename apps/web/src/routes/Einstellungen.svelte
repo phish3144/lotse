@@ -120,11 +120,11 @@
         await beobachter.stoppen();
         meldungen.zeigen('Beobachtung angehalten.');
       } else {
+        // Ohne Suchordner ist die Beobachtung nicht sinnlos: die Ordner der eigenen
+        // Vorhaben werden ohnehin mitbeobachtet. Hier stand vorher ein Abbruch mit
+        // »Erst einen Ordner wählen«, und damit konnte niemand die Beobachtung
+        // einschalten, der seine Vorhaben per Hineinziehen angelegt hat.
         const wurzeln = wurzel.trim() ? [wurzel.trim()] : (beoStatus?.wurzeln ?? []);
-        if (wurzeln.length === 0) {
-          meldungen.zeigen('Erst einen Ordner wählen.', 'fehler');
-          return;
-        }
         await beobachter.starten(wurzeln);
         meldungen.zeigen('Beobachtung läuft.');
       }
@@ -745,8 +745,14 @@
           Nur Namen und Zeiten, keine Inhalte; <code>.env</code>, Schlüssel und Zertifikate stehen auf einer festen
           Ausschlussliste.
         </p>
+        <p class="hinweis">
+          Läuft von selbst, sobald du entsperrst. Beobachtet werden
+          {#if beoStatus}<strong>{beoStatus.projektordner}</strong>{:else}die{/if}
+          Ordner deiner Vorhaben – dafür braucht es keinen Suchordner. Ein Suchordner kommt
+          nur dazu, wenn Lotse dort auch nach <em>neuen</em> Vorhaben sehen soll.
+        </p>
         {#if beoStatus && beoStatus.wurzeln.length > 0}
-          <p class="mono klein">{beoStatus.wurzeln.join(' · ')}</p>
+          <p class="mono">Suchordner: {beoStatus.wurzeln.join(' · ')}</p>
         {/if}
       </div>
       <button type="button" class:primaer={!beoStatus?.laeuft} onclick={beobachtenUmschalten}>
@@ -755,6 +761,11 @@
     </div>
     {#if beoStatus?.laeuft}
       <p class="ergebnis">Läuft. Neue Einträge erscheinen von selbst im Logbuch.</p>
+    {:else}
+      <p class="ergebnis fehler">
+        Angehalten. Solange nichts läuft, kommen keine neuen Commits und keine
+        Dateiänderungen ins Logbuch.
+      </p>
     {/if}
   {:else}
     <p class="nur-desktop">Nur in der Desktop-App: der Browser hat keinen Zugriff auf deine Ordner.</p>
