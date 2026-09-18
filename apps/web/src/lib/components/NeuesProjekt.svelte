@@ -17,6 +17,7 @@
   import { datenVersion } from '../data/version.svelte';
   import {
     deuten,
+    ki,
     system,
     type Befund,
     type Deutung,
@@ -43,6 +44,49 @@
   let vorlage: VorlagenId = $state('generisch');
   let kurs = $state('');
   let tags: string[] = $state([]);
+
+  // Deuten durch die KI: der Schritt, der aus einem Ordnernamen ein beschriebenes
+  // Vorhaben macht. Erst der Text zum Ansehen, dann das Senden – dieselbe Regel wie
+  // überall sonst: nichts verlässt das Gerät, bevor es jemand gelesen hat.
+  let kiText: string | null = $state(null);
+  let kiLaeuft = $state(false);
+  let kiFaeden: string[] = $state([]);
+  let kiFehler = $state('');
+  /** Kann hier überhaupt gedeutet werden? Nur bei einem Ordner, und nur mit Kern. */
+  const kiMoeglich = $derived(echteDaten && !!ordnerPfad);
+
+  async function kiVorbereiten() {
+    if (!ordnerPfad) return;
+    kiFehler = '';
+    kiLaeuft = true;
+    try {
+      kiText = await ki.ordnerText(ordnerPfad);
+    } catch (e) {
+      kiFehler = e instanceof Error ? e.message : String(e);
+    } finally {
+      kiLaeuft = false;
+    }
+  }
+
+  async function kiSenden() {
+    if (!kiText) return;
+    kiFehler = '';
+    kiLaeuft = true;
+    try {
+      const d = await ki.vorhabenDeuten(kiText);
+      // Übernommen wird nur, was auch etwas sagt. Ein leeres Feld überschreibt nichts:
+      // sonst wäre ein wortkarges Modell schlimmer als gar keines.
+      if (d.titel) titel = d.titel;
+      if (d.kurs) kurs = d.kurs;
+      if (d.tags.length) tags = [...new Set([...tags, ...d.tags])];
+      kiFaeden = d.offene_faeden;
+      kiText = null;
+    } catch (e) {
+      kiFehler = e instanceof Error ? e.message : String(e);
+    } finally {
+      kiLaeuft = false;
+    }
+  }
   /** Häkchen je Fund, alle vorangekreuzt. */
   let gewaehlt: Record<string, boolean> = $state({});
   let laeuft = $state(false);
@@ -251,6 +295,7 @@
         remote: remote && gewaehlt[schluessel(remote)] ? remote.url : undefined,
         startseite: startseite && gewaehlt[schluessel(startseite)] ? startseite.url : undefined,
         tags,
+        offene_faeden: kiFaeden,
         unterprojekte: gewaehltePfade(unterprojekte),
         dokumente: gewaehltePfade(dokumente),
         an_projekt: bekannt?.id,
@@ -377,6 +422,52 @@
             <textarea bind:value={kurs} rows="2" placeholder="Worum geht es? Was ist das Ziel?"></textarea>
           </label>
 
+          {#if kiMoeglich}
+            <div class="deuten-ki">
+              {#if kiText}
+                <p class="hinweis">
+                  <strong>Das geht an das Modell</strong> – und nichts sonst. Keine
+                  Dateiinhalte außer der README.
+                </p>
+                <pre class="ki-text">{kiText}</pre>
+                <div class="ki-knoepfe">
+                  <button type="button" onclick={() => (kiText = null)}>Doch nicht</button>
+                  <button type="button" class="primaer" onclick={kiSenden} disabled={kiLaeuft}>
+                    {kiLaeuft ? 'Läuft …' : 'Senden'}
+                  </button>
+                </div>
+              {:else if kiFaeden.length}
+                <p class="hinweis">
+                  <strong>Offene Fäden aus dem Ordner</strong> – sie landen im Logbuch:
+                </p>
+                <ul class="ki-faeden">
+                  {#each kiFaeden as f, i (f)}
+                    <li>
+                      {f}
+                      <button
+                        type="button"
+                        class="tag"
+                        title="Weglassen"
+                        onclick={() => (kiFaeden = kiFaeden.filter((_, j) => j !== i))}>×</button
+                      >
+                    </li>
+                  {/each}
+                </ul>
+              {:else}
+                <button type="button" onclick={kiVorbereiten} disabled={kiLaeuft}>
+                  {kiLaeuft ? 'Sehe nach …' : 'Von der KI deuten lassen'}
+                </button>
+                <span class="hinweis klein">
+                  Liest README, Dateinamen und Erkennungsmarken und schlägt Titel, Kurs,
+                  Themen und offene Fäden vor. Du siehst den Text vorher.
+                </span>
+              {/if}
+              {#if kiFehler}
+                <p class="hinweis fehler">{kiFehler}</p>
+              {/if}
+            </div>
+          {/if}
+
           {#if tags.length}
             <p class="tags">
               <span class="hinweis klein">Themen von der Gegenseite:</span>
@@ -501,6 +592,37 @@
 {/if}
 
 <style>
+  .deuten-ki {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    background: var(--ground-2, transparent);
+  }
+  .ki-text {
+    max-height: 14rem;
+    overflow: auto;
+    margin: 0;
+    padding: 0.6rem;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .ki-knoepfe {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .ki-faeden {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.92rem;
+  }
   .ueberlagerung {
     position: fixed;
     inset: 0;

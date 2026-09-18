@@ -250,7 +250,10 @@ Siehe [[Gegenseite]] und [[Kalender]].
 | `ki_modelle` | `basis_url` | Modelle eines Ziels, damit niemand einen Namen abtippen muss. |
 | `ki_anfrage_text` | `projekt_id` | **Genau der Text, der gesendet würde** – die Oberfläche zeigt ihn, bevor etwas das Gerät verlässt. |
 | `ki_kurs_text` | `projekt_id` | Dasselbe für den Kurs-Vorschlag: Name, Erkennungsmarken, README und Dateinamen des angehängten Ordners. **Keine Dateiinhalte außer der README.** Fehlt der Ordner, ist das ein Fehler und kein leerer Text – ein Kurs aus dem Titel allein wäre geraten. |
-| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. `zweck` ist `brief_verdichten`, `datei_deuten` oder `kurs_vorschlagen`. |
+| `ki_ordner_text` | `pfad` | Dasselbe für einen Ordner, den es als Vorhaben noch **nicht** gibt – der Text, den das Deuten beim Anlegen senden würde. |
+| `ki_vorhaben_deuten` | `eingabe` | Sendet diesen Text und liefert Titel, Kurs, Themen und offene Fäden. Bekommt den Text, nicht den Pfad: wer sieht, was gesendet wird, soll sicher sein, dass genau das gesendet wurde. |
+| `ki_ablehnen` | `abgelehnt` | Merkt »nicht mehr fragen« – oder nimmt es zurück. |
+| `ki_verdichten` | `zweck`, `eingabe` | Die Anfrage. `zweck` ist `brief_verdichten`, `datei_deuten`, `kurs_vorschlagen` oder `vorhaben_deuten`. |
 | `ki_verbrauch` | – | Zähler und die letzten Protokolleinträge. |
 | `ki_verbrauch_loeschen` | – | Was Lotse über den eigenen Gebrauch führt, muss man auch loswerden können. |
 | `datei_auszug` | `pfad` | Macht **eine** ausdrücklich gewählte Datei auf. Gespeichert wird dabei nichts. |

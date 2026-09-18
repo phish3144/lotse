@@ -530,6 +530,14 @@ pub struct Auftrag {
     /// Abgehakte Dokumente – Referenzen am Hauptvorhaben.
     #[serde(default)]
     pub dokumente: Vec<String>,
+    /// Offene Fäden, die beim Deuten sichtbar wurden – je einer wird eine Notiz.
+    ///
+    /// Sie kommen von außen und nicht aus dem Kern, weil sie eine Entscheidung sind: wer
+    /// sie nicht will, schickt sie nicht mit. Beim Ordner-Import sind sie die eigentliche
+    /// Ausbeute – vorher stand dort ein einziger Faden, der den Menschen aufforderte, den
+    /// Kurs selbst zu schreiben.
+    #[serde(default)]
+    pub offene_faeden: Vec<String>,
     /// Statt anzulegen an dieses Vorhaben anhängen.
     pub an_projekt: Option<Ulid>,
 }
@@ -564,6 +572,9 @@ impl Auftrag {
                 _ => None,
             }),
             tags: v.map(|v| v.tags.clone()).unwrap_or_default(),
+            // Der Befund allein kennt keine offenen Fäden: die entstehen erst beim
+            // Deuten durch ein Modell, und das ist eine eigene Entscheidung.
+            offene_faeden: Vec::new(),
             unterprojekte: befund
                 .funde
                 .iter()
@@ -686,6 +697,23 @@ pub fn anlegen(store: &mut Store, auftrag: &Auftrag) -> Result<Bilanz> {
             p
         }
     };
+
+    // Offene Fäden aus dem Deuten. Sie stehen vor den Referenzen, weil sie das sind, was
+    // ein Mensch beim nächsten Mal sucht – nicht der Pfad.
+    for faden in auftrag
+        .offene_faeden
+        .iter()
+        .map(|f| f.trim())
+        .filter(|f| !f.is_empty())
+    {
+        store.notiz_speichern(&Notiz::neu(
+            projekt.id,
+            NotizQuelle::Import,
+            Art::Offen,
+            faden,
+            naechster(),
+        ))?;
+    }
 
     // Was schon am Vorhaben hängt, wird nicht ein zweites Mal angelegt. Beim Anhängen an
     // ein bekanntes Vorhaben lag der Ordner sonst jedes Mal erneut darin.
@@ -1036,6 +1064,63 @@ mod tests {
             .count();
         assert_eq!(rust, 1, "einmal genügt: {:?}", b.projekt.tags);
         assert!(b.projekt.tags.iter().any(|t| t == "tauri"));
+    }
+
+    /// Ein gedeuteter Ordner bringt Inhalt mit, keine Hausaufgabe.
+    ///
+    /// Vorher war die ganze Ausbeute des Einlesens ein offener Faden »Kurs festlegen:
+    /// worum geht es, was ist das Ziel?« – das Programm reichte die Arbeit zurück. Mit
+    /// einem Kurs und offenen Fäden aus dem Deuten entfällt die Aufforderung, und was
+    /// dasteht, ist das, was beim nächsten Mal im Weg steht.
+    #[test]
+    fn gedeutetes_vorhaben_bringt_faeden_statt_einer_aufforderung() {
+        let mut store = leerer_store();
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Heizungssteuerung".into(),
+                kurs: Some("Die Gastherme über einen ESP32 fernsteuern.".into()),
+                offene_faeden: vec![
+                    "Passendes Relais für 230 V wählen.".into(),
+                    "  ".into(), // Leeres wird nicht zur Notiz
+                    "Fühler kalibrieren.".into(),
+                ],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let notizen = store.notizen(b.projekt.id).unwrap();
+        let faeden: Vec<&str> = notizen
+            .iter()
+            .filter(|n| n.art == Art::Offen)
+            .map(|n| n.text.as_str())
+            .collect();
+        assert_eq!(faeden.len(), 2, "leere Fäden zählen nicht: {faeden:?}");
+        assert!(faeden.iter().any(|f| f.contains("Relais")));
+        assert!(
+            !faeden.iter().any(|f| f.contains("Kurs festlegen")),
+            "mit einem Kurs braucht es keine Aufforderung: {faeden:?}"
+        );
+    }
+
+    /// Ohne Kurs bleibt die Aufforderung – sie ist dann berechtigt.
+    #[test]
+    fn ohne_kurs_bleibt_die_aufforderung() {
+        let mut store = leerer_store();
+        let b = anlegen(
+            &mut store,
+            &Auftrag {
+                titel: "Namenlos".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(store
+            .notizen(b.projekt.id)
+            .unwrap()
+            .iter()
+            .any(|n| n.text.contains("Kurs festlegen")));
     }
 
     #[test]

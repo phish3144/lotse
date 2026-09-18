@@ -927,6 +927,7 @@ fn aus_befund_anlegen(
         remote: auftrag.remote,
         startseite: auftrag.startseite,
         tags: auftrag.tags,
+        offene_faeden: auftrag.offene_faeden,
         unterprojekte: auftrag.unterprojekte,
         dokumente: auftrag.dokumente,
         an_projekt: an,
@@ -946,6 +947,8 @@ struct AnlegenAuftrag {
     startseite: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
+    #[serde(default)]
+    offene_faeden: Vec<String>,
     unterprojekte: Vec<String>,
     dokumente: Vec<String>,
     an_projekt: Option<String>,
@@ -1435,6 +1438,12 @@ const META_KI_URL: &str = "ki_basis_url";
 const META_KI_MODELL: &str = "ki_modell";
 const META_KI_EINTRAG: &str = "ki_schluessel_eintrag";
 const META_KI_FELD: &str = "ki_schluessel_feld";
+/// Hat jemand die Einrichtung ausdrücklich abgelehnt? Dann wird nicht mehr gefragt.
+///
+/// Der Unterschied zu »noch nicht eingerichtet« ist der ganze Punkt: bis 0.10 lag die KI
+/// hinter den Einstellungen und wurde nie angeboten, also hat sie schlicht niemand
+/// benutzt. Angeboten wird jetzt bei jedem Start – aber ein Nein gilt.
+const META_KI_ABGELEHNT: &str = "ki_nicht_fragen";
 
 #[derive(Serialize)]
 struct KiStatus {
@@ -1444,6 +1453,10 @@ struct KiStatus {
     schluessel_feld: Option<String>,
     /// Antwortet unter der üblichen Adresse ein Ollama? Dann geht es ohne Schlüssel.
     ollama_da: bool,
+    /// Steht ein Modell fest und ist es erreichbar genug, um es anzubieten?
+    eingerichtet: bool,
+    /// Wurde die Einrichtung abgelehnt? Dann nicht mehr von selbst fragen.
+    abgelehnt: bool,
 }
 
 /// Liest den Schlüssel aus dem Tresor. Der Tresor-Zugriff gehört in die Hülle;
@@ -1486,18 +1499,41 @@ fn ki_status(state: State<AppState>) -> R<KiStatus> {
     // Ein kurzer Blick, ob lokal etwas antwortet – damit die Oberfläche sagen kann
     // „Ollama läuft" statt den Nutzer raten zu lassen.
     let ollama_da = lotse_core::ai::erreichbar(lotse_core::ai::OLLAMA_URL);
-    let (eintrag, feld) = mit(&state, |s| {
+    let (eintrag, feld, abgelehnt) = mit(&state, |s| {
         Ok((
             s.store.meta_get(META_KI_EINTRAG)?,
             s.store.meta_get(META_KI_FELD)?,
+            s.store.meta_get(META_KI_ABGELEHNT)?.as_deref() == Some("ja"),
         ))
     })?;
+    // Eingerichtet heißt: ein Modell steht fest und es gibt einen Weg dorthin – lokal
+    // ohne Schlüssel, sonst mit einem hinterlegten. Alles andere würde beim ersten
+    // Versuch mit einer Fehlermeldung enden, und das ist keine Einrichtung.
+    let eingerichtet = !ziel.modell.trim().is_empty()
+        && (ziel.lokal() || eintrag.as_deref().is_some_and(|e| !e.is_empty()));
     Ok(KiStatus {
         basis_url: ziel.basis_url,
         modell: ziel.modell,
         schluessel_eintrag: eintrag,
         schluessel_feld: feld,
         ollama_da,
+        eingerichtet,
+        abgelehnt,
+    })
+}
+
+/// Merkt, dass jemand die KI-Einrichtung nicht will – oder nimmt das zurück.
+///
+/// »Nicht mehr fragen« ist eine Antwort, kein Versehen: danach steht die Einrichtung nur
+/// noch in den Einstellungen. Zurücknehmen geht ebenda.
+#[tauri::command]
+fn ki_ablehnen(state: State<AppState>, abgelehnt: bool) -> R<()> {
+    mit(&state, |s| {
+        if abgelehnt {
+            s.store.meta_set(META_KI_ABGELEHNT, "ja")
+        } else {
+            s.store.meta_loeschen(META_KI_ABGELEHNT)
+        }
     })
 }
 
@@ -1536,6 +1572,66 @@ fn ki_modelle(state: State<AppState>, basis_url: String) -> R<Vec<String>> {
     lotse_core::ai::modelle(&ziel).map_err(fehler)
 }
 
+/// Sammelt, was über einen Ordner gesagt werden darf: Name, Erkennungsmarken, README und
+/// Dateinamen. **Keine Dateiinhalte** außer der README.
+///
+/// Eine Stelle für beide Zwecke – den Kurs eines bestehenden Vorhabens und das Deuten
+/// eines Ordners, den es noch nicht gibt. Zweimal dasselbe zu sammeln hieße, dass die
+/// beiden Wege irgendwann Verschiedenes senden, ohne dass es jemand merkt.
+fn ordner_anfrage(titel: &str, pfad: &std::path::Path) -> R<String> {
+    if !pfad.is_dir() {
+        return Err(format!("Den Ordner {} gibt es nicht (mehr).", pfad.display()));
+    }
+    // Ohne Sperre lesen: das geht auf die Platte und kann dauern.
+    let erkannt = lotse_core::detect::erkenne(pfad);
+    let marken = erkannt.as_ref().map(|k| k.marken.clone()).unwrap_or_default();
+    let readme = erkannt.as_ref().and_then(|k| k.readme.clone());
+    let dateien = ordner_dateinamen(pfad);
+    Ok(lotse_core::ai::kurs_anfrage_text(
+        titel,
+        &marken,
+        readme.as_deref(),
+        &dateien,
+    ))
+}
+
+/// Der Text, den das Deuten eines Ordners senden würde – zum Ansehen, bevor er geht.
+///
+/// Das ist die Stelle, an der die KI wirklich etwas abnimmt: ohne sie liefert das
+/// Einlesen den Ordnernamen als Titel und einen offenen Faden, der den Menschen
+/// auffordert, den Kurs selbst zu schreiben.
+#[tauri::command]
+fn ki_ordner_text(pfad: String) -> R<String> {
+    let p = PathBuf::from(&pfad);
+    let name = p
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| pfad.clone());
+    ordner_anfrage(&name, &p)
+}
+
+/// Deutet einen Ordner zu Titel, Kurs, Tags und offenen Fäden.
+///
+/// Bekommt den Text, den die Oberfläche gezeigt hat – nicht den Pfad. Wer zusieht, was
+/// gesendet wird, soll auch sicher sein, dass genau das gesendet wurde.
+#[tauri::command]
+fn ki_vorhaben_deuten(
+    state: State<AppState>,
+    eingabe: String,
+) -> R<lotse_core::ai::Vorhabendeutung> {
+    let zweck = lotse_core::ai::Zweck::VorhabenDeuten;
+    let ziel = mit(&state, ki_ziel)?;
+    let antwort = lotse_core::ai::verdichten(&ziel, zweck, &eingabe).map_err(fehler)?;
+    ki_buchen(
+        &state,
+        zweck,
+        &ziel,
+        eingabe.chars().count(),
+        antwort.verbrauch,
+    )?;
+    lotse_core::ai::vorhabendeutung_lesen(&antwort.text).map_err(fehler)
+}
+
 /// Baut den Text für den Kurs-Vorschlag: der eine Satz, den keine Regel schreiben kann.
 ///
 /// Gelesen wird der Ordner, der als Referenz am Vorhaben hängt – Name, Erkennungsmarken,
@@ -1564,23 +1660,7 @@ fn ki_kurs_text(state: State<AppState>, projekt_id: String) -> R<String> {
                     zu deuten – ein Kurs aus dem Titel allein wäre geraten."
             .into());
     };
-    let pfad = PathBuf::from(&ordner);
-    if !pfad.is_dir() {
-        return Err(format!("Den Ordner {ordner} gibt es nicht (mehr)."));
-    }
-
-    // Ohne Sperre lesen: das geht auf die Platte und kann dauern.
-    let erkannt = lotse_core::detect::erkenne(&pfad);
-    let marken = erkannt.as_ref().map(|k| k.marken.clone()).unwrap_or_default();
-    let readme = erkannt.as_ref().and_then(|k| k.readme.clone());
-    let dateien = ordner_dateinamen(&pfad);
-
-    Ok(lotse_core::ai::kurs_anfrage_text(
-        &titel,
-        &marken,
-        readme.as_deref(),
-        &dateien,
-    ))
+    ordner_anfrage(&titel, &PathBuf::from(&ordner))
 }
 
 /// Dateinamen der obersten Ebene, sortiert. Versteckte Dateien und die üblichen
@@ -3093,6 +3173,9 @@ pub fn run() {
             ki_modelle,
             ki_anfrage_text,
             ki_kurs_text,
+            ki_ablehnen,
+            ki_ordner_text,
+            ki_vorhaben_deuten,
             ki_verdichten,
             ki_verbrauch,
             ki_verbrauch_loeschen,

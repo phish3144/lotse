@@ -207,6 +207,10 @@ export interface KiStatus {
   schluessel_feld?: string;
   /** Antwortet unter der üblichen Adresse ein Ollama? Dann geht es ohne Schlüssel. */
   ollama_da: boolean;
+  /** Steht ein Modell fest und gibt es einen Weg dorthin? */
+  eingerichtet: boolean;
+  /** Wurde die Einrichtung abgelehnt? Dann nicht mehr von selbst fragen. */
+  abgelehnt: boolean;
 }
 
 /** Die üblichen Ziele. Alles andere ist dieselbe Schnittstelle mit anderer Adresse. */
@@ -225,6 +229,8 @@ export const KI_ZIELE = [
  */
 export const ki = {
   status: () => invoke<KiStatus>('ki_status'),
+  /** »Nicht mehr fragen« – und das Zurücknehmen davon. */
+  ablehnen: (abgelehnt: boolean) => invoke<void>('ki_ablehnen', { abgelehnt }),
   zielSetzen: (basisUrl: string, modell: string, schluesselEintrag: string, schluesselFeld: string) =>
     invoke<void>('ki_ziel_setzen', { basisUrl, modell, schluesselEintrag, schluesselFeld }),
   modelle: (basisUrl: string) => invoke<string[]>('ki_modelle', { basisUrl }),
@@ -237,7 +243,22 @@ export const ki = {
    * `provider.kiVerdichten(text, 'kurs_vorschlagen')`.
    */
   kursText: (projektId: string) => invoke<string>('ki_kurs_text', { projektId }),
+  /**
+   * Derselbe Text für einen Ordner, den es als Vorhaben noch nicht gibt – das ist der
+   * Moment, in dem die KI wirklich etwas abnimmt.
+   */
+  ordnerText: (pfad: string) => invoke<string>('ki_ordner_text', { pfad }),
+  /** Sendet den angezeigten Text und liefert Titel, Kurs, Tags und offene Fäden. */
+  vorhabenDeuten: (eingabe: string) => invoke<Vorhabendeutung>('ki_vorhaben_deuten', { eingabe }),
 };
+
+/** Was aus dem Deuten eines Ordners herauskommt. Leere Felder sind leer, nicht geraten. */
+export interface Vorhabendeutung {
+  titel: string;
+  kurs: string;
+  tags: string[];
+  offene_faeden: string[];
+}
 
 export interface KiProtokollEintrag {
   ts: number;
@@ -431,6 +452,8 @@ export interface AnlegenAuftrag {
   remote?: string;
   startseite?: string;
   tags: string[];
+  /** Offene Fäden aus dem Deuten – je einer wird eine Notiz. */
+  offene_faeden?: string[];
   unterprojekte: string[];
   dokumente: string[];
   /** Statt anzulegen an dieses Projekt anhängen. */

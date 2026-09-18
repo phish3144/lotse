@@ -1,7 +1,9 @@
 <script lang="ts">
   import { auffaelligkeit, type Auffaelligkeit } from '../lib/brief';
   import ProjektKarte from '../lib/components/ProjektKarte.svelte';
-  import { provider } from '../lib/data/store';
+  import { echteDaten, provider } from '../lib/data/store';
+  import { ki, type KiStatus } from '../lib/data/tauri';
+  import KiEinrichten from '../lib/components/KiEinrichten.svelte';
   import { datenVersion } from '../lib/data/version.svelte';
   import { erfassung } from '../lib/erfassung.svelte';
   import { meldungen } from '../lib/meldung.svelte';
@@ -67,6 +69,16 @@
     }
   }
 
+  // Der Stand der KI-Einrichtung. Im Browser gibt es keinen Kern, also auch keine Frage.
+  let kiStatus: KiStatus | null = $state(null);
+  let kiErledigt = $state(false);
+  $effect(() => {
+    if (!echteDaten) return;
+    ki.status()
+      .then((s) => (kiStatus = s))
+      .catch(() => {});
+  });
+
   function sortiertNachAuffaelligkeit(liste: Eintrag[]): Eintrag[] {
     return [...liste].sort(
       (a, b) => GRAD_RANG[a.grad] - GRAD_RANG[b.grad] || b.projekt.zuletzt_beruehrt.localeCompare(a.projekt.zuletzt_beruehrt),
@@ -77,6 +89,18 @@
 <svelte:head><title>Hafen · Lotse</title></svelte:head>
 
 <NeuesProjekt bind:offen={neuesProjektOffen} />
+
+<!-- Einmal beim Start fragen, statt die Einrichtung in den Einstellungen zu verstecken.
+     Wer »Nicht mehr fragen« wählt, wird nicht mehr gefragt – das merkt sich der Kern. -->
+{#if kiStatus && !kiStatus.eingerichtet && !kiStatus.abgelehnt && !kiErledigt}
+  <KiEinrichten
+    status={kiStatus}
+    fertig={(neu) => {
+      kiErledigt = true;
+      if (neu) kiStatus = neu;
+    }}
+  />
+{/if}
 
 <div class="seiten-kopf">
   <h1>Hafen</h1>

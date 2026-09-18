@@ -87,15 +87,25 @@ pub enum Zweck {
     /// meistens eine Überschrift, kein Ziel. Den einen Satz, der in drei Monaten sagt,
     /// was man eigentlich wollte, kann keine Regel schreiben.
     KursVorschlagen,
+    /// Aus einem Ordner ein beschriebenes Vorhaben machen: Titel, Kurs, Tags und die
+    /// offenen Fäden, die schon dastehen.
+    ///
+    /// `KursVorschlagen` liefert einen Satz. Das genügt nicht: was beim Einlesen fehlt,
+    /// ist alles andere auch. Der Titel ist bis dahin der Ordnername
+    /// (»heizungssteuerung-esp32«), und als einzige Ausbeute steht ein offener Faden da,
+    /// der den Menschen auffordert, den Kurs selbst zu schreiben. Diese Aufgabe ersetzt
+    /// beides.
+    VorhabenDeuten,
 }
 
 impl Zweck {
     /// Alle Zwecke. `parse` läuft darüber – eine Liste, die von Hand nachgezogen werden
     /// muss, hat schon einmal dazu geführt, dass ein Zweck nicht mehr ankam.
-    pub const ALLE: [Zweck; 3] = [
+    pub const ALLE: [Zweck; 4] = [
         Zweck::BriefVerdichten,
         Zweck::DateiDeuten,
         Zweck::KursVorschlagen,
+        Zweck::VorhabenDeuten,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -103,6 +113,7 @@ impl Zweck {
             Zweck::BriefVerdichten => "brief_verdichten",
             Zweck::DateiDeuten => "datei_deuten",
             Zweck::KursVorschlagen => "kurs_vorschlagen",
+            Zweck::VorhabenDeuten => "vorhaben_deuten",
         }
     }
 
@@ -116,6 +127,7 @@ impl Zweck {
             Zweck::BriefVerdichten => "Brief verdichten",
             Zweck::DateiDeuten => "Datei deuten",
             Zweck::KursVorschlagen => "Kurs vorschlagen",
+            Zweck::VorhabenDeuten => "Vorhaben deuten",
         }
     }
 
@@ -144,8 +156,80 @@ impl Zweck {
                  Anrede. Nenne nur, was in der Eingabe steht. Nennt sie kein Ziel, schreibe \
                  nur, worum es geht – erfinde keines."
             }
+            Zweck::VorhabenDeuten => {
+                "Du liest, was in einem Projektordner liegt, und beschreibst daraus das \
+                 Vorhaben. Antworte ausschließlich mit einem JSON-Objekt, ohne \
+                 Code-Zaun und ohne Text davor oder danach, mit genau diesen Schlüsseln: \
+                 \"titel\" (ein lesbarer Name in Worten, nicht der Ordnername mit \
+                 Bindestrichen, höchstens 60 Zeichen), \"kurs\" (ein Satz: worum es \
+                 geht und was das Ziel ist, höchstens 200 Zeichen), \"tags\" (bis zu \
+                 fünf einzelne Wörter, klein geschrieben) und \"offene_faeden\" (bis \
+                 zu fünf Sätze über das, was laut Eingabe noch offen ist – jeder eine \
+                 Frage oder ein Schritt, der beim nächsten Mal im Weg steht). Alles auf \
+                 Deutsch. Nenne nur, was in der Eingabe steht; erfinde nichts. Ist etwas \
+                 nicht zu erkennen, lass das Feld leer beziehungsweise die Liste leer – \
+                 rate nicht."
+            }
         }
     }
+}
+
+/// Was aus `Zweck::VorhabenDeuten` herauskommt.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vorhabendeutung {
+    #[serde(default)]
+    pub titel: String,
+    #[serde(default)]
+    pub kurs: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub offene_faeden: Vec<String>,
+}
+
+/// Liest die Antwort auf `Zweck::VorhabenDeuten`.
+///
+/// Modelle halten sich nicht immer an »nur JSON«: manche legen einen Code-Zaun darum,
+/// manche einen Satz davor. Das hier fischt das erste Objekt heraus, statt an einem
+/// Backtick zu scheitern – und liefert einen Fehler mit dem Anfang der Antwort, wenn
+/// wirklich keines da ist. Eine Meldung ohne den Text wäre bei einem fremden Modell
+/// nicht zu beheben.
+pub fn vorhabendeutung_lesen(text: &str) -> Result<Vorhabendeutung> {
+    let roh = text.trim();
+    let anfang = roh.find('{');
+    let ende = roh.rfind('}');
+    let kern = match (anfang, ende) {
+        (Some(a), Some(e)) if e > a => &roh[a..=e],
+        _ => {
+            return Err(Error::Invalid(format!(
+                "Das Modell hat kein JSON geliefert. Anfang der Antwort: »{}«",
+                roh.chars().take(120).collect::<String>()
+            )))
+        }
+    };
+    let mut d: Vorhabendeutung = serde_json::from_str(kern).map_err(|e| {
+        Error::Invalid(format!(
+            "Die Antwort des Modells war kein brauchbares JSON ({e}). Anfang: »{}«",
+            kern.chars().take(120).collect::<String>()
+        ))
+    })?;
+    d.titel = d.titel.trim().chars().take(60).collect();
+    d.kurs = d.kurs.trim().chars().take(200).collect();
+    d.tags = d
+        .tags
+        .into_iter()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .take(5)
+        .collect();
+    d.offene_faeden = d
+        .offene_faeden
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .take(5)
+        .collect();
+    Ok(d)
 }
 
 /// Obergrenze für eine einzelne Anfrage.
@@ -463,6 +547,42 @@ mod tests {
         assert!(t.contains("3 Commits"));
         assert!(t.contains("- Bewehrung nötig?"));
         assert!(t.contains("- Statik prüfen"));
+    }
+
+    /// Modelle halten sich nicht an »nur JSON«. Der Leser muss damit rechnen.
+    #[test]
+    fn vorhabendeutung_ueberlebt_code_zaun_und_vorrede() {
+        let sauber = r#"{"titel":"Heizungssteuerung","kurs":"Die Gastherme über ESP32 fernsteuern.","tags":["esp32","hardware"],"offene_faeden":["Relais wählen"]}"#;
+        let d = vorhabendeutung_lesen(sauber).unwrap();
+        assert_eq!(d.titel, "Heizungssteuerung");
+        assert_eq!(d.tags, vec!["esp32", "hardware"]);
+        assert_eq!(d.offene_faeden.len(), 1);
+
+        let verpackt = format!("Gern! Hier das Ergebnis:\n```json\n{sauber}\n```\n");
+        assert_eq!(vorhabendeutung_lesen(&verpackt).unwrap(), d);
+    }
+
+    #[test]
+    fn vorhabendeutung_ohne_json_nennt_den_anfang_der_antwort() {
+        let e = vorhabendeutung_lesen("Tut mir leid, dazu kann ich nichts sagen.").unwrap_err();
+        let text = e.to_string();
+        assert!(text.contains("Tut mir leid"), "Meldung war: {text}");
+    }
+
+    /// Fehlende Felder sind leer, nicht geraten – und die Obergrenzen greifen.
+    #[test]
+    fn vorhabendeutung_kuerzt_und_laesst_leer() {
+        let d = vorhabendeutung_lesen(r#"{"titel":"   "}"#).unwrap();
+        assert!(d.titel.is_empty());
+        assert!(d.kurs.is_empty());
+        assert!(d.tags.is_empty());
+
+        let viele: Vec<String> = (0..9).map(|i| format!("Tag{i}")).collect();
+        let json = serde_json::json!({ "titel": "x".repeat(200), "tags": viele }).to_string();
+        let d = vorhabendeutung_lesen(&json).unwrap();
+        assert_eq!(d.titel.chars().count(), 60);
+        assert_eq!(d.tags.len(), 5);
+        assert_eq!(d.tags[0], "tag0", "Tags werden klein geschrieben");
     }
 
     #[test]

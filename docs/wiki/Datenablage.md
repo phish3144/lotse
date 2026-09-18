@@ -118,6 +118,7 @@ Zeiger. Siehe [[Gegenseite]].
 |---|---|
 | `ki_basis_url` | Adresse des Ziels, z. B. `http://localhost:11434/v1`. |
 | `ki_modell` | Modellname. |
+| `ki_nicht_fragen` | `ja`, wenn die Einrichtung ausdrücklich abgelehnt wurde. Dann fragt Lotse beim Start nicht mehr; die Einrichtung steht weiter unter Einstellungen → KI. |
 | `kalender_vorrat` | Die Kalenderadressen, die dieser Mensch besitzt, eine pro Zeile. Ein **Vorrat, keine Zuordnung**: gelesen wird ein Kalender nur dort, wo er als Referenz an einem Vorhaben hängt ([[Kalender]]). Die Adressen sind Geheimnisse – wer sie hat, liest den Kalender. |
 | `ki_schluessel_eintrag` | ID des Tresor-Eintrags mit dem API-Schlüssel. |
 | `ki_schluessel_feld` | Welches Feld darin. |

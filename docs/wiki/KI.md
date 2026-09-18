@@ -1,15 +1,38 @@
 # KI
 
-**Standardmäßig aus.** Lotse funktioniert vollständig ohne. Was die KI tut, ist
-Verdichten und Deuten – nie Entscheiden, nie Automatisieren.
+**Standardmäßig aus, aber nicht mehr versteckt.** Lotse funktioniert vollständig ohne. Was
+die KI tut, ist Verdichten und Deuten – nie Entscheiden, nie Automatisieren.
+
+## Sie fragt beim Start
+
+Ist nichts eingerichtet, steht im Hafen eine Karte, die es anbietet und durch die
+Einrichtung führt – Ollama lokal oder ein Schlüssel für einen gehosteten Dienst. Das war
+bis 0.10 anders: die Einrichtung lag unter Einstellungen → KI, zeigte auf ein lokales
+Ollama, das die wenigsten laufen haben, und wurde nie angeboten. Gefunden hat sie kaum
+jemand, und benutzt niemand.
+
+**»Nicht mehr fragen« ist eine Antwort.** Danach fragt Lotse nicht wieder; die Einrichtung
+steht weiter unter Einstellungen → KI, und dort lässt sich das auch zurücknehmen.
 
 ## Was sie tut
 
 | Funktion | Zweck | Was passiert |
 |---|---|---|
+| **Vorhaben deuten** | `vorhaben_deuten` | Beim Anlegen aus einem Ordner: Titel in Worten statt Ordnername, ein Satz zum Ziel, Themen und die offenen Fäden, die schon dastehen. |
 | **Brief verdichten** | `brief_verdichten` | Aus dem Wo-war-ich-Brief wird ein Fließtext. Auf der Projektseite, pro Aufruf, nur auf Klick. |
 | **Datei deuten** | `datei_deuten` | Aus einem Dateiauszug wird eine Zusammenfassung. |
 | **Kurs vorschlagen** | `kurs_vorschlagen` | Aus dem Ordner eines Vorhabens wird der eine Satz, der sagt, worum es geht und was das Ziel ist. Unter *Bearbeiten*, neben dem Kursfeld. |
+
+### Warum beim Anlegen
+
+Das ist der Moment, in dem das Einlesen sonst wenig hergibt. Ohne Modell liefert es den
+Ordnernamen als Titel (»heizungssteuerung-esp32«), eine aus Dateinamen geratene Vorlage
+und einen offenen Faden, der dich auffordert, den Kurs selbst zu schreiben. Mit Modell
+steht da ein beschriebenes Vorhaben.
+
+Gesendet wird dasselbe wie beim Kurs-Vorschlag, und du siehst den vollständigen Text
+vorher. Übernommen wird nur, was auch etwas sagt: ein leeres Feld überschreibt nichts.
+Die vorgeschlagenen Fäden lassen sich einzeln wegnehmen, bevor du anlegst.
 
 Das Ergebnis ist immer ein **Vorschlag**. Es landet nur im Logbuch, wenn du es
 übernimmst; beim Kurs füllt »Übernehmen« das Feld, gespeichert wird erst mit *Speichern*.
