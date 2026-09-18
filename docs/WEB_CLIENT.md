@@ -98,9 +98,11 @@ im Arbeitsspeicher zu halten kostet **~0,9 kB je Notiz**, und das sind beim Zehn
 lange vorher.
 
 Was an dieser Stelle **nicht** gemessen ist: die Grenze eines Telefons. Der Versuch, sie mit
-`--max-old-space-size` nachzustellen, trägt nicht – V8 hält sich nicht daran, wenn der
-Speicher in Zeichenketten steckt (437 MB tatsächlich bei angeblich 352 MB Grenze). Die
-tragende Zahl ist deshalb der Verbrauch selbst, nicht ein simulierter Absturz.
+`--max-old-space-size` nachzustellen, ist ein grobes Werkzeug: mit 96 MB stirbt der Tab bei
+500 000 Sätzen, bevor er etwas melden kann – mit 256 MB läuft er durch und braucht dabei
+437 MB, also mehr als die angegebene Grenze. V8 hält sich nicht daran, wenn der Speicher in
+Zeichenketten steckt. Der Knopf zeigt also, *dass* es kippt, aber nicht *wo*. Die tragende
+Zahl bleibt der Verbrauch selbst.
 
 #### Obergrenzen, gegen die gebaut wird
 

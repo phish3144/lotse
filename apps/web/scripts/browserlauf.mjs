@@ -135,6 +135,15 @@ export async function imBrowser({
       '--no-sandbox',
       '--disable-gpu',
       '--disable-dev-shm-usage',
+      // Der Lauf hat im Netz nichts zu suchen: er lädt eine Seite von 127.0.0.1. Ohne diese
+      // Flaggen versucht Chromium nebenher Komponenten-Updates und ähnliches und schreibt
+      // TLS-Fehler in die Ausgabe, die wie ein Problem des Tests aussehen.
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-component-update',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--metrics-recording-only',
       `--user-data-dir=${profil}`,
       ...flaggen,
       adresse,
