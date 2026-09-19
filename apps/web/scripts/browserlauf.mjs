@@ -10,6 +10,7 @@
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname, resolve } from 'node:path'
@@ -148,7 +149,10 @@ export async function imBrowser({
       ...flaggen,
       adresse,
     ],
-    { stdio: ['ignore', 'pipe', 'pipe'] },
+    // Eigene Prozessgruppe: Chromium startet Renderer als Kindprozesse, und ein Signal an
+    // den Elternprozess allein erreicht die nicht. Die schrieben dann weiter in den
+    // Profilordner, während er schon gelöscht wurde.
+    { stdio: ['ignore', 'pipe', 'pipe'], detached: true },
   )
   let ausgabe = ''
   kind.stdout.on('data', (d) => (ausgabe += d))
@@ -162,9 +166,27 @@ export async function imBrowser({
   const antwort = await Promise.race([ergebnis, abbruch])
   clearTimeout(wecker)
 
-  kind.kill('SIGKILL')
+  // Erst die ganze Gruppe beenden, dann auf das Ende warten, dann aufräumen. `kill` kehrt
+  // sofort zurück; wer danach gleich löscht, löscht unter einem noch laufenden Chromium weg
+  // und bekommt `ENOTEMPTY` auf `Default/Cache/Cache_Data`. In CI ist ein Lauf genau damit
+  // abgebrochen – und zwar 0,6 s nach dem Start, also bevor die Messung etwas sagen konnte:
+  // der Aufräumfehler kann auch einen vorherigen verdeckt haben. Deshalb beides, Ordnung
+  // beim Beenden und ein Aufräumen, das keinen Lauf mehr umbringt.
+  try {
+    process.kill(-kind.pid, 'SIGKILL')
+  } catch {
+    kind.kill('SIGKILL')
+  }
+  await Promise.race([once(kind, 'exit'), new Promise((r) => setTimeout(r, 2000).unref())])
   server.close()
-  rmSync(profil, { recursive: true, force: true })
+  // maxRetries deckt den Rest ab: ein Kind, das die Gruppe überlebt hat, hält eine Datei
+  // höchstens noch Millisekunden. Und wenn doch etwas liegen bleibt, ist das ein Ordner in
+  // /tmp – kein Grund, einen bestandenen Lauf für gescheitert zu erklären.
+  try {
+    rmSync(profil, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })
+  } catch (e) {
+    console.error(`Hinweis: Profilordner blieb liegen (${profil}): ${e.message}`)
+  }
 
   if (!antwort) {
     throw new Error(
