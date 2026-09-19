@@ -2912,7 +2912,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "age",
  "argon2",
@@ -2943,7 +2943,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-desktop"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "lotse-core",
  "serde",

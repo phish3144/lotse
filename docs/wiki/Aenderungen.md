@@ -13,7 +13,95 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.10.0 — laufende Fassung
+## 0.11.0 — laufende Fassung
+
+Diese Fassung beantwortet eine Rückmeldung, die nicht zu beschönigen war: *»Die Anwendung
+fühlt sich immer noch nicht wie eine Arbeitserleichterung an.«* Sechs Punkte standen darin,
+und fünf davon waren im Quelltext zu belegen. Der gemeinsame Nenner: Lotse **zeichnete
+auf**, statt Arbeit abzunehmen. Es ließ dich beschreiben, einsortieren und pflegen – und
+zeigte dir danach deine eigenen Eingaben.
+
+### Das Logbuch füllt sich wieder von selbst
+
+»Historien werden nicht geladen« war kein Eindruck, sondern **vier Fehler**, die sich
+gegenseitig verdeckt haben:
+
+| | |
+|---|---|
+| Die Beobachtung startete **nie** von selbst | Nach jedem Programmstart war sie aus – erkennbar nur an einer Knopfbeschriftung tief in den Einstellungen. |
+| Sie ließ sich **ohne Suchordner gar nicht einschalten** | Wer seine Vorhaben per Hineinziehen angelegt hatte, kam nie an eine laufende Beobachtung. |
+| Beobachtet wurden **nur Suchordner**, nie die Ordner der Vorhaben | Ein Projektordner außerhalb jeder Suchwurzel wurde auch bei laufender Beobachtung nicht mitgeschrieben. |
+| Ein **nachträglich angehängtes Repo** las nie seine Historie | Der naheliegendste Weg – Vorhaben anlegen, Ordner später anhängen – führte zu einem leeren Logbuch. Gemeldet wurde nur »Referenz angelegt«. |
+
+Jetzt: Die Beobachtung nimmt ihre Arbeit auf, sobald du entsperrst. Die Ordner deiner
+Vorhaben werden immer beobachtet – **ohne Einstellung**, denn wer einen Ordner an ein
+Vorhaben hängt, hat damit gesagt, dass er dazugehört. Ein Suchordner ist etwas anderes und
+kommt nur dazu, wenn Lotse dort auch nach *neuen* Vorhaben sehen soll. Und ein Repo bringt
+seine Vorgeschichte mit, egal auf welchem Weg es an ein Vorhaben kommt; Tage, für die schon
+eine Notiz steht, werden dabei übersprungen. Auch Referenzen aus älteren Fassungen bekommen
+ihre Historie beim nächsten Lauf nachgereicht. Siehe [[Beobachter und Erkennung|Beobachter-und-Erkennung]].
+
+### Aus einem Ordner wird ein beschriebenes Vorhaben
+
+Bisher ergab ein eingelesener Ordner: den Ordnernamen als Titel
+(»heizungssteuerung-esp32«), eine aus Dateinamen geratene Vorlage – und als eigentliche
+Ausbeute einen offenen Faden **»Kurs festlegen: worum geht es, was ist das Ziel?«**. Das
+Programm reichte dir die Arbeit zurück.
+
+Die KI konnte das Richtige längst und hing an der falschen Stelle: im Importweg wurde sie
+nie gefragt. Jetzt steht im Befund *Von der KI deuten lassen*, und was herauskommt, sind
+Titel in Worten, ein Satz zum Ziel, Themen und **die offenen Fäden, die schon im Ordner
+stehen**. Den vollständigen Text siehst du vorher; übernommen wird nur, was auch etwas
+sagt, und einzelne Fäden lassen sich wegnehmen.
+
+### Die KI wird angeboten statt versteckt
+
+Sie lag in einem Reiter der Einstellungen und zeigte standardmäßig auf ein lokales Ollama,
+das die wenigsten laufen haben. Gefunden hat sie kaum jemand. Jetzt steht beim Start eine
+Karte im Hafen, die es anbietet und durch die Einrichtung führt – Ollama oder ein Schlüssel
+für einen gehosteten Dienst. **»Nicht mehr fragen« ist eine echte Antwort**: danach fragt
+Lotse nicht wieder, und die Einrichtung steht weiter unter Einstellungen → KI. Siehe [[KI]].
+
+### Eine Referenz ist ein Feld
+
+»Der Unterschied der Materialien und anderen Dingen ist nicht klar« – kein Wunder: das
+Formular verlangte **acht Typen und drei Rollen**, bevor überhaupt etwas dastand. 24
+Kombinationen für das, was du als »da liegt das« denkst, und keine der beiden Achsen wurde
+in der Oberfläche erklärt.
+
+Jetzt schreibst du hin, wo es liegt, und Lotse sieht es sich an: eine Adresse ist eine
+Adresse, ein Ordner mit `.git` darin ein Repo, »Keller, Regal 3, blaue Kiste« ein Ort. Die
+Rolle ist keine Frage mehr und steht nur noch dort, wo sie von *Material* abweicht – an
+jedem Eintrag »Material« war die Voreinstellung als Auskunft ausgegeben. Wer eine der drei
+Arten braucht, die sich nicht ansehen lassen, klappt *Genauer* auf. Siehe [[Referenzen]].
+
+### Ein Name ist ein Vorhaben
+
+Wer »Dachboden ausbauen« tippte, bekam einen zweiten Bildschirm mit Titel, Vorlage und Kurs
+– also die Frage nach dem, was er gerade geschrieben hatte. Jetzt wird angelegt: ein Klick,
+ein Vorhaben.
+
+Steckt mehr dahinter, heißt der Bildschirm **»Das habe ich gefunden«** statt »Befund«, die
+Quelle steht oben, und Geratenes trägt die Marke *vorgeschlagen* – die verschwindet, sobald
+du das Feld anfasst. Vorher sah Vorgeschlagenes aus wie selbst Getipptes.
+
+### Die Oberfläche hört auf, sich zu erklären
+
+**»Heute wichtig«** stand über den drei Vorhaben, bei denen am *längsten nichts passiert
+ist* – zuletzt berührt vor 20, 40 und 45 Tagen. Die Überschrift versprach Dringlichkeit und
+lieferte eine Schuldliste. Sie heißt jetzt **»Wartet auf dich«**.
+
+Der Brief zählte Quellen statt Inhalte: *»Git: 1 Einträge, MCP: 1 Einträge«* – über Notizen,
+die direkt darunter im Wortlaut standen, und die Mehrzahl auch bei einem einzigen Eintrag.
+Jetzt steht dort, **was** passiert ist.
+
+Und weg sind die Rechtfertigungen: *»Was das hier nicht ist«*, *»das ist kein Mangel«*,
+*»Das ist in Ordnung – nur weiß beim nächsten Mal niemand …«*, *»Nichts davon ist
+übernommen«*. Ein Werkzeug, das trägt, muss sich nicht verteidigen.
+
+---
+
+## 0.10.0
 
 **Ein zweites Gerät braucht nur E-Mail und Passwort.** Bisher musste dafür die Adresse des
 Sync-Dienstes abgetippt werden — im Anmeldefenster stand ein Platzhalter

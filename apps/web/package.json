@@ -1,6 +1,6 @@
 {
   "name": "@lotse/web",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "description": "Lotse UI-Skelett (Svelte 5 + Vite + TypeScript). L\u00e4uft im Tauri-2-Webview und als eigenst\u00e4ndige Web-App auf Cloudflare Pages. Datenschicht ist ein Mock-Provider, wird sp\u00e4ter durch lotse-core als WebAssembly ersetzt.",
