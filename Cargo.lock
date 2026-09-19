@@ -1873,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-cli"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-core"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "age",
  "argon2",
@@ -1922,7 +1922,7 @@ dependencies = [
 
 [[package]]
 name = "lotse-wasm"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "base64 0.22.1",
  "js-sys",
