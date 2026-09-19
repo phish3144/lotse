@@ -7,18 +7,69 @@ der nächste Schritt, wo liegt das Material, wie komme ich rein?*
 Lotse löst vier Probleme: Wiedereinstieg in alte Projekte, den Faden nicht verlieren, das
 Rad nicht neu erfinden, Geheimnisse sicher am Projekt aufbewahren.
 
+## Installieren
+
+### Linux: über die Paketquelle
+
+Damit aktualisiert `apt upgrade` Lotse zusammen mit allem anderen – kein Knopf, kein
+Download.
+
+**Debian, Ubuntu, Mint** – Quelle hinterlegen:
+
+```bash
+curl -fsSL https://lotse.sanctora.eu/lotse-archiv.gpg \
+  | sudo tee /usr/share/keyrings/lotse-archiv.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/lotse-archiv.gpg] https://lotse.sanctora.eu/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/lotse.list
+```
+
+Installieren:
+
+```bash
+sudo apt update && sudo apt install lotse
+```
+
+**Fedora, openSUSE, RHEL:**
+
+```bash
+sudo curl -fsSL -o /etc/yum.repos.d/lotse.repo https://lotse.sanctora.eu/rpm/lotse.repo
+sudo dnf install lotse
+```
+
+Die Quelle ist signiert; eine veränderte Quelle lehnt `apt` mit `BADSIG` ab. In ihr steht
+immer die **neueste** Fassung – zum Aktualisieren genügt das, eine ältere gezielt zu
+installieren geht darüber nicht.
+
+### Ohne Paketverwaltung
+
+Alle Dateien liegen bei den [Releases](https://github.com/phish3144/lotse/releases), jede
+mit `.sha256` daneben:
+
+| Datei | Aktualisiert sich |
+|---|---|
+| `Lotse_<version>_amd64.AppImage` | aus der App heraus, signaturgeprüft |
+| `Lotse_<version>_x64-setup.exe` (Windows) | aus der App heraus |
+| `Lotse_<version>_x64.dmg` / `_aarch64.dmg` (macOS) | aus der App heraus |
+| `lotse-cli-<version>-<ziel>.tar.gz` | von Hand |
+
+Mehr, auch zur Einrichtung der Paketquelle für den Betrieb: **[Installation](https://github.com/phish3144/lotse/wiki/Installation)**.
+
 ## Status
 
-Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
+Veröffentlicht als **0.11.0** (Vorabversion: das Datenformat kann sich noch ändern; der
+Klartext-Spiegel ist die Sicherung, der du trauen kannst). Siehe `docs/CONCEPT.md`
+Abschnitt 11 für die Roadmap und
+[Änderungen](https://github.com/phish3144/lotse/wiki/Aenderungen) für das, was je Fassung
+dazukam.
 
 | Teil | Stand |
 |---|---|
 | Konzept, Bedrohungsmodell, Nicht-Ziele, Sync-Protokoll | geschrieben (`docs/`) |
 | Rust-Kern: Modell, Krypto, Tresor mit zwei Stufen, Sync-Umschläge, SQLCipher-Speicher mit Änderungsprotokoll und Volltextsuche, Projekterkennung, Git-Import, Spiegel- und age-Export | läuft, getestet |
 | CLI `lotse` | läuft |
-| Web-Oberfläche (Svelte) | Gerüst mit Mock-Daten |
+| Web-Oberfläche (Svelte) | läuft in der Desktop-Hülle gegen den Kern; im reinen Browser noch gegen Beispieldaten |
 | Sync-Dienst (Cloudflare Worker) + Sync-Client im Kern und in der CLI | läuft, End-to-End getestet (`scripts/sync-e2e.sh`) |
-| Desktop-Hülle (Tauri 2) | läuft. Anlegen, erfassen, Fäden abhaken, Status mit Übergabe, Projektkopf bearbeiten, Referenzen anlegen/prüfen/öffnen, Tresor lesen/anlegen/löschen, Ordner scannen und laufend beobachten, Stand von GitHub/GitLab holen, Termine aus abonnierten Kalendern, KI-Verdichtung des Briefs, Update-Hinweis, Export (Spiegel und age-Bundle), Abgleich mit Geräteverwaltung, Passwortwechsel und Konto-Wiederherstellung. Sperrt nach Untätigkeit von selbst und räumt die Zwischenablage. Offen: Tray, selbsttätiger signierter Updater, MCP aus der entsperrten Sitzung |
+| Desktop-Hülle (Tauri 2) | läuft. Anlegen, erfassen, Fäden abhaken, Status mit Übergabe, Projektkopf bearbeiten, Referenzen anlegen/prüfen/öffnen, Tresor lesen/anlegen/löschen, Ordner scannen und laufend beobachten, Stand von GitHub/GitLab holen, Termine aus abonnierten Kalendern, KI-Verdichtung des Briefs, Update-Hinweis, Export (Spiegel und age-Bundle), Abgleich mit Geräteverwaltung, Passwortwechsel und Konto-Wiederherstellung. Sperrt nach Untätigkeit von selbst und räumt die Zwischenablage. Der Updater tauscht sich signaturgeprüft selbst aus, MCP läuft aus der entsperrten Sitzung. Offen: Tray |
 | Landing Page (`site/`) | fertig, Deploy per GitHub Pages |
 | Ordner-Beobachter | läuft, in der CLI (`lotse beobachten`) und in der Desktop-App |
 | MCP-Server (`lotse mcp`) | läuft |
@@ -26,8 +77,8 @@ Phase 0, Fundament. Siehe `docs/CONCEPT.md` Abschnitt 11 für die Roadmap.
 | KI-Verdichtung des Briefs (Ollama, Gemini, jede OpenAI-kompatible Adresse) | läuft im Kern und in der App; standardmäßig aus, Verbrauch und Protokoll sichtbar |
 | Datei deuten (PDF, Text, Markdown, CSV, JSON) | läuft in der App: eine Datei, vom Menschen gewählt, Auszug vor dem Senden sichtbar |
 | Kalender lesend (iCalendar/.ics, auch `webcal://`) | läuft im Kern, in der App und in der CLI (`lotse termine`) |
-| Update-Hinweis (neue Version erkennen, Datei fürs System nennen) | läuft in der App und in der CLI (`lotse update`); lädt bewusst nichts herunter |
-| WebAssembly-Client für den Browser | offen |
+| Update-Weg | läuft: auf Linux über die eigene signierte APT-/RPM-Quelle (`apt upgrade`), aus einem AppImage heraus tauscht die App sich selbst aus, sonst Hinweis mit der passenden Datei (`lotse update`) |
+| WebAssembly-Client für den Browser | **halb**: der Kern spricht im Browser (`crates/lotse-wasm`, Krypto, Umschläge, Brief – in CI gegen echtes Chromium geprüft), der Datenweg fehlt. Plan in `docs/WEB_CLIENT.md` |
 
 ## Bekannte Grenzen
 
@@ -111,10 +162,12 @@ Adresse auf `.ics` oder `webcal://`), und zeigt, was ansteht. Geschrieben wird d
 nichts: Termine bleiben im Kalender.
 
 `update` sieht bei den Veröffentlichungen dieses Projekts nach, ob es eine neuere
-Version gibt, und nennt die Datei für dieses System. Heruntergeladen und installiert wird
-nichts von allein – die Installer sind unsigniert, deshalb bleibt der letzte Schritt
-bewusst beim Menschen. Die Desktop-App zeigt denselben Hinweis beim Entsperren, höchstens
-einmal am Tag, abschaltbar unter *Einstellungen → Version und Updates*.
+Version gibt, und nennt die Datei für dieses System – passend dazu, **wie** Lotse
+installiert wurde: aus einem Paket heraus nennt es den Befehl der Paketverwaltung statt
+einer Datei. Die Kommandozeile lädt selbst nichts herunter; die Desktop-App tauscht sich
+aus einem AppImage heraus selbst aus und prüft dabei die Signatur gegen den eingebauten
+öffentlichen Schlüssel. Denselben Hinweis zeigt sie beim Entsperren, höchstens einmal am
+Tag, abschaltbar unter *Einstellungen → Version und Updates*.
 
 `init` zeigt einmalig den Wiederherstellungscode und den Desktop-Schlüssel. Beides gehört
 in den Passwortmanager. Einträge der Stufe »nur Desktop« brauchen den Desktop-Schlüssel
@@ -124,11 +177,13 @@ Das age-Bundle lässt sich ohne Lotse entschlüsseln: `age -d -o bundle.json bac
 
 ## Abgleich zwischen Geräten
 
+Die Adresse des Dienstes ist eingebaut; `--url` braucht nur, wer selbst hostet.
+
 ```
 # Erstes Gerät: Konto beim Dienst registrieren (fragt den Wiederherstellungscode ab)
-lotse sync register --url https://api.example.invalid --email du@example.invalid
+lotse sync register --email du@example.invalid
 # Weiteres Gerät: anmelden, alles herunterladen
-lotse sync login --url https://api.example.invalid --email du@example.invalid --geraet "Laptop"
+lotse sync login --email du@example.invalid --geraet "Laptop"
 lotse sync jetzt      # pushen, dann pullen
 lotse sync status     # lokal und entfernt
 lotse sync geraete    # Geräte des Kontos, `lotse sync widerrufen <id>` entzieht eines
