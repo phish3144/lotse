@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { computeBrief, sollBriefZeigen } from '../lib/brief';
+  import { briefHatInhalt, computeBrief, sollBriefZeigen } from '../lib/brief';
   import NeuerTresorEintrag from '../lib/components/NeuerTresorEintrag.svelte';
   import NoteText from '../lib/components/NoteText.svelte';
   import TresorListe from '../lib/components/TresorListe.svelte';
@@ -13,6 +13,7 @@
     type DateiAuszug,
     type ForgeProjekt,
     type KalenderVorschlag,
+    type KiStatus,
     type Termin,
   } from '../lib/data/tauri';
   import { datenVersion } from '../lib/data/version.svelte';
@@ -237,6 +238,20 @@
       wirdGespeichert = false;
     }
   }
+
+  // Ist die KI überhaupt eingerichtet? Ohne diese Frage führte jeder KI-Knopf ohne
+  // Einrichtung in eine rohe Fehlermeldung – eine Sackgasse statt eines Weges.
+  let kiStatus: KiStatus | null = $state(null);
+  $effect(() => {
+    if (!echteDaten) return;
+    ki.status()
+      .then((s) => (kiStatus = s))
+      .catch(() => {});
+  });
+  // `$derived.by`, nicht `$derived`: bei einem Wert, der nur in einem Rückruf gesetzt
+  // wird, verengt die Typprüfung den Ausdruck sonst auf `never`. Dieselbe Falle wie
+  // schon einmal beim Befund.
+  const kiBereit = $derived.by(() => kiStatus?.eingerichtet === true);
 
   // --- Referenzen -----------------------------------------------------------
   //
@@ -615,7 +630,11 @@
     <p class="hinweis fehler">Projekt nicht gefunden.</p>
   {:else}
     {@const offeneFaeden = notizen.filter((n) => n.art === 'offen' && !n.erledigt_am)}
-    {@const brief = sollBriefZeigen(projekt, notizen) ? computeBrief(projekt, notizen) : null}
+    <!-- Die Karte hing allein am Erwartungsintervall. An einem Projekt, das man gerade in
+         der Hand hat, war sie damit unsichtbar – und mit ihr der einzige Knopf, mit dem man
+         die KI von Hand auslöst. Jetzt zeigt sie sich auch, wenn etwas drinsteht. -->
+    {@const vollerBrief = computeBrief(projekt, notizen)}
+    {@const brief = sollBriefZeigen(projekt, notizen) || briefHatInhalt(vollerBrief) ? vollerBrief : null}
 
     <NeuerTresorEintrag bind:offen={tresorOffen} projekte={[projekt]} vorausgewaehlt={projekt.id} />
 
@@ -627,6 +646,13 @@
           <div class="brief-uebergabe">
             <strong>Letzte Übergabe:</strong>
             <NoteText text={brief.letzteUebergabe.text} />
+          </div>
+        {:else if brief.letzteNotiz}
+          <!-- Ohne Übergabe die letzte Notiz überhaupt: schlechter als eine Übergabe,
+               besser als nichts. Stand so im Konzept und fehlte hier. -->
+          <div class="brief-uebergabe">
+            <strong>Letzter Eintrag:</strong>
+            <NoteText text={brief.letzteNotiz.text} />
           </div>
         {/if}
         {#if brief.offeneFaeden.length > 0}
@@ -659,7 +685,11 @@
         {/if}
 
         {#if echteDaten}
-          {#if !kiText}
+          {#if !kiBereit}
+            <p class="hinweis klein">
+              <a href="#/einstellungen/ki">KI einrichten</a>, dann fasst sie das hier auf Klick zusammen.
+            </p>
+          {:else if !kiText}
             <button type="button" class="schlicht ki-knopf" onclick={kiVorbereiten} disabled={kiLaeuft}>
               {kiLaeuft ? 'Moment …' : 'Von der KI verdichten lassen'}
             </button>
@@ -722,7 +752,11 @@
         </label>
         <!-- Nur wenn ein Ordner dranhängt: ohne Unterlagen wäre ein Kurs geraten. -->
         {#if echteDaten && referenzen.some((r) => r.typ === 'ordner' || r.typ === 'git_repo')}
-          {#if !kursText}
+          {#if !kiBereit}
+            <p class="hinweis klein">
+              <a href="#/einstellungen/ki">KI einrichten</a>, dann schlägt sie den Kurs aus dem Ordner vor.
+            </p>
+          {:else if !kursText}
             <button type="button" class="schlicht ki-knopf" onclick={kursVorbereiten} disabled={kursLaeuft}>
               {kursLaeuft ? 'Moment …' : 'Kurs von der KI vorschlagen lassen'}
             </button>

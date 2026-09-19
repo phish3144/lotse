@@ -13,7 +13,55 @@ Diese Seite wird mit jeder Fassung erweitert – wie und warum das erzwungen ist
 
 ---
 
-## 0.11.0 — laufende Fassung
+## 0.11.1 — laufende Fassung
+
+### Die KI sagt jetzt, dass sie da ist
+
+*»Ich kann weder etwas händisch auslösen, noch sehe ich, dass irgendwas automatisch
+passiert.«* Die Funktionen waren alle vorhanden – nur unauffindbar, und an einer Stelle
+tatsächlich unerreichbar.
+
+| | |
+|---|---|
+| Einstellungen → KI sprach nur von *KI-Verdichtung* | Drei der vier Fähigkeiten waren dort nie erwähnt, und wo ihre Knöpfe sitzen, stand nirgends. |
+| Kein Stand, keine Probe | Ob das eingetragene Ziel überhaupt trägt, erfuhr man irgendwann an ganz anderer Stelle. |
+| *Von der KI verdichten lassen* saß **in** der Karte *Wo war ich* | Und die erschien nur nach längerer Stille. An einem Vorhaben, an dem man gerade arbeitet, gab es diesen Knopf schlicht nicht. |
+| Die KI-Knöpfe fragten nicht, ob eingerichtet ist | Ohne Modell endete ein Klick in einer rohen Fehlermeldung statt in der Einrichtung. |
+| Ein Fehler beim Lesen des KI-Stands wurde **verschluckt** | Dann fehlte auch die Karte im Hafen – ohne Karte und ohne Meldung sieht ein Fehler aus wie »alles in Ordnung«. |
+
+Jetzt steht in Einstellungen → *KI* der Stand (eingerichtet, mit Modell und Adresse – oder
+nicht), darunter **Was sie tut, und wo**: die vier Fähigkeiten mit dem Weg zu ihrem Knopf,
+und der Satz, der die Frage eigentlich beantwortet – *von selbst passiert nichts davon*.
+Daneben **Ausprobieren**: ein Probesatz, eine Antwort, sichtbar in derselben Sekunde. Wo
+nichts eingerichtet ist, steht statt eines Knopfes, der scheitert, der Weg zur Einrichtung.
+Siehe [[KI]].
+
+### Der Brief erschien nie, wo er gebraucht wurde
+
+Beim Nachsehen, warum der Verdichten-Knopf fehlt, kam der eigentliche Fehler heraus – und er
+ist größer als die KI. Der Wo-war-ich-Brief ist die Sache, um die Lotse gebaut ist, und in
+genau den Vorhaben, die Lotse selbst anlegt, funktionierte er nicht:
+
+- Die Oberfläche zählte »letzter Kontakt« ab der letzten Notiz **welcher Quelle auch
+  immer**. Läuft der Beobachter, rückt dieser Punkt jeden Tag nach: der Brief wurde nie
+  fällig. Genau bei einem Vorhaben mit viel Aktivität also nie.
+- Der Kern führte die Liste »seit deinem letzten Besuch« nur, wenn es mindestens **eine
+  eigene Notiz** gab. In einem übernommenen Vorhaben gibt es die nicht – dort schreibt
+  `import` und danach der Beobachter. Die Liste blieb dauerhaft leer.
+- Und beide waren sich uneins: die Farbe im Hafen wurde ab dem **einfachen**
+  Erwartungsintervall rot, `lotse hafen` und die Beschreibung erst ab dem **doppelten**.
+  Zwei Antworten auf dieselbe Frage, je nachdem, wo man hinsah.
+
+Jetzt zählt der Brief ab deinem letzten eigenen Eintrag, ohne eigenen ab dem Anlegen, und
+die Karte zeigt sich auch dann, wenn etwas aus deiner Abwesenheit vorliegt – eine Übergabe,
+offene Fäden, Aktivität. Ohne Übergabe steht der **letzte Eintrag** darin; den hatte bisher
+nur die Kommandozeile gezeigt. Die Farbschwellen der Oberfläche sind die des Kerns, und
+`apps/web/src/lib/brief.ts` sagt in der ersten Zeile, dass es eine Übersetzung von
+`crates/lotse-core/src/brief.rs` ist und keine zweite Meinung. Siehe [[Wo-war-ich-Brief]].
+
+---
+
+## 0.11.0
 
 Diese Fassung beantwortet eine Rückmeldung, die nicht zu beschönigen war: *»Die Anwendung
 fühlt sich immer noch nicht wie eine Arbeitserleichterung an.«* Sechs Punkte standen darin,

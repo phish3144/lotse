@@ -139,6 +139,15 @@ ausdrückliches Zutun verlässt nie etwas das Gerät.
 | **Modell** | Modellname, z. B. `llama3.2`. Bei erreichbarem Ziel füllt Lotse eine Auswahlliste. |
 | **Schlüssel** | API-Schlüssel. Landet im Tresor, nicht in den Einstellungen. Lokale Ziele brauchen keinen. |
 | **Merken** | Speichert Adresse, Modell und Schlüssel. |
+| **Ausprobieren** | Schickt einen einzigen Probesatz an das eingetragene Ziel und zeigt die Antwort. |
+
+Oben im Abschnitt steht der **Stand**: eingerichtet mit Modell und Adresse, oder *nicht
+eingerichtet*. Darunter **Was sie tut, und wo** – die vier Stellen in der App, an denen ein
+KI-Knopf sitzt, jeweils mit dem Weg dorthin. Beides gab es bis 0.11 nicht: das Ziel ließ
+sich eintragen, aber nichts sagte, ob es trägt, und wo man es benutzt, stand nirgends.
+
+*Ausprobieren* geht denselben Weg wie jede andere Anfrage und zählt deshalb im Verbrauch
+mit.
 
 ### Was bisher gesendet wurde
 

@@ -14,11 +14,23 @@ Beim Öffnen eines Vorhabens, wenn seit deinem letzten Kontakt mehr Zeit vergang
 das Erwartungsintervall ([[Vorhaben]]). Bei einem Software-Vorhaben also nach mehr als
 14 Tagen, bei einem Gartenhaus nach mehr als 60.
 
-Bei einem Vorhaben, das du gestern angefasst hast, erscheint er nicht. Ein Brief, der
-jedes Mal kommt, wird weggeklickt und ist dann nichts wert.
+**Oder wenn etwas aus deiner Abwesenheit vorliegt**: eine Übergabe, offene Fäden, oder
+Aktivität, seit du zuletzt selbst geschrieben hast. Dann hat der Brief etwas zu sagen, auch
+wenn die Frist noch nicht um ist.
+
+Bei einem Vorhaben, das du gestern angefasst hast und in dem seitdem nichts passiert ist,
+erscheint er nicht. Ein Brief, der jedes Mal kommt, wird weggeklickt und ist dann nichts
+wert.
 
 Abrufen lässt er sich immer – in der App über die Projektseite, im Terminal über
 `lotse projekt zeige <PROJEKT>`.
+
+**Bis 0.11 war beides kaputt.** »Letzter Kontakt« zählte in der App ab der letzten Notiz
+*welcher Quelle auch immer*. In einem Vorhaben mit laufendem [[Beobachter und
+Erkennung|Beobachter-und-Erkennung]] rückte dieser Punkt jeden Tag nach: der Brief wurde
+nie fällig. Und im Kern zählte die Aktivitätsliste nur, wenn es mindestens eine eigene
+Notiz gab – in einem übernommenen Vorhaben (nur `import`, dann der Beobachter) blieb sie
+dauerhaft leer. Genau die Vorhaben, die Lotse selbst anlegt, hatten damit keinen Brief.
 
 ---
 
@@ -34,6 +46,14 @@ als **du** etwas geschrieben hast. Nicht ab der letzten Aktivität überhaupt: s
 ein Vorhaben, in dem der Beobachter täglich mitschreibt, immer »null Tage her«, obwohl
 du ein halbes Jahr nicht hingesehen hast.
 
+Hast du in diesem Vorhaben noch nie selbst geschrieben – der Normalfall direkt nach dem
+Übernehmen –, zählt es ab dem **Anlegen**. Nie weiter zurück als das: ein Vorhaben kann
+nicht länger still sein, als es existiert.
+
+Die Farbe im Hafen zählt anders, nämlich ab der letzten Notiz *jeder* Quelle
+([[Vorhaben]]). Das ist Absicht: die Farbe fragt »ist hier etwas passiert?«, der Brief
+fragt »war **ich** hier?«.
+
 ### 2 · Die letzte Übergabenotiz
 
 Der Wortlaut dessen, was du beim Pausieren oder Warten notiert hast.
@@ -46,7 +66,8 @@ Das ist die wertvollste Zeile im Brief, und sie existiert nur, weil `pausiert` u
 ### 3 · Die letzte Notiz überhaupt
 
 Falls es keine Übergabe gibt – weil das Vorhaben einfach eingeschlafen ist statt bewusst
-pausiert zu werden. Schlechter als eine Übergabe, besser als nichts.
+pausiert zu werden. Schlechter als eine Übergabe, besser als nichts. In der App steht sie
+als *Letzter Eintrag*; bis 0.11 zeigte nur die Kommandozeile sie an.
 
 ### 4 · Die offenen Fäden
 
@@ -63,7 +84,8 @@ wurde; drei MCP-Einträge heißen, dass ein Assistent daran saß.
 
 Gezählt wird alles **nach** deiner letzten `mensch`- oder `cli`-Notiz, und nur, was
 nicht von dir kam. Deine eigenen Einträge sind kein »das ist passiert, während ich weg
-war«.
+war«. Ohne eigene Notiz zählt es ab dem Anlegen – sonst hätte ein übernommenes Vorhaben
+nie eine Zeile hier.
 
 Dazu nennt der Brief die Auffälligkeit des Vorhabens, damit die Zahl »120 Tage« gleich
 eingeordnet ist.

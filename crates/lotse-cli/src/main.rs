@@ -1495,9 +1495,10 @@ fn projekt(store: &mut Store, c: ProjektCmd) -> Result<()> {
             if !p.kurs.is_empty() {
                 println!("Kurs: {}", p.kurs);
             }
-            if brief::brief_faellig(&p, b.offene_faeden.first().map(|n| n.ts), jetzt)
-                || b.tage_seit > p.erwartungsintervall_tage as i64
-            {
+            // Eine Schwelle, geteilt mit Oberfläche und Kern. Hier stand vorher der
+            // Zeitstempel des neuesten offenen Fadens als Bezugspunkt – ein dritter
+            // Maßstab für dieselbe Frage.
+            if brief::faellig(&b, &p) || brief::hat_inhalt(&b) {
                 println!();
                 println!("Wo war ich?  Zuletzt vor {} Tagen.", b.tage_seit);
                 if let Some(u) = &b.letzte_uebergabe {

@@ -62,11 +62,6 @@ pub fn auffaelligkeit(
     }
 }
 
-/// Soll beim Öffnen der Brief gezeigt werden?
-pub fn brief_faellig(projekt: &Projekt, letzte_notiz_ts: Option<i64>, jetzt_ms: i64) -> bool {
-    tage_seit(projekt, letzte_notiz_ts, jetzt_ms) > projekt.erwartungsintervall_tage as i64
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Brief {
     pub tage_seit: i64,
@@ -85,10 +80,17 @@ pub fn brief(projekt: &Projekt, notizen: &[Notiz], jetzt_ms: i64) -> Brief {
     let mut sortiert: Vec<&Notiz> = notizen.iter().collect();
     sortiert.sort_by_key(|n| std::cmp::Reverse(n.ts));
 
+    // Bezugspunkt für „seit meinem letzten Besuch“: der letzte *eigene* Eintrag. Gibt es
+    // keinen, das Anlegen des Vorhabens – nicht die letzte Notiz überhaupt. Sonst war der
+    // Brief für jedes übernommene Vorhaben tot: `detect::uebernehmen` schreibt nur
+    // `import`, danach schreibt der Beobachter `git` und `datei`, und ohne eigene Notiz
+    // stand die Aktivitätsliste dauerhaft leer, während der Bezugspunkt täglich
+    // nachrückte – also nie ein fälliger Brief und nie eine Zeile darin.
     let letzter_mensch_ts = sortiert
         .iter()
         .find(|n| matches!(n.quelle, Quelle::Mensch | Quelle::Cli))
         .map(|n| n.ts);
+    let eigener_bezug = letzter_mensch_ts.unwrap_or(projekt.angelegt);
     let letzte_ts = sortiert.first().map(|n| n.ts);
 
     let letzte_uebergabe = sortiert
@@ -104,22 +106,39 @@ pub fn brief(projekt: &Projekt, notizen: &[Notiz], jetzt_ms: i64) -> Brief {
         .collect();
 
     let mut aktivitaet = BTreeMap::new();
-    if let Some(grenze) = letzter_mensch_ts {
-        for n in &sortiert {
-            if n.ts > grenze && !matches!(n.quelle, Quelle::Mensch | Quelle::Cli) {
-                *aktivitaet.entry(n.quelle.as_str().to_string()).or_insert(0) += 1;
-            }
+    for n in &sortiert {
+        if n.ts > eigener_bezug && !matches!(n.quelle, Quelle::Mensch | Quelle::Cli) {
+            *aktivitaet.entry(n.quelle.as_str().to_string()).or_insert(0) += 1;
         }
     }
 
     Brief {
-        tage_seit: tage_seit(projekt, letzter_mensch_ts.or(letzte_ts), jetzt_ms),
+        tage_seit: tage_seit(projekt, Some(eigener_bezug), jetzt_ms),
         letzte_uebergabe,
         letzte_notiz,
         offene_faeden,
         aktivitaet_seit_letztem_besuch: aktivitaet,
         auffaelligkeit: auffaelligkeit(projekt, letzte_ts, jetzt_ms),
     }
+}
+
+/// Ob der Brief beim Öffnen gezeigt werden soll: länger still als das Erwartungsintervall.
+///
+/// Nimmt den fertigen Brief, nicht einen Zeitstempel. Vorher gab es hier `brief_faellig`
+/// mit einem `Option<i64>` – und jeder Aufrufer suchte sich einen anderen Wert dafür: die
+/// CLI den neuesten offenen Faden, die Oberfläche die letzte Notiz jeder Quelle. Der
+/// Bezugspunkt gehört in den Brief, nicht in die Aufrufstelle.
+pub fn faellig(brief: &Brief, projekt: &Projekt) -> bool {
+    brief.tage_seit > projekt.erwartungsintervall_tage as i64
+}
+
+/// Ob im Brief etwas steht, das aus der Abwesenheit stammt: eine Übergabe, offene Fäden
+/// oder Aktivität seit dem letzten eigenen Eintrag. Ein Brief, der nur »zuletzt vor 3
+/// Tagen« sagt, ist keiner.
+pub fn hat_inhalt(brief: &Brief) -> bool {
+    brief.letzte_uebergabe.is_some()
+        || !brief.offene_faeden.is_empty()
+        || !brief.aktivitaet_seit_letztem_besuch.is_empty()
 }
 
 /// Vorbefüllung für die Übergabenotiz beim Pausieren: offene Fäden als Liste plus ein
@@ -224,6 +243,64 @@ mod tests {
         let v = uebergabe_vorschlag(&b);
         assert!(v.contains("Bewehrung"));
         assert!(v.contains("2 × datei"));
+    }
+
+    #[test]
+    fn brief_lebt_auch_ohne_eigene_notiz() {
+        // Der Fall jedes übernommenen Vorhabens: nur `import` und danach der Beobachter.
+        // Vorher rückte der Bezugspunkt mit jeder Beobachter-Notiz nach, die Liste blieb
+        // leer und der Brief wurde nie fällig.
+        let mut p = projekt();
+        p.angelegt = 0;
+        p.zuletzt_beruehrt = 30 * MS_PRO_TAG;
+        let pid = Ulid::new();
+        let notizen = vec![
+            Notiz::neu(pid, Quelle::Import, Art::Offen, "Kurs festlegen.", 1),
+            Notiz::neu(pid, Quelle::Git, Art::Log, "3 Commits", 20 * MS_PRO_TAG),
+            Notiz::neu(pid, Quelle::Datei, Art::Log, "5 Dateien", 30 * MS_PRO_TAG),
+        ];
+        let b = brief(&p, &notizen, 31 * MS_PRO_TAG);
+        assert_eq!(
+            b.tage_seit, 31,
+            "gezählt ab dem Anlegen, nicht ab der letzten Beobachter-Notiz"
+        );
+        assert_eq!(b.aktivitaet_seit_letztem_besuch.get("git"), Some(&1));
+        assert_eq!(b.aktivitaet_seit_letztem_besuch.get("datei"), Some(&1));
+        assert_eq!(b.aktivitaet_seit_letztem_besuch.get("import"), Some(&1));
+        assert!(faellig(&b, &p));
+        assert!(hat_inhalt(&b));
+    }
+
+    #[test]
+    fn eigene_notiz_setzt_den_bezugspunkt_zurueck() {
+        let mut p = projekt();
+        p.angelegt = 0;
+        let pid = Ulid::new();
+        let notizen = vec![
+            Notiz::neu(pid, Quelle::Git, Art::Log, "alt", 5 * MS_PRO_TAG),
+            Notiz::neu(
+                pid,
+                Quelle::Mensch,
+                Art::Log,
+                "heute dran gewesen",
+                29 * MS_PRO_TAG,
+            ),
+            Notiz::neu(pid, Quelle::Git, Art::Log, "neu", 30 * MS_PRO_TAG),
+        ];
+        let b = brief(&p, &notizen, 30 * MS_PRO_TAG);
+        assert_eq!(b.tage_seit, 1);
+        assert_eq!(b.aktivitaet_seit_letztem_besuch.get("git"), Some(&1));
+        assert!(!faellig(&b, &p));
+    }
+
+    #[test]
+    fn ohne_inhalt_kein_brief() {
+        let mut p = projekt();
+        p.angelegt = 0;
+        let pid = Ulid::new();
+        let notizen = vec![Notiz::neu(pid, Quelle::Mensch, Art::Log, "gerade eben", 0)];
+        let b = brief(&p, &notizen, MS_PRO_TAG);
+        assert!(!hat_inhalt(&b));
     }
 
     #[test]

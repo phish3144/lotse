@@ -517,6 +517,31 @@
     }
   }
 
+  // Ausprobieren. Ohne das erfährt man erst irgendwann an einer ganz anderen Stelle, ob
+  // die Einrichtung überhaupt trägt – und hält bis dahin für kaputt, was nur nie
+  // aufgerufen wurde.
+  let probeLaeuft = $state(false);
+  let probeAntwort = $state('');
+  let probeFehler = $state('');
+  const PROBE_TEXT =
+    'Dies ist eine Probe aus Lotse. Antworte mit einem einzigen kurzen Satz auf Deutsch, ' +
+    'damit sichtbar wird, dass die Verbindung steht.';
+
+  async function kiProbe() {
+    probeLaeuft = true;
+    probeAntwort = '';
+    probeFehler = '';
+    try {
+      probeAntwort = (await provider.kiVerdichten(PROBE_TEXT, 'brief_verdichten')).trim();
+      if (!probeAntwort) probeFehler = 'Das Ziel hat geantwortet, aber ohne Text.';
+      kiVerbrauch = await ki.verbrauch();
+    } catch (e) {
+      probeFehler = e instanceof Error ? e.message : String(e);
+    } finally {
+      probeLaeuft = false;
+    }
+  }
+
   // --- Konto, Abgleich, Geräte ---------------------------------------------
   let kontoStatus: KontoStatus | null = $state(null);
   let syncStatus: SyncStatus | null = $state(null);
@@ -806,16 +831,52 @@
 
 {#if reiter === 'ki'}
 <section aria-labelledby="ki-titel">
-  <h2 id="ki-titel">KI-Verdichtung</h2>
+  <h2 id="ki-titel">KI</h2>
   <p class="hinweis">
-    Fasst auf Wunsch zusammen, was seit dem letzten Besuch passiert ist – auf der Projektseite, pro Aufruf und nur
-    auf Klick. <strong>Vor dem Senden siehst du den vollständigen Text</strong>, der das Gerät verlassen würde. Der
-    Tresor ist für die KI unerreichbar, und das Ergebnis ist ein Vorschlag: es landet nur im Logbuch, wenn du es
-    übernimmst.
+    <strong>Vor dem Senden siehst du jedes Mal den vollständigen Text</strong>, der das Gerät verlassen würde. Der
+    Tresor ist für die KI unerreichbar, und jedes Ergebnis ist ein Vorschlag: es landet nur dort, wo du es
+    übernimmst. Ohne Einrichtung funktioniert Lotse vollständig – es schreibt dann mit, statt mitzudenken.
   </p>
   {#if !echteDaten}
     <p class="nur-desktop">Nur in der Desktop-App.</p>
   {:else}
+    <!-- Der Stand zuerst. »Tut die KI etwas?« war bis hierher nirgends zu beantworten:
+         das Ziel ließ sich einstellen, aber nichts sagte, ob es trägt. -->
+    <div class="ki-stand" class:ki-stand--an={kiStatus?.eingerichtet}>
+      {#if kiStatus?.eingerichtet}
+        <strong>Eingerichtet.</strong>
+        <span class="mono">{kiStatus.modell}</span>
+        <span class="hinweis">auf {kiStatus.basis_url}</span>
+      {:else}
+        <strong>Nicht eingerichtet.</strong>
+        <span class="hinweis">Kein Modell gewählt – die KI-Knöpfe melden bis dahin einen Fehler.</span>
+      {/if}
+    </div>
+
+    <h3>Was sie tut, und wo</h3>
+    <ul class="ki-taten">
+      <li>
+        <strong>Ordner deuten</strong> – aus einem hineingezogenen Ordner werden Titel, Kurs, Themen und die
+        offenen Fäden, die schon darin stehen.
+        <span class="hinweis">Beim Anlegen, unter <em>Von der KI deuten lassen</em>.</span>
+      </li>
+      <li>
+        <strong>Kurs vorschlagen</strong> – der eine Satz, der in drei Monaten sagt, was du wolltest.
+        <span class="hinweis">Projektseite → <em>Bearbeiten</em>, neben dem Kursfeld. Braucht einen angehängten Ordner.</span>
+      </li>
+      <li>
+        <strong>Brief verdichten</strong> – was seit dem letzten Besuch passiert ist, in wenigen Sätzen.
+        <span class="hinweis">Projektseite, oben bei <em>Wo war ich</em>.</span>
+      </li>
+      <li>
+        <strong>Datei deuten</strong> – ein PDF, eine Tabelle, eine Notiz, von dir ausgewählt.
+        <span class="hinweis">Projektseite, unten.</span>
+      </li>
+    </ul>
+    <p class="hinweis klein">
+      Von selbst passiert nichts davon. Jeder dieser Wege beginnt mit einem Klick von dir und zeigt den Text, bevor
+      er das Gerät verlässt.
+    </p>
     {#if kiStatus?.ollama_da}
       <p class="ergebnis">Ollama läuft auf diesem Rechner. Damit bleibt alles lokal – kein Schlüssel, kein Konto.</p>
     {:else}
@@ -874,8 +935,18 @@
 
       <div class="aktionen">
         <button type="submit" class="primaer" disabled={!kiModell.trim()}>Merken</button>
+        <button type="button" onclick={kiProbe} disabled={probeLaeuft || !kiStatus?.eingerichtet}>
+          {probeLaeuft ? 'Frage …' : 'Ausprobieren'}
+        </button>
       </div>
     </form>
+
+    {#if probeAntwort}
+      <p class="ergebnis"><strong>Antwort:</strong> {probeAntwort}</p>
+    {/if}
+    {#if probeFehler}
+      <p class="hinweis fehler">{probeFehler}</p>
+    {/if}
 
     {#if kiVerbrauch}
       <h3>Was bisher gesendet wurde</h3>
@@ -1494,6 +1565,32 @@
 </div>
 
 <style>
+  .ki-stand {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 8px;
+  }
+  .ki-stand--an {
+    border-left-color: var(--accent);
+  }
+  .ki-taten {
+    margin: 0 0 0.8rem;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.45rem;
+  }
+  .ki-taten li {
+    line-height: 1.45;
+  }
+  .ki-taten .hinweis {
+    display: block;
+  }
   .gefahr {
     border: 1px solid var(--farbe-ueberfaellig);
     border-radius: 8px;

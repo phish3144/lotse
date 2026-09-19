@@ -71,12 +71,16 @@
 
   // Der Stand der KI-Einrichtung. Im Browser gibt es keinen Kern, also auch keine Frage.
   let kiStatus: KiStatus | null = $state(null);
+  let kiFehler = $state('');
   let kiErledigt = $state(false);
   $effect(() => {
     if (!echteDaten) return;
     ki.status()
       .then((s) => (kiStatus = s))
-      .catch(() => {});
+      // Ein verschluckter Fehler sieht genauso aus wie »alles in Ordnung«: keine Karte,
+      // keine Meldung, nichts. Genau daran ist die Frage »was tut die KI eigentlich?«
+      // hängen geblieben.
+      .catch((e) => (kiFehler = e instanceof Error ? e.message : String(e)));
   });
 
   function sortiertNachAuffaelligkeit(liste: Eintrag[]): Eintrag[] {
@@ -92,6 +96,12 @@
 
 <!-- Einmal beim Start fragen, statt die Einrichtung in den Einstellungen zu verstecken.
      Wer »Nicht mehr fragen« wählt, wird nicht mehr gefragt – das merkt sich der Kern. -->
+{#if kiFehler}
+  <p class="hinweis fehler">
+    Der Stand der KI ließ sich nicht lesen: {kiFehler}
+    <a href="#/einstellungen/ki">Einstellungen → KI</a>
+  </p>
+{/if}
 {#if kiStatus && !kiStatus.eingerichtet && !kiStatus.abgelehnt && !kiErledigt}
   <KiEinrichten
     status={kiStatus}

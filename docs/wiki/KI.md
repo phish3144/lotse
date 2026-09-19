@@ -23,6 +23,26 @@ steht weiter unter Einstellungen → KI, und dort lässt sich das auch zurückne
 | **Datei deuten** | `datei_deuten` | Aus einem Dateiauszug wird eine Zusammenfassung. |
 | **Kurs vorschlagen** | `kurs_vorschlagen` | Aus dem Ordner eines Vorhabens wird der eine Satz, der sagt, worum es geht und was das Ziel ist. Unter *Bearbeiten*, neben dem Kursfeld. |
 
+### Wo die Knöpfe sitzen
+
+| Funktion | Wo |
+|---|---|
+| Vorhaben deuten | Beim Anlegen aus einem Ordner, unter *Von der KI deuten lassen*. |
+| Kurs vorschlagen | Projektseite → *Bearbeiten*, neben dem Kursfeld. Nur mit angehängtem Ordner. |
+| Brief verdichten | Projektseite, oben in der Karte *Wo war ich*. |
+| Datei deuten | Projektseite, unten bei den Referenzen. |
+
+Dieselbe Liste steht in der App unter Einstellungen → *KI*, samt Stand der Einrichtung und
+einem Knopf **Ausprobieren**, der einen einzigen Probesatz sendet und die Antwort zeigt.
+Ohne das war »tut die KI überhaupt etwas?« nirgends zu beantworten.
+
+Ist nichts eingerichtet, steht an diesen Stellen keine Fehlermeldung, sondern der Weg zur
+Einrichtung.
+
+Dass die Karte *Wo war ich* nur nach längerer Stille erschien, hat den Knopf zum Verdichten
+lange mitversteckt; sie zeigt sich jetzt auch, wenn etwas aus deiner Abwesenheit vorliegt
+([[Wo-war-ich-Brief]]).
+
 ### Warum beim Anlegen
 
 Das ist der Moment, in dem das Einlesen sonst wenig hergibt. Ohne Modell liefert es den
