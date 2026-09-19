@@ -16,7 +16,7 @@ Web-Client in `docs/WEB_CLIENT.md`.
 | `apps/desktop` | Tauri-2-Hülle: Kommandos in `src-tauri/src/lib.rs` spiegeln `apps/web/src/lib/data/provider.ts`. Braucht GTK/WebKit zum Bauen, wird nur in `release.yml` gebaut. |
 | `services/sync-worker` | Cloudflare Worker (TypeScript) + D1 + R2, implementiert `SYNC_PROTOCOL.md`. |
 | `site` | Landing Page: eine HTML-Datei, inline CSS/JS, keine Fremdressourcen. Deploy über `.github/workflows/pages.yml`. |
-| `scripts` | `make-icons.sh` und `pack-icons.py` erzeugen die Tauri-Icons aus `icon.svg`. |
+| `scripts` | `make-icons.sh` und `pack-icons.py` erzeugen die Tauri-Icons aus `icon.svg`. `paketquelle-bauen.sh` baut die signierte APT- und RPM-Quelle; sie entsteht beim Ausliefern der Seite und liegt nie im Repository (`docs/wiki/Installation.md`). |
 
 ## Prüfen vor jedem Commit
 

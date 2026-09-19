@@ -42,6 +42,63 @@ jobs:
           # Kopf von main veröffentlicht werden, samt der gerade eingetragenen Liste.
           ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
       - uses: actions/configure-pages@v5
+
+      # Die Paketquelle entsteht hier und **nicht** im Repository: ein `.deb` und ein
+      # `.rpm` sind zusammen rund 25 MB, und die blieben für immer in der Git-Geschichte.
+      # So liegen sie nur im ausgelieferten Bündel. Der Preis: in der Quelle steht immer
+      # nur die neueste Fassung – zum Aktualisieren genügt das, eine ältere Fassung
+      # gezielt zu installieren geht darüber nicht.
+      #
+      # Ohne den Signierschlüssel wird sie übersprungen. Die Seite muss auch dann
+      # ausgeliefert werden: eine fehlende Paketquelle ist ein Mangel, eine fehlende
+      # Landing Page ein Ausfall.
+      - name: Paketquelle bauen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APT_GPG_KEY: ${{ secrets.APT_GPG_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # Die Prüfung steht hier und nicht in einem `if:` – der Secrets-Kontext ist
+          # dort nicht überall verfügbar, und ein stillschweigend übersprungener Schritt
+          # wäre schlimmer als eine Zeile im Protokoll.
+          if [ -z "${APT_GPG_KEY:-}" ]; then
+            echo "Kein APT_GPG_KEY hinterlegt – Paketquelle übersprungen."
+            echo "Einrichtung: docs/wiki/Installation.md, Abschnitt »Paketquelle«."
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dpkg-dev createrepo-c
+
+          mkdir -p /tmp/pakete
+          # Immer die neueste Veröffentlichung, unabhängig davon, was diesen Lauf
+          # ausgelöst hat. Sonst zeigte die Quelle nach einer reinen Seitenänderung auf
+          # einen älteren Stand.
+          tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Paketquelle für $tag"
+          gh release download "$tag" --dir /tmp/pakete \
+            --pattern '*.deb' --pattern '*.rpm' --clobber
+
+          export GNUPGHOME=$(mktemp -d)
+          chmod 700 "$GNUPGHOME"
+          printf 'allow-loopback-pinentry\n' > "$GNUPGHOME/gpg-agent.conf"
+          printf '%s' "$APT_GPG_KEY" | gpg --batch --import
+          GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}')
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "::error::APT_GPG_KEY enthält keinen brauchbaren geheimen Schlüssel."
+            exit 1
+          fi
+          export GPG_KEY_ID
+
+          scripts/paketquelle-bauen.sh /tmp/pakete site https://lotse.sanctora.eu
+
+          # Nicht blind vertrauen: ohne signiertes InRelease ist die Quelle für apt
+          # wertlos, und das soll hier auffallen und nicht beim Nutzer.
+          test -s site/apt/dists/stable/InRelease
+          gpg --verify site/apt/dists/stable/InRelease
+          test -s site/lotse-archiv.asc
+          gpg --dearmor < site/lotse-archiv.asc > site/lotse-archiv.gpg
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

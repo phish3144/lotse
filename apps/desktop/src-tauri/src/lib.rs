@@ -2352,7 +2352,12 @@ fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateSt
             ..leer
         });
     };
-    let datei = lotse_core::update::passende_datei(&v, std::env::consts::OS, std::env::consts::ARCH);
+    let datei = lotse_core::update::passende_datei(
+        &v,
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        lotse_core::update::LinuxPaket::erkennen(),
+    );
     Ok(UpdateStand {
         laufend,
         neu: Some(v.version.clone()),
@@ -2379,18 +2384,34 @@ fn update_pruefen(state: State<AppState>, erzwingen: Option<bool>) -> R<UpdateSt
 /// - **macOS und Windows**: geht, solange der Ordner beschreibbar ist. Ob er das ist,
 ///   weiß man erst beim Versuch – das meldet dann der Fehler, keine Vorhersage hier.
 fn selbst_austauschbar() -> (bool, Option<String>) {
-    if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_none() {
-        return (
+    if !cfg!(target_os = "linux") {
+        return (true, None);
+    }
+    match lotse_core::update::LinuxPaket::erkennen() {
+        lotse_core::update::LinuxPaket::AppImage => (true, None),
+        // Ein Paket gehört der Paketverwaltung. Sich selbst zu überschreiben würde deren
+        // Buchführung zerreißen – und eine heruntergeladene Datei danebenzulegen ergäbe
+        // zwei Installationen statt einer Aktualisierung. Deshalb steht hier der Befehl,
+        // der es wirklich tut, und kein Knopf, der es nur so aussehen lässt.
+        paket @ (lotse_core::update::LinuxPaket::Deb | lotse_core::update::LinuxPaket::Rpm) => (
+            false,
+            paket.befehl().map(|b| {
+                format!(
+                    "Diese Installation kommt aus einem Paket. Aktualisiert wird sie mit der \
+                     Paketverwaltung:\n\n    {b}"
+                )
+            }),
+        ),
+        lotse_core::update::LinuxPaket::Unbekannt => (
             false,
             Some(
-                "Diese Installation kommt aus einem Paket (.deb oder .rpm). Dort aktualisiert \
-                 die Paketverwaltung, nicht Lotse – sich selbst zu überschreiben würde deren \
-                 Buchführung zerreißen."
+                "Woher diese Installation kommt, lässt sich nicht erkennen. Lotse tauscht \
+                 sich deshalb nicht selbst aus – lade die passende Datei und ersetze sie \
+                 so, wie du sie installiert hast."
                     .to_string(),
             ),
-        );
+        ),
     }
-    (true, None)
 }
 
 // ------------------------------------------------------------ Systemeintrag

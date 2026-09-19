@@ -487,9 +487,12 @@ fn update_pruefen() -> Result<()> {
     }
     let vorab = if v.vorab { " (Vorabversion)" } else { "" };
     println!("Version {} ist da{vorab}, hier läuft {laufend}.", v.version);
-    if let Some(d) =
-        lotse_core::update::passende_datei(&v, std::env::consts::OS, std::env::consts::ARCH)
-    {
+    if let Some(d) = lotse_core::update::passende_datei(
+        &v,
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        lotse_core::update::LinuxPaket::erkennen(),
+    ) {
         println!("  {}  {}", d.name, d.url);
     }
     println!("  Alle Dateien: {}", v.seite);

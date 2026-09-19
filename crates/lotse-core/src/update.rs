@@ -21,6 +21,94 @@ use serde::Deserialize;
 use crate::forge::{Anbieter, RepoZeiger};
 use crate::Result;
 
+/// Wie Lotse auf diesem Linux installiert wurde.
+///
+/// Das entscheidet, welche Datei überhaupt etwas nützt. Bis 0.11 stand die Reihenfolge
+/// fest – AppImage zuerst –, und ein Rechner mit `.deb`-Installation bekam folgerichtig
+/// ein AppImage angeboten, mit dem er nichts anfangen konnte. Die Hülle weiß es besser
+/// als eine Liste: sie kann nachsehen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LinuxPaket {
+    /// `APPIMAGE` ist gesetzt – das Programm läuft aus einem AppImage.
+    AppImage,
+    Deb,
+    Rpm,
+    /// Nicht zu erkennen. Dann das Tragbare anbieten: ein AppImage läuft überall.
+    #[default]
+    Unbekannt,
+}
+
+impl LinuxPaket {
+    /// Die Endungen in der Reihenfolge, in der sie für diese Installation taugen.
+    fn endungen(self) -> &'static [&'static str] {
+        match self {
+            LinuxPaket::AppImage => &[".appimage"],
+            // Kein Rückfall auf das AppImage: wer aus einem Paket installiert hat und
+            // ein AppImage bekommt, hat zwei Installationen und keine Aktualisierung.
+            LinuxPaket::Deb => &[".deb"],
+            LinuxPaket::Rpm => &[".rpm"],
+            LinuxPaket::Unbekannt => &[".appimage", ".deb", ".rpm"],
+        }
+    }
+
+    /// Die Entscheidung selbst, ohne Umwelt – damit sie prüfbar ist.
+    ///
+    /// `aus_paket` heißt: die laufende Datei liegt dort, wo eine Paketverwaltung sie
+    /// hinlegt (`/usr/…`). Ein AppImage, das jemand nach `/usr/local/bin` kopiert hat,
+    /// setzt `APPIMAGE` trotzdem – deshalb steht diese Frage zuerst.
+    pub fn bestimmen(
+        appimage: bool,
+        aus_paket: bool,
+        debian: bool,
+        rpm_system: bool,
+    ) -> LinuxPaket {
+        if appimage {
+            return LinuxPaket::AppImage;
+        }
+        if !aus_paket {
+            return LinuxPaket::Unbekannt;
+        }
+        match (debian, rpm_system) {
+            (true, false) => LinuxPaket::Deb,
+            (false, true) => LinuxPaket::Rpm,
+            // Beides oder keins: nicht raten. Ein falsches Paket ist schlimmer als
+            // keine Empfehlung.
+            _ => LinuxPaket::Unbekannt,
+        }
+    }
+
+    /// Sieht nach, wie diese Installation zustande kam.
+    #[cfg(feature = "native")]
+    pub fn erkennen() -> LinuxPaket {
+        if !cfg!(target_os = "linux") {
+            return LinuxPaket::Unbekannt;
+        }
+        let appimage = std::env::var_os("APPIMAGE").is_some();
+        let aus_paket = std::env::current_exe()
+            .map(|p| p.starts_with("/usr/"))
+            .unwrap_or(false);
+        let debian = std::path::Path::new("/etc/debian_version").exists();
+        let rpm_system = [
+            "/etc/redhat-release",
+            "/etc/fedora-release",
+            "/etc/SuSE-release",
+        ]
+        .iter()
+        .any(|p| std::path::Path::new(p).exists());
+        LinuxPaket::bestimmen(appimage, aus_paket, debian, rpm_system)
+    }
+
+    /// Der Befehl, mit dem dieses System aktualisiert – oder `None`, wo Lotse es selbst
+    /// tut.
+    pub fn befehl(self) -> Option<&'static str> {
+        match self {
+            LinuxPaket::Deb => Some("sudo apt update && sudo apt upgrade lotse"),
+            LinuxPaket::Rpm => Some("sudo dnf upgrade lotse"),
+            LinuxPaket::AppImage | LinuxPaket::Unbekannt => None,
+        }
+    }
+}
+
 /// Eine Veröffentlichung, auf das Nötige reduziert.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Veroeffentlichung {
@@ -92,7 +180,12 @@ fn vorab_stuecke(s: &str) -> Vec<Stueck> {
 /// Sucht die Datei, die auf dieses System passt. `os` und `arch` sind die Werte von
 /// `std::env::consts`. `None` heißt: für dieses System liegt nichts bereit – dann
 /// bleibt der Weg über die Veröffentlichungsseite.
-pub fn passende_datei<'a>(v: &'a Veroeffentlichung, os: &str, arch: &str) -> Option<&'a Datei> {
+pub fn passende_datei<'a>(
+    v: &'a Veroeffentlichung,
+    os: &str,
+    arch: &str,
+    linux_paket: LinuxPaket,
+) -> Option<&'a Datei> {
     let brauchbar = |d: &&Datei| {
         let n = d.name.to_ascii_lowercase();
         // Prüfsummen, Signaturen, die Updater-Pakete und die Kommandozeile sind keine
@@ -102,11 +195,12 @@ pub fn passende_datei<'a>(v: &'a Veroeffentlichung, os: &str, arch: &str) -> Opt
             && !n.ends_with(".app.tar.gz")
             && !n.starts_with("lotse-cli-")
     };
-    // Reihenfolge der Endungen je System: das Übliche zuerst.
+    // Reihenfolge der Endungen je System: das Übliche zuerst. Auf Linux entscheidet
+    // die Art der Installation, nicht eine feste Liste.
     let endungen: &[&str] = match os {
         "windows" => &["-setup.exe", ".msi"],
         "macos" => &[".dmg"],
-        "linux" => &[".appimage", ".deb", ".rpm"],
+        "linux" => linux_paket.endungen(),
         _ => return None,
     };
     // Der Bau muss zur Architektur passen. Ein Intel-Mac kann mit einem Bau für Apple
@@ -257,7 +351,8 @@ mod tests {
             true,
         )
         .unwrap();
-        let name = |os, arch| passende_datei(&v, os, arch).map(|d| d.name.clone());
+        let name =
+            |os, arch| passende_datei(&v, os, arch, LinuxPaket::Unbekannt).map(|d| d.name.clone());
         assert_eq!(
             name("windows", "x86_64").as_deref(),
             Some("Lotse_0.2.0_x64-setup.exe")
@@ -295,10 +390,10 @@ mod tests {
             }],
         };
         assert_eq!(
-            passende_datei(&v, "macos", "aarch64").map(|d| d.name.as_str()),
+            passende_datei(&v, "macos", "aarch64", LinuxPaket::Unbekannt).map(|d| d.name.as_str()),
             Some("Lotse_9.9.9_aarch64.dmg")
         );
-        assert!(passende_datei(&v, "macos", "x86_64").is_none());
+        assert!(passende_datei(&v, "macos", "x86_64", LinuxPaket::Unbekannt).is_none());
     }
 
     #[test]
@@ -313,7 +408,7 @@ mod tests {
             ("macos", "aarch64"),
             ("linux", "x86_64"),
         ] {
-            let d = passende_datei(&v, os, arch).unwrap();
+            let d = passende_datei(&v, os, arch, LinuxPaket::Unbekannt).unwrap();
             assert!(!d.name.ends_with(".sha256"), "{}", d.name);
             assert!(!d.name.starts_with("lotse-cli-"), "{}", d.name);
             assert!(d.bytes > 0, "{}", d.name);
@@ -339,5 +434,78 @@ mod tests {
         ]"#;
         let v = neueste_aus(serde_json::from_str(json).unwrap(), false).unwrap();
         assert_eq!(v.version, "0.2.0");
+    }
+    fn datei(name: &str) -> Datei {
+        Datei {
+            name: name.to_string(),
+            url: format!("https://example.invalid/{name}"),
+            bytes: 1,
+        }
+    }
+
+    /// Was angeboten wird, muss zur Installation passen.
+    ///
+    /// Bis 0.11 stand auf Linux fest »AppImage zuerst«. Wer aus einem `.deb`
+    /// installiert hatte, bekam damit ein AppImage zum Herunterladen – eine Datei, mit
+    /// der er nichts anfangen kann, und am Ende zwei Installationen statt einer
+    /// Aktualisierung.
+    #[test]
+    fn linux_bekommt_das_paket_seiner_installation() {
+        let v = Veroeffentlichung {
+            version: "0.11.0".into(),
+            seite: "s".into(),
+            vorab: false,
+            dateien: vec![
+                datei("Lotse_0.11.0_amd64.AppImage"),
+                datei("Lotse_0.11.0_amd64.deb"),
+                datei("Lotse-0.11.0-1.x86_64.rpm"),
+            ],
+        };
+        let name = |p| {
+            passende_datei(&v, "linux", "x86_64", p)
+                .map(|d| d.name.clone())
+                .unwrap()
+        };
+        assert_eq!(name(LinuxPaket::AppImage), "Lotse_0.11.0_amd64.AppImage");
+        assert_eq!(name(LinuxPaket::Deb), "Lotse_0.11.0_amd64.deb");
+        assert_eq!(name(LinuxPaket::Rpm), "Lotse-0.11.0-1.x86_64.rpm");
+        // Ohne Wissen das Tragbare: ein AppImage läuft überall.
+        assert_eq!(name(LinuxPaket::Unbekannt), "Lotse_0.11.0_amd64.AppImage");
+    }
+
+    /// Fehlt das passende Paket in einem Release, wird **nichts** angeboten – nicht
+    /// ersatzweise etwas anderes.
+    #[test]
+    fn ohne_passendes_paket_lieber_nichts() {
+        let v = Veroeffentlichung {
+            version: "0.11.0".into(),
+            seite: "s".into(),
+            vorab: false,
+            dateien: vec![datei("Lotse_0.11.0_amd64.AppImage")],
+        };
+        assert!(passende_datei(&v, "linux", "x86_64", LinuxPaket::Deb).is_none());
+        assert!(passende_datei(&v, "linux", "x86_64", LinuxPaket::Rpm).is_none());
+    }
+
+    #[test]
+    fn installationsart_wird_nicht_geraten() {
+        use LinuxPaket::*;
+        // APPIMAGE schlägt alles: ein AppImage bleibt eines, wo es auch liegt.
+        assert_eq!(LinuxPaket::bestimmen(true, true, true, false), AppImage);
+        assert_eq!(LinuxPaket::bestimmen(false, true, true, false), Deb);
+        assert_eq!(LinuxPaket::bestimmen(false, true, false, true), Rpm);
+        // Nicht aus einem Systempfad gestartet: unbekannt, nicht »deb, weil Debian«.
+        assert_eq!(LinuxPaket::bestimmen(false, false, true, false), Unbekannt);
+        // Beides oder keins der Merkmale: lieber nichts behaupten.
+        assert_eq!(LinuxPaket::bestimmen(false, true, true, true), Unbekannt);
+        assert_eq!(LinuxPaket::bestimmen(false, true, false, false), Unbekannt);
+    }
+
+    #[test]
+    fn nur_paketverwaltete_installationen_nennen_einen_befehl() {
+        assert!(LinuxPaket::Deb.befehl().unwrap().contains("apt"));
+        assert!(LinuxPaket::Rpm.befehl().unwrap().contains("dnf"));
+        assert!(LinuxPaket::AppImage.befehl().is_none());
+        assert!(LinuxPaket::Unbekannt.befehl().is_none());
     }
 }

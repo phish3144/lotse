@@ -70,19 +70,46 @@ direkt aus dem DMG heraus nicht.
 
 ## Linux
 
-Hier lohnt sich die Wahl, weil sie darüber entscheidet, ob Lotse sich selbst
-aktualisieren kann:
+### Empfohlen: die Paketquelle
 
-| Datei | Selbst-Update | Wann |
+Damit aktualisiert `apt upgrade` Lotse zusammen mit allem anderen – kein Knopf, kein
+Download, keine Handarbeit. Einmal einrichten:
+
+**Debian, Ubuntu, Mint**
+
+```bash
+curl -fsSL https://lotse.sanctora.eu/lotse-archiv.gpg \
+  | sudo tee /usr/share/keyrings/lotse-archiv.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/lotse-archiv.gpg] https://lotse.sanctora.eu/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/lotse.list
+sudo apt update && sudo apt install lotse
+```
+
+**Fedora, openSUSE, RHEL**
+
+```bash
+sudo curl -fsSL -o /etc/yum.repos.d/lotse.repo https://lotse.sanctora.eu/rpm/lotse.repo
+sudo dnf install lotse
+```
+
+Die Quelle ist signiert; eine veränderte Quelle lehnt `apt` mit `BADSIG` ab. In ihr steht
+immer die **neueste** Fassung – zum Aktualisieren genügt das, eine ältere Fassung gezielt
+zu installieren geht darüber nicht.
+
+### Oder einzelne Dateien
+
+| Datei | Aktualisiert sich | Wann |
 |---|---|---|
-| `Lotse_<version>_amd64.AppImage` | **ja** | **Empfohlen**, wenn du Updates aus der App willst. Keine Installation nötig. |
-| `Lotse_<version>_amd64.deb` | nein | Debian, Ubuntu, Mint – wenn dir Paketverwaltung wichtiger ist. |
-| `Lotse-<version>-1.x86_64.rpm` | nein | Fedora, openSUSE, RHEL. |
+| Paketquelle (oben) | **von selbst**, über `apt`/`dnf` | **Empfohlen** |
+| `Lotse_<version>_amd64.AppImage` | **aus der App heraus** | Ohne Paketverwaltung, ohne Root, tragbar – auch vom Stick. |
+| `Lotse_<version>_amd64.deb` | über `apt`, aber ohne Quelle von Hand | Wenn du die Quelle nicht willst. |
+| `Lotse-<version>-1.x86_64.rpm` | dito über `dnf` | |
 
 Aus `.deb` und `.rpm` heraus aktualisiert die **Paketverwaltung**, nicht Lotse. Die App
-merkt das (am fehlenden `APPIMAGE` in der Umgebung), versucht es gar nicht erst und
-zeigt stattdessen den Download-Weg. Sich dort selbst zu überschreiben würde die
-Buchführung der Paketverwaltung zerreißen.
+merkt, woher sie kommt, versucht es gar nicht erst und nennt stattdessen den Befehl, der
+es wirklich tut. Sich dort selbst zu überschreiben würde die Buchführung der
+Paketverwaltung zerreißen – und eine heruntergeladene Datei danebenzulegen ergäbe zwei
+Installationen statt einer Aktualisierung.
 
 AppImage startbar machen:
 
@@ -168,3 +195,32 @@ LOTSE_HOME=~/Cloud/lotse lotse hafen
 Die App wie jedes andere Programm entfernen. Der Datenordner bleibt – er gehört dir.
 Wenn er auch weg soll, lösche ihn von Hand. Vorher lohnt ein **[[Export und
 Fluchtweg|Export-und-Fluchtweg]]**.
+
+
+---
+
+## Die Paketquelle betreiben
+
+*Für den Betrieb, nicht für die Benutzung.* Die Quelle entsteht in
+`.github/workflows/pages.yml` beim Ausliefern der Seite und liegt nur im Seiten-Bündel –
+nicht im Repository. Ein `.deb` und ein `.rpm` sind zusammen rund 25 MB, und die blieben
+sonst für immer in der Git-Geschichte.
+
+Sie braucht **einen GPG-Signierschlüssel**, getrennt vom minisign-Schlüssel des Updaters.
+Einmalig:
+
+```bash
+gpg --quick-generate-key "Lotse Paketquelle <paket@sanctora.eu>" rsa4096 sign never
+gpg --armor --export-secret-keys paket@sanctora.eu
+```
+
+Die Ausgabe kommt als Repository-Geheimnis `APT_GPG_KEY` hinterlegt; hat der Schlüssel
+eine Passphrase, zusätzlich `APT_GPG_PASSPHRASE`. **Ohne das Geheimnis wird die Quelle
+übersprungen** und die Seite trotzdem ausgeliefert – eine fehlende Paketquelle ist ein
+Mangel, eine fehlende Landing Page ein Ausfall.
+
+Örtlich ausprobieren, ohne etwas zu veröffentlichen:
+
+```bash
+scripts/paketquelle-bauen.sh <ordner-mit-paketen> <ausgabe> https://lotse.sanctora.eu
+```
